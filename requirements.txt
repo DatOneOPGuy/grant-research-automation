@@ -1,0 +1,5 @@
+pandas
+lxml
+thefuzz
+python-Levenshtein
+requests

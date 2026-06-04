@@ -1,0 +1,28 @@
+# Data: raw inputs, intermediate artifacts, and large indexes
+data/raw/
+data/grants.db
+data/full_index.csv
+data/pf_index.csv
+data/ein_mapping.csv
+data/target_eins.txt
+data/target_objects.txt
+
+# Generated output CSVs
+matches.csv
+results.csv
+unmatched.csv
+opportunityscore.csv
+originalwithopportunity.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environments / secrets
+.env
+venv/
+.venv/
+
+# OS / editor
+.DS_Store
