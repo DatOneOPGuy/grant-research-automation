@@ -379,13 +379,12 @@ def run():
         }
 
         grant_amount = row.get('grant_amount', '')
-        match_percent = row.get('match_percent', '')
 
         if match and pass_num > 0:
             ein = match['ein']
             scores = score_foundation(conn, ein, target_lookup)
             opp_score = score_opportunity(
-                scores['alignment_score'], grant_amount, match_percent
+                scores['alignment_score'], grant_amount
             )
             result.update({
                 'ein': ein,
@@ -394,7 +393,7 @@ def run():
                 **scores,
             })
         else:
-            opp_score = score_opportunity(0, grant_amount, match_percent)
+            opp_score = score_opportunity(0, grant_amount)
             result.update({
                 'ein': '',
                 'data_found': 'No',

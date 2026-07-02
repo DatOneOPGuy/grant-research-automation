@@ -3,3 +3,4 @@ lxml
 thefuzz
 python-Levenshtein
 requests
+anthropic

@@ -10,6 +10,7 @@ SCORE_WEIGHTS = {
 
 # Recency multipliers by tax year
 RECENCY_MULTIPLIER = {
+    2025: 1.2,
     2024: 1.2,
     2023: 1.0,
 }
@@ -24,7 +25,7 @@ GRANTEE_MAX_LARGE_BONUS = 5
 # --- Fuzzy matching ---
 FUZZY_THRESHOLD = 90
 
-# --- Target Organizations (53) ---
+# --- Target Organizations (66) ---
 TARGET_ORGANIZATIONS = [
     "Samaritan's Purse",
     "Campus Crusade for Christ",
@@ -73,11 +74,25 @@ TARGET_ORGANIZATIONS = [
     "Luis Palau Association",
     "Alpha International",
     "Joshua Project",
-    "Ethos360",
+    "Ethnos360",
     "Every Home for Christ",
     "Open Doors",
     "Christian Solidarity International",
     "Release International",
+    "Navigators",
+    "InterVarsity Christian Fellowship",
+    "Fellowship of Christian Athletes",
+    "Prison Fellowship",
+    "American Bible Society",
+    "Gideons International",
+    "Awana",
+    "Child Evangelism Fellowship",
+    "Focus on the Family",
+    "OMF International",
+    "Send Relief",
+    "World Gospel Mission",
+    "Joshua Fund",
+    "Medical Ambassadors International",
 ]
 
 # --- Manual Alias Map ---
@@ -120,6 +135,14 @@ ALIASES = {
     "twr": "Trans World Radio",
     "voice of the martyrs": "Voice of the Martyrs",
     "vom": "Voice of the Martyrs",
+    "ethos360": "Ethnos360",
+    "new tribes mission": "Ethnos360",
+    "fca": "Fellowship of Christian Athletes",
+    "intervarsity": "InterVarsity Christian Fellowship",
+    "the navigators": "Navigators",
+    "gideons": "Gideons International",
+    "omf": "OMF International",
+    "the joshua fund": "Joshua Fund",
 }
 
 # --- Keywords grouped by cluster ---
@@ -140,6 +163,18 @@ KEYWORD_CLUSTERS = {
         "Africa", "South America", "Latin America",
         "Middle East", "Israel", "Asia", "Global",
     ],
+    "denominations": [
+        "Lutheran", "Pentecostal", "Anglican", "Evangelical",
+        "Reformed", "Wesleyan", "Mennonite", "Nazarene",
+        "Adventist", "Assemblies of God", "Charismatic",
+        "Orthodox", "Quaker", "Moravian", "Brethren", "Vineyard",
+    ],
+    "theology": [
+        "Jesus", "Lord", "Kingdom", "Redeemer", "Savior",
+        "Salvation", "Worship", "Prayer", "Chaplain", "Seminary",
+        "Theological", "Diocese", "Parish", "Congregation",
+        "Pastor", "Clergy", "Apostolic", "Holy Spirit", "Sacred",
+    ],
 }
 
 # Flatten for quick lookup
@@ -150,7 +185,8 @@ for cluster_keywords in KEYWORD_CLUSTERS.values():
 # Compound phrases that must be matched as whole phrases
 COMPOUND_KEYWORDS = [
     "Faith Based", "Latin America", "South America",
-    "Middle East", "Cross-cultural",
+    "Middle East", "Cross-cultural", "Assemblies of God",
+    "Holy Spirit",
 ]
 
 # Field weights for keyword scoring
@@ -199,7 +235,7 @@ FKA_MARKERS = [
 
 # --- IRS download config ---
 IRS_INDEX_BASE = "https://www.irs.gov/charities-non-profits/form-990-series-downloads"
-IRS_YEARS = [2023, 2024]
+IRS_YEARS = [2023, 2024, 2025]
 DATA_DIR = "data"
 RAW_DIR = "data/raw"
 DB_PATH = "data/grants.db"

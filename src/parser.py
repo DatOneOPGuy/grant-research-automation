@@ -1,6 +1,5 @@
 """Parse IRS 990-PF XML files into SQLite database."""
 
-import os
 import sqlite3
 import logging
 from pathlib import Path
@@ -8,6 +7,7 @@ from pathlib import Path
 from lxml import etree
 
 from src.config import DB_PATH, RAW_DIR
+from src.profile_fields import extract_profile_fields, PROFILE_COLUMNS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +34,18 @@ def create_tables(conn: sqlite3.Connection):
             distributions INTEGER,
             has_grants INTEGER,
             tax_year INTEGER,
+            website TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            revenue INTEGER,
+            invite_only INTEGER,
+            contact_person TEXT DEFAULT '',
+            contact_address TEXT DEFAULT '',
+            contact_phone TEXT DEFAULT '',
+            contact_email TEXT DEFAULT '',
+            application_format TEXT DEFAULT '',
+            deadlines TEXT DEFAULT '',
+            restrictions TEXT DEFAULT '',
+            has_application_info INTEGER DEFAULT 0,
             PRIMARY KEY (ein, tax_year)
         );
 
@@ -72,6 +84,22 @@ def create_tables(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_foundations_name
             ON foundations(organization_name);
     """)
+    migrate_schema(conn)
+
+
+def migrate_schema(conn: sqlite3.Connection):
+    """Add Phase 2 columns to a pre-existing foundations table."""
+    existing = {
+        row[1] for row in conn.execute("PRAGMA table_info(foundations)")
+    }
+    int_cols = {'revenue', 'invite_only', 'has_application_info'}
+    for col in PROFILE_COLUMNS:
+        if col in existing:
+            continue
+        col_type = 'INTEGER' if col in int_cols else "TEXT DEFAULT ''"
+        conn.execute(
+            f"ALTER TABLE foundations ADD COLUMN {col} {col_type}"
+        )
 
 
 def _find_text(element, xpath, ns=None):
@@ -300,10 +328,6 @@ def parse_xml_file(filepath: str):
         log.warning("No namespace found in %s", filepath)
         return None
 
-    # Check if this is a 990-PF (not 990 or 990-EZ)
-    root_tag = root.tag.split('}')[-1] if '}' in root.tag else root.tag
-    return_type = _find_text(root, './/irs:ReturnTypeCd', ns)
-
     header = parse_foundation_header(root, ns)
     if not header['ein']:
         log.debug("No EIN found in %s, skipping", filepath)
@@ -314,6 +338,7 @@ def parse_xml_file(filepath: str):
 
     grants = parse_grants(root, ns, ein, tax_year)
     header['has_grants'] = 1 if grants else 0
+    header.update(extract_profile_fields(root, ns))
 
     activities = parse_charitable_activities(
         root, ns, ein, tax_year
@@ -327,17 +352,29 @@ def parse_xml_file(filepath: str):
 
 
 def insert_parsed_data(conn, data):
-    """Insert parsed 990 data into SQLite."""
+    """Insert parsed 990 data into SQLite. Idempotent per (ein, tax_year)."""
     fdn = data['foundation']
     conn.execute(
-        """INSERT OR REPLACE INTO foundations
+        "DELETE FROM grants WHERE ein = ? AND tax_year = ?",
+        (fdn['ein'], fdn['tax_year']),
+    )
+    conn.execute(
+        "DELETE FROM charitable_activities WHERE ein = ? AND tax_year = ?",
+        (fdn['ein'], fdn['tax_year']),
+    )
+    profile_vals = [fdn.get(c) for c in PROFILE_COLUMNS]
+    profile_cols = ', '.join(PROFILE_COLUMNS)
+    placeholders = ', '.join('?' * (9 + len(PROFILE_COLUMNS)))
+    conn.execute(
+        f"""INSERT OR REPLACE INTO foundations
            (ein, organization_name, city, state, country,
-            assets, distributions, has_grants, tax_year)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            assets, distributions, has_grants, tax_year,
+            {profile_cols})
+           VALUES ({placeholders})""",
         (fdn['ein'], fdn['organization_name'], fdn['city'],
          fdn['state'], fdn['country'], fdn['assets'],
          fdn['distributions'], fdn['has_grants'],
-         fdn['tax_year']),
+         fdn['tax_year'], *profile_vals),
     )
 
     for g in data['grants']:

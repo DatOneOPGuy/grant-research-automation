@@ -1,11 +1,5 @@
-# Data: raw inputs, intermediate artifacts, and large indexes
-data/raw/
-data/grants.db
-data/full_index.csv
-data/pf_index.csv
-data/ein_mapping.csv
-data/target_eins.txt
-data/target_objects.txt
+# Data: raw inputs, intermediate artifacts, caches, and large indexes
+data/
 
 # Generated output CSVs
 matches.csv
@@ -13,6 +7,9 @@ results.csv
 unmatched.csv
 opportunityscore.csv
 originalwithopportunity.csv
+foundation_database.csv
+inviteonly.csv
+inviteonlyvalues.csv
 
 # Python
 __pycache__/
