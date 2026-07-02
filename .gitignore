@@ -23,3 +23,7 @@ venv/
 
 # OS / editor
 .DS_Store
+
+# Local Netlify folder
+.netlify
+foundation-explorer/frontend/public/demo/

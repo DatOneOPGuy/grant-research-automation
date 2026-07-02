@@ -77,7 +77,13 @@ export function filterParams(f: FoundationFilterState): URLSearchParams {
   return p
 }
 
+export const DEMO = import.meta.env.VITE_DEMO === '1'
+
 export async function apiGet<T>(path: string): Promise<T> {
+  if (DEMO) {
+    const { demoGet } = await import('./demoApi')
+    return demoGet(path)
+  }
   const res = await fetch(path)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json()

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Download, ExternalLink } from 'lucide-react'
 import {
-  apiGet, defaultFilters, filterParams,
+  apiGet, DEMO, defaultFilters, filterParams,
   type FoundationFilterState, type FoundationRow, type Paged,
 } from '../lib/api'
 import { money, num, scoreColor } from '../lib/format'
@@ -60,12 +60,14 @@ export default function Foundations() {
               : 'Loading…'}
           </div>
         </div>
-        <a
-          href={`/api/export/foundations.csv?${params}`}
-          className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90"
-        >
-          <Download size={15} /> Export current view
-        </a>
+        {!DEMO && (
+          <a
+            href={`/api/export/foundations.csv?${params}`}
+            className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90"
+          >
+            <Download size={15} /> Export current view
+          </a>
+        )}
       </div>
 
       <div className="flex gap-8">
