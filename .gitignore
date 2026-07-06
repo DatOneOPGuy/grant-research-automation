@@ -30,3 +30,4 @@ venv/
 .netlify
 foundation-explorer/frontend/public/demo/
 foundation-explorer/frontend/public/report/
+foundation-explorer/frontend/public/sample/
