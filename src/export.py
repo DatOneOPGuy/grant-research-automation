@@ -65,7 +65,23 @@ def load_faith_scores(conn) -> dict[str, dict]:
     }
 
 
-def build_row(u, profile, states, faith) -> dict:
+ENRICH_COLS = ['faith_score_composite', 'christian_dollars_3yr',
+               'christian_dollars_2023', 'christian_dollars_2024',
+               'christian_dollars_2025', 'christian_grant_count_3yr',
+               'is_testamentary_trust', 'is_small_fund',
+               'is_actively_giving']
+
+
+def load_enrich(conn) -> dict[str, dict]:
+    try:
+        sql = f"SELECT ein, {', '.join(ENRICH_COLS)} FROM foundation_enrich"
+        return {row[0].zfill(9): dict(zip(ENRICH_COLS, row[1:]))
+                for row in conn.execute(sql)}
+    except sqlite3.OperationalError:
+        return {}
+
+
+def build_row(u, profile, states, faith, enrich) -> dict:
     ein = u['EIN']
     row = {
         'ein': ein,
@@ -98,6 +114,8 @@ def build_row(u, profile, states, faith) -> dict:
     }
     for col in FAITH_COLS:
         row[col] = faith.get(col, '')
+    for col in ENRICH_COLS:
+        row[col] = enrich.get(col, '')
     return row
 
 
@@ -107,20 +125,22 @@ def run():
     profiles = load_profiles(conn)
     states = load_states_given(conn)
     faith = load_faith_scores(conn)
+    enrich = load_enrich(conn)
     conn.close()
-    log.info("Universe %d EINs; profiles for %d, faith scores for %d",
-             len(universe), len(profiles), len(faith))
+    log.info("Universe %d EINs; profiles for %d, faith scores for %d, "
+             "enrich for %d", len(universe), len(profiles), len(faith),
+             len(enrich))
 
     rows = [
         build_row(u, profiles.get(u['EIN'], {}), states,
-                  faith.get(u['EIN'], {}))
+                  faith.get(u['EIN'], {}), enrich.get(u['EIN'], {}))
         for u in universe.to_dict('records')
     ]
     df = pd.DataFrame(rows)
-    df['faith_alignment_score'] = pd.to_numeric(
-        df['faith_alignment_score'], errors='coerce'
-    )
-    df = df.sort_values('faith_alignment_score', ascending=False,
+    for c in ('faith_alignment_score', 'faith_score_composite'):
+        df[c] = pd.to_numeric(df[c], errors='coerce')
+    # primary sort now the composite (dollar-weighted) score
+    df = df.sort_values('faith_score_composite', ascending=False,
                         na_position='last')
     df.to_csv(OUTPUT_CSV, index=False, quoting=1)
     log.info("Wrote %d rows to %s (%d with filing data, "

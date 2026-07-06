@@ -77,7 +77,18 @@ export function filterParams(f: FoundationFilterState): URLSearchParams {
   return p
 }
 
-export const DEMO = import.meta.env.VITE_DEMO === '1'
+// Demo mode is detected at runtime so a single build works everywhere:
+// on localhost we call the real FastAPI backend; anywhere else (Netlify)
+// we serve the bundled static sample JSON. Override with ?demo=1 / ?live=1.
+function detectDemo(): boolean {
+  const params = new URLSearchParams(location.search)
+  if (params.get('demo') === '1') return true
+  if (params.get('live') === '1') return false
+  const h = location.hostname
+  return h !== 'localhost' && h !== '127.0.0.1' && h !== '[::1]'
+}
+
+export const DEMO = detectDemo()
 
 export async function apiGet<T>(path: string): Promise<T> {
   if (DEMO) {

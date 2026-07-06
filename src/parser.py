@@ -172,8 +172,13 @@ def parse_foundation_header(root, ns):
         root, './/irs:TotalAssetsEOYAmt', ns
     )
 
+    # Part XII total qualifying distributions is the canonical "total
+    # distributions" for a private foundation; fall back to Part I
+    # contributions/gifts/grants paid (line 25) when absent.
     distributions = _find_int(
-        root, './/irs:TotDistriAndExpensesRevAndExpnssAmt', ns
+        root, './/irs:QualifyingDistributionsAmt', ns
+    ) or _find_int(
+        root, './/irs:ContriPaidRevAndExpnssAmt', ns
     )
 
     return {
