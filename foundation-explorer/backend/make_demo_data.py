@@ -22,16 +22,46 @@ def dump(name: str, data):
     print(f"  {name}: {path.stat().st_size / 1024:.0f} KB")
 
 
+# Marquee foundations that must be searchable in the demo regardless of
+# where they rank (Part 10 test set + verification set).
+MARQUEE_EINS = [
+    '626041468',  # Maclellan
+    '350868122',  # Lilly Endowment
+    '621322826',  # John Templeton
+    '237456468',  # M J Murdock
+    '916020515',  # Stewardship
+    '205132900',  # The Rees-Jones Foundation
+]
+MARQUEE_NAMES = ['MACLELLAN', 'LILLY ENDOWMENT', 'TEMPLETON FOUNDATION',
+                 'MURDOCK CHARITABLE', 'STEWARDSHIP FOUNDATION',
+                 'REES-JONES', 'CABRINI HEALTH']
+
+
 def sample_eins(conn) -> list[str]:
+    # rank by the corrected composite score
     top = [r[0] for r in conn.execute(
-        "SELECT ein FROM universe WHERE faith_alignment_score IS NOT NULL "
-        "ORDER BY faith_alignment_score DESC, faith_giving DESC LIMIT 1500"
+        "SELECT ein FROM universe WHERE faith_score_composite IS NOT NULL "
+        "ORDER BY faith_score_composite DESC, christian_dollars_3yr DESC "
+        "LIMIT 1500"
     )]
+    # top Christian-dollar givers
+    vol = [r[0] for r in conn.execute(
+        "SELECT ein FROM universe WHERE christian_dollars_3yr > 0 "
+        "ORDER BY christian_dollars_3yr DESC LIMIT 200"
+    )]
+    # force-include marquee foundations by EIN and by name
+    marquee = set(MARQUEE_EINS)
+    for pat in MARQUEE_NAMES:
+        marquee.update(r[0] for r in conn.execute(
+            "SELECT ein FROM universe WHERE foundation_name LIKE ?",
+            (f'%{pat}%',)))
+    seen = set(top) | set(vol) | marquee
     rand = [r[0] for r in conn.execute(
         "SELECT ein FROM universe WHERE ein NOT IN "
-        f"({','.join('?' * len(top))}) ORDER BY ein LIMIT 500", top
+        f"({','.join('?' * len(seen))}) ORDER BY ein LIMIT 500", list(seen)
     )]
-    return top + rand
+    ordered = list(dict.fromkeys(top + vol + sorted(marquee) + rand))
+    return ordered
 
 
 def main():
@@ -110,8 +140,9 @@ def main():
 
     # full-database aggregates (real numbers)
     from routes.analytics import (
-        data_quality, score_distribution, size_distribution,
-        state_breakdown, top_funders, yearly_trends,
+        data_quality, leaderboards, score_distribution, size_distribution,
+        state_breakdown, state_christian, top_funders, verification,
+        yearly_trends,
     )
     from routes.foundations import foundation_stats
     dump('stats.json', foundation_stats())
@@ -119,9 +150,12 @@ def main():
         'score-distribution': score_distribution(),
         'size-distribution': size_distribution(),
         'state-breakdown': state_breakdown(),
+        'state-christian': state_christian(),
         'top-funders': top_funders(100),
         'yearly-trends': yearly_trends(),
         'data-quality': data_quality(),
+        'verification': verification(),
+        'leaderboards': leaderboards(10),
     })
     conn.close()
     print(f"Demo data written to {OUT} ({len(eins)} foundations)")

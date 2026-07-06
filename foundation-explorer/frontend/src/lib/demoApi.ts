@@ -1,5 +1,5 @@
 /* Static demo mode: emulates the FastAPI endpoints client-side over
-   bundled JSON in /demo. Active when VITE_DEMO=1. */
+   bundled JSON in /demo. Active when detectDemo() is true. */
 
 const cache = new Map<string, any>()
 
@@ -19,28 +19,63 @@ const SIZES: Record<string, (d: number | null) => boolean> = {
   'gte10m': (d) => d !== null && d >= 10_000_000,
 }
 
+type Preset = {
+  where: (r: any) => boolean
+  sort: string
+  dir: 'asc' | 'desc'
+}
+const PRESETS: Record<string, Preset> = {
+  'best-prospects': {
+    where: (r) => r.application_status === 'Accepting Applications'
+      && r.faith_score_composite > 30 && r.christian_dollars_3yr >= 100000
+      && !Number(r.is_testamentary_trust),
+    sort: 'christian_dollars_3yr', dir: 'desc',
+  },
+  'top-christian-dollars': {
+    where: (r) => r.christian_dollars_3yr > 0
+      && !Number(r.is_testamentary_trust),
+    sort: 'christian_dollars_3yr', dir: 'desc',
+  },
+  'highest-alignment': {
+    where: (r) => r.faith_score_composite > 90,
+    sort: 'faith_score_composite', dir: 'desc',
+  },
+  'accepting': {
+    where: (r) => r.application_status === 'Accepting Applications'
+      && !Number(r.is_testamentary_trust),
+    sort: 'faith_score_composite', dir: 'desc',
+  },
+}
+
 function foundationList(p: URLSearchParams, rows: any[]) {
   const q = (p.get('q') || '').toLowerCase()
   const states = p.getAll('states')
-  const tiers = p.getAll('tiers')
   const status = p.getAll('status')
   const sizes = p.getAll('sizes')
-  const scoreMin = p.get('score_min')
-  const scoreMax = p.get('score_max')
+  const presetKey = p.get('preset') || ''
+  const preset = PRESETS[presetKey]
+  const numOr = (k: string) => {
+    const v = p.get(k)
+    return v === null || v === '' ? undefined : Number(v)
+  }
+  const scoreMin = numOr('score_min')
+  const scoreMax = numOr('score_max')
+  const pctMin = numOr('pct_min')
+  const christianMin = numOr('christian_min')
 
   let out = rows.filter((r) => {
-    if (q && !(`${r.foundation_name} ${r.ein}`.toLowerCase().includes(q)))
-      return false
+    if (preset && !preset.where(r)) return false
+    if (q && !(`${r.foundation_name} ${r.ein} ${r.city}`
+      .toLowerCase().includes(q))) return false
     if (states.length && !states.includes(r.state)) return false
-    if (scoreMin !== null && scoreMin !== '' &&
-      !(r.faith_alignment_score >= Number(scoreMin))) return false
-    if (scoreMax !== null && scoreMax !== '' &&
-      !(r.faith_alignment_score <= Number(scoreMax))) return false
-    if (tiers.length) {
-      const ok = tiers.some((t) => t === 'Unclassified'
-        ? r.faith_tier == null : r.faith_tier === t)
-      if (!ok) return false
-    }
+    if (scoreMin !== undefined && !(r.faith_score_composite >= scoreMin))
+      return false
+    if (scoreMax !== undefined && !(r.faith_score_composite <= scoreMax))
+      return false
+    if (pctMin !== undefined && !(r.christian_giving_pct >= pctMin))
+      return false
+    if (christianMin !== undefined && !(r.christian_dollars_3yr >= christianMin))
+      return false
     if (status.length) {
       const ok = status.some((s) => s === 'Unknown'
         ? !r.application_status : r.application_status === s)
@@ -58,11 +93,19 @@ function foundationList(p: URLSearchParams, rows: any[]) {
         if (flag === 'has_filings' ? v !== 'Yes' : !v) return false
       }
     }
+    if (!preset) {
+      if (p.get('include_trusts') !== 'true' && Number(r.is_testamentary_trust))
+        return false
+      if (p.get('include_small') !== 'true' && Number(r.is_small_fund))
+        return false
+    }
     return true
   })
 
-  const sort = p.get('sort') || 'faith_alignment_score'
-  const dir = p.get('direction') === 'asc' ? 1 : -1
+  let sort = p.get('sort') || ''
+  let dir = p.get('direction') === 'asc' ? 1 : -1
+  if (preset && !sort) { sort = preset.sort; dir = preset.dir === 'asc' ? 1 : -1 }
+  if (!sort) sort = 'faith_score_composite'
   out = out.sort((a, b) => {
     const av = a[sort], bv = b[sort]
     if (av == null) return 1
@@ -84,30 +127,24 @@ export async function demoGet(path: string): Promise<any> {
   const parts = url.pathname.replace(/^\/api\//, '').split('/')
 
   if (parts[0] === 'foundations') {
-    if (parts.length === 1) {
-      return foundationList(p, await load('foundations'))
-    }
+    if (parts.length === 1) return foundationList(p, await load('foundations'))
     if (parts[1] === 'stats') return load('stats')
     const ein = parts[1]
-    const base = (await load('foundations'))
-      .find((r: any) => r.ein === ein)
+    const base = (await load('foundations')).find((r: any) => r.ein === ein)
+    const d = await load(`f/${ein}`).catch(() => ({}))
     if (parts.length === 2) {
-      const d = await load(`f/${ein}`)
-      return { ...base, activities: d.activities, filings: [] }
+      return { ...base, activities: d.activities || [], filings: [] }
     }
-    const d = await load(`f/${ein}`)
     if (parts[2] === 'grants') {
       const q = (p.get('q') || '').toLowerCase()
-      const rows = d.grants.filter((g: any) => !q ||
+      const rows = (d.grants || []).filter((g: any) => !q ||
         `${g.grantee_name} ${g.purpose}`.toLowerCase().includes(q))
-      return {
-        total: d.grants_total, total_dollars: d.grants_dollars, rows,
-      }
+      return { total: d.grants_total || rows.length,
+        total_dollars: d.grants_dollars || 0, rows }
     }
     if (parts[2] === 'recipients') {
-      return {
-        distinct_recipients: d.recipients.length, top: d.recipients,
-      }
+      return { distinct_recipients: (d.recipients || []).length,
+        top: d.recipients || [] }
     }
   }
 
@@ -122,31 +159,24 @@ export async function demoGet(path: string): Promise<any> {
       rows = rows.filter((g) => g.state === p.get('recipient_state'))
     if (p.get('amount_min'))
       rows = rows.filter((g) => g.amount >= Number(p.get('amount_min')))
-    if (p.get('foreign_only') === 'true')
-      rows = rows.filter((g) => g.is_foreign)
+    if (p.get('foreign_only') === 'true') rows = rows.filter((g) => g.is_foreign)
     const page = Number(p.get('page') || 1)
-    const total_dollars = rows.reduce((s, g) => s + (g.amount || 0), 0)
-    return {
-      total: rows.length, total_dollars, page,
-      rows: rows.slice((page - 1) * 50, page * 50),
-    }
+    return { total: rows.length,
+      total_dollars: rows.reduce((s, g) => s + (g.amount || 0), 0),
+      page, rows: rows.slice((page - 1) * 50, page * 50) }
   }
 
   if (parts[0] === 'recipients') {
     if (parts.length === 1) {
       let rows = (await load('recipients')) as any[]
       const q = (p.get('q') || '').toLowerCase()
-      if (q) rows = rows.filter((r) =>
-        r.display_name.toLowerCase().includes(q))
+      if (q) rows = rows.filter((r) => r.display_name.toLowerCase().includes(q))
       if (p.get('tag')) rows = rows.filter((r) =>
         r.tags.some((t: any) => t.name === p.get('tag')))
-      if (p.get('source'))
-        rows = rows.filter((r) => r.source === p.get('source'))
+      if (p.get('source')) rows = rows.filter((r) => r.source === p.get('source'))
       const page = Number(p.get('page') || 1)
-      return {
-        total: rows.length, page,
-        rows: rows.slice((page - 1) * 50, page * 50),
-      }
+      return { total: rows.length, page,
+        rows: rows.slice((page - 1) * 50, page * 50) }
     }
     if (parts[2] === 'funders') return { funders: [] }
   }

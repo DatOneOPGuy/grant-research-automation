@@ -74,6 +74,30 @@ export default function Analytics() {
         ) : <Skeleton className="h-48" />}
       </Card>
 
+      <Card className="mb-6">
+        <CardTitle>How the composite score works</CardTitle>
+        <p className="text-sm text-muted mb-3">
+          <strong>Composite Score = 40% × Percentage Christian Giving + 60% ×
+          log-scaled Christian Dollar Volume.</strong> The volume component
+          means a large foundation moving real money to Christian causes
+          outranks a tiny memorial trust giving 100% to one church.
+        </p>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="border border-line rounded p-3">
+            <div className="font-medium">Small trust — 100% Christian</div>
+            <div className="text-muted">$10k total, all to one ministry</div>
+            <div className="mt-1">Percentage: 100 · Volume: ~20 →
+              <span className="font-medium text-scoremid"> composite ≈ 52</span></div>
+          </div>
+          <div className="border border-line rounded p-3">
+            <div className="font-medium">Large foundation — 15% Christian</div>
+            <div className="text-muted">$100M total, $15M to Christian causes</div>
+            <div className="mt-1">Percentage: 15 · Volume: ~86 →
+              <span className="font-medium text-scorehigh"> composite ≈ 58</span></div>
+          </div>
+        </div>
+      </Card>
+
       <Card>
         <CardTitle>Top 100 Christian funders</CardTitle>
         <table className="w-full text-sm">

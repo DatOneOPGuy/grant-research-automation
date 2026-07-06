@@ -1,156 +1,172 @@
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
+import { ArrowRight } from 'lucide-react'
 import { apiGet } from '../lib/api'
-import { money, num } from '../lib/format'
-import { Card, CardTitle, KPI, Skeleton } from '../components/ui/primitives'
+import { money, num, scoreColor, titleCase } from '../lib/format'
+import { Badge, Card, CardTitle, KPI, Skeleton } from '../components/ui/primitives'
 
 export default function Dashboard() {
+  const nav = useNavigate()
   const { data: stats } = useQuery({
-    queryKey: ['stats'],
-    queryFn: () => apiGet<any>('/api/foundations/stats'),
+    queryKey: ['stats'], queryFn: () => apiGet<any>('/api/foundations/stats'),
   })
-  const { data: scoreDist } = useQuery({
-    queryKey: ['scoredist'],
-    queryFn: () => apiGet<any[]>('/api/analytics/score-distribution'),
+  const { data: verify } = useQuery({
+    queryKey: ['verify'],
+    queryFn: () => apiGet<any[]>('/api/analytics/verification'),
   })
-  const { data: sizeDist } = useQuery({
-    queryKey: ['sizedist'],
-    queryFn: () => apiGet<any[]>('/api/analytics/size-distribution'),
+  const { data: lb } = useQuery({
+    queryKey: ['leaderboards'],
+    queryFn: () => apiGet<any>('/api/analytics/leaderboards'),
   })
-  const { data: top } = useQuery({
-    queryKey: ['top10'],
-    queryFn: () => apiGet<any[]>('/api/analytics/top-funders?limit=10'),
+  const { data: sc } = useQuery({
+    queryKey: ['statechristian'],
+    queryFn: () => apiGet<any[]>('/api/analytics/state-christian'),
   })
-
-  const appData = stats ? [
-    { name: 'Invite Only', value: stats.invite_only, fill: '#b8860b' },
-    { name: 'Accepting', value: stats.accepting, fill: '#2d5a3d' },
-    {
-      name: 'Unknown',
-      value: stats.total - stats.invite_only - stats.accepting,
-      fill: '#9ca3af',
-    },
-  ] : []
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-semibold text-primary mb-6">
+      <h1 className="font-display text-3xl font-semibold text-primary mb-1">
         Dashboard
       </h1>
+      <p className="text-muted mb-6">
+        Every private foundation in the United States, scored for Christian
+        grantmaking from IRS 990-PF filings.
+      </p>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
         <KPI label="Private foundations"
-          value={stats ? num(stats.total) : '…'} />
-        <KPI label="Grants tracked"
-          value={stats ? num(stats.total_grants) : '…'}
-          sub={stats ? `${money(stats.total_grants_dollars)} total` : ''} />
+          value={stats ? num(stats.total) : '…'}
+          sub={stats ? `${num(stats.with_filings)} with filings` : ''} />
+        <KPI label="Qualifying distributions"
+          value={stats ? money(stats.total_grants_dollars) : '…'}
+          sub="grant dollars tracked" />
         <KPI label="Faith-scored foundations"
           value={stats ? num(stats.scored) : '…'} />
-        <KPI label="High alignment (score ≥ 60)"
-          value={stats ? num(stats.high_alignment) : '…'} />
+        <KPI label="Best-prospect universe"
+          value={stats ? num(stats.best_prospects) : '…'}
+          sub={stats ? `${money(stats.best_prospect_dollars)} addressable` : ''} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardTitle>Faith Alignment Score distribution</CardTitle>
-          {scoreDist ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={scoreDist}>
-                <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} scale="sqrt" />
-                <Tooltip formatter={(v) => num(Number(v))} />
-                <Bar dataKey="n" fill="#1a3a2e" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <Skeleton className="h-52" />}
-        </Card>
-        <Card>
-          <CardTitle>Foundation size (total distributions)</CardTitle>
-          {sizeDist ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={sizeDist}>
-                <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => num(Number(v))} />
-                <Bar dataKey="n" fill="#c9a961" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <Skeleton className="h-52" />}
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardTitle>Top 10 by Faith Alignment</CardTitle>
-          <table className="w-full text-sm">
-            <tbody>
-              {top?.map((f) => (
-                <tr key={f.ein} className="border-b border-line/60">
-                  <td className="py-1.5 pr-2 font-medium max-w-64 truncate">
-                    {f.foundation_name}
-                  </td>
-                  <td className="text-muted pr-2">{f.state}</td>
-                  <td className="text-right tabular font-medium text-scorehigh">
-                    {f.faith_alignment_score}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <Card>
-          <CardTitle>Application status</CardTitle>
-          {stats ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={appData} dataKey="value" nameKey="name"
-                  innerRadius={55} outerRadius={85} paddingAngle={2}>
-                  {appData.map((d) => (
-                    <Cell key={d.name} fill={d.fill} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => num(Number(v))} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : <Skeleton className="h-52" />}
-          <div className="flex justify-center gap-4 text-xs text-muted">
-            {appData.map((d) => (
-              <span key={d.name} className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full inline-block"
-                  style={{ background: d.fill }} />
-                {d.name} ({num(d.value)})
-              </span>
-            ))}
+      {/* Best-prospect hero */}
+      <div className="rounded-lg bg-primary text-white p-6 mb-6 flex items-center justify-between">
+        <div>
+          <div className="font-display text-2xl font-semibold text-accent">
+            The Best-Prospect Universe
           </div>
-        </Card>
+          <p className="text-white/80 mt-2 max-w-2xl text-sm leading-relaxed">
+            {stats ? num(stats.best_prospects) : '—'} foundations that accept
+            applications, score above 30 on the composite Faith Alignment
+            Score, and have given more than $100k to Christian causes over the
+            last three years — {stats ? money(stats.best_prospect_dollars) : '—'}
+            {' '}in addressable Christian giving.
+          </p>
+        </div>
+        <button
+          onClick={() => nav('/best-prospects')}
+          className="shrink-0 flex items-center gap-2 bg-accent text-primary font-medium rounded-md px-5 py-2.5 hover:bg-accent/90">
+          View best prospects <ArrowRight size={16} />
+        </button>
       </div>
 
-      {stats && (
-        <Card>
-          <CardTitle>Data coverage</CardTitle>
-          <div className="grid grid-cols-4 gap-4 text-sm">
-            {[
-              ['Have 2023–2025 filings', stats.with_filings],
-              ['Have contact person', stats.with_contact],
-              ['Have phone', stats.with_phone],
-              ['Have website', stats.with_website],
-            ].map(([label, v]) => (
-              <div key={label as string}>
-                <div className="tabular font-medium">
-                  {num(v as number)}{' '}
-                  <span className="text-muted font-normal">
-                    ({(((v as number) / stats.total) * 100).toFixed(0)}%)
-                  </span>
-                </div>
-                <div className="text-xs text-muted">{label}</div>
-              </div>
+      {/* Verification table */}
+      <Card className="mb-6">
+        <CardTitle>Verification — known major Christian funders</CardTitle>
+        <p className="text-sm text-muted mb-3">
+          The old percentage-only score buried these known funders. The new
+          composite score surfaces them at their proper rank.
+        </p>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-muted border-b border-line">
+              <th className="py-2">Funder</th>
+              <th className="text-right">Old (%-only)</th>
+              <th className="text-right">New composite</th>
+              <th className="text-right">Christian $ (3yr)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {verify?.map((v) => (
+              <tr key={v.label} className="border-b border-line/60">
+                <td className="py-2 font-medium">
+                  {titleCase(v.foundation_name)}
+                </td>
+                <td className="text-right tabular text-muted">
+                  {v.faith_alignment_score}
+                </td>
+                <td className="text-right">
+                  <Badge className={scoreColor(v.faith_score_composite)}>
+                    {v.faith_score_composite}
+                  </Badge>
+                </td>
+                <td className="text-right tabular font-medium">
+                  {money(v.christian_dollars_3yr)}
+                </td>
+              </tr>
             ))}
-          </div>
-        </Card>
-      )}
+            {!verify && <tr><td colSpan={4}><Skeleton className="h-20" /></td></tr>}
+          </tbody>
+        </table>
+      </Card>
+
+      {/* Two leaderboards */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <Leaderboard title="Top 10 by composite score"
+          rows={lb?.composite} metric="faith_score_composite"
+          fmt={(v) => String(v)} onClick={(e) => nav(`/foundations?ein=${e}`)} />
+        <Leaderboard title="Top 10 by Christian dollars (3yr)"
+          rows={lb?.volume} metric="christian_dollars_3yr"
+          fmt={money} onClick={(e) => nav(`/foundations?ein=${e}`)} />
+      </div>
+
+      {/* State christian giving */}
+      <Card>
+        <CardTitle>Christian giving by state (top 20)</CardTitle>
+        {sc ? (
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={sc.slice(0, 20)}>
+              <XAxis dataKey="state" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }}
+                tickFormatter={(v) => money(v)} />
+              <Tooltip formatter={(v) => money(Number(v))} />
+              <Bar dataKey="christian_dollars" fill="#1a3a2e"
+                radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : <Skeleton className="h-64" />}
+      </Card>
     </div>
+  )
+}
+
+function Leaderboard({ title, rows, metric, fmt, onClick }: {
+  title: string; rows: any[] | undefined; metric: string
+  fmt: (v: number) => string; onClick: (ein: string) => void
+}) {
+  return (
+    <Card>
+      <CardTitle>{title}</CardTitle>
+      <table className="w-full text-sm">
+        <tbody>
+          {rows?.map((r, i) => (
+            <tr key={r.ein}
+              onClick={() => onClick(r.ein)}
+              className="border-b border-line/60 hover:bg-canvas/70 cursor-pointer">
+              <td className="py-1.5 pr-2 tabular text-muted w-6">{i + 1}</td>
+              <td className="pr-2 font-medium max-w-56 truncate">
+                {titleCase(r.foundation_name)}
+              </td>
+              <td className="pr-2 text-muted text-xs">{r.state}</td>
+              <td className="text-right tabular font-medium text-scorehigh">
+                {fmt(r[metric])}
+              </td>
+            </tr>
+          ))}
+          {!rows && <tr><td><Skeleton className="h-40" /></td></tr>}
+        </tbody>
+      </table>
+    </Card>
   )
 }

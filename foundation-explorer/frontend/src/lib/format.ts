@@ -24,6 +24,21 @@ export function scoreColor(score: number | null | undefined): string {
   return 'bg-gray-100 text-scorelow'
 }
 
+// Title-case all-caps foundation names for display (keep raw data intact).
+const KEEP_UPPER = new Set(['LLC', 'INC', 'USA', 'US', 'TUW', 'UW', 'II',
+  'III', 'IV', 'MJ', 'JE'])
+export function titleCase(s: string | null | undefined): string {
+  if (!s) return '—'
+  if (s !== s.toUpperCase()) return s // already mixed-case, leave it
+  return s.toLowerCase().replace(/\b[a-z']+\b/g, (w) => {
+    const up = w.toUpperCase()
+    if (KEEP_UPPER.has(up)) return up
+    if (w.length <= 2 && /^[a-z]+$/.test(w) && !['of', 'to', 'in', 'by',
+      'at', 'on'].includes(w)) return up
+    return w.charAt(0).toUpperCase() + w.slice(1)
+  })
+}
+
 export const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
   'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA',

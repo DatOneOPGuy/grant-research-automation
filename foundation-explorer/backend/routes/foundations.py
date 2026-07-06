@@ -12,8 +12,10 @@ router = APIRouter(prefix='/api/foundations', tags=['foundations'])
 
 LIST_COLS = (
     'ein, foundation_name, city, state, distributions, assets, revenue, '
-    'faith_alignment_score, faith_tier, application_status, '
-    'data_found, propublica_url, latest_tax_year'
+    'faith_alignment_score, faith_score_composite, christian_giving_pct, '
+    'christian_dollars_3yr, total_giving, faith_tier, application_status, '
+    'is_testamentary_trust, is_small_fund, data_found, propublica_url, '
+    'latest_tax_year'
 )
 
 
@@ -22,7 +24,7 @@ def list_foundations(
     p: FoundationFilters = Depends(foundation_filters_dep),
 ):
     where, args = foundation_filters(p)
-    order = order_clause(p.sort, p.direction)
+    order = order_clause(p)
     offset = (p.page - 1) * p.page_size
     conn = get_conn()
     try:
@@ -54,8 +56,26 @@ def foundation_stats():
                        AS with_filings,
                    SUM(CASE WHEN faith_alignment_score IS NOT NULL
                        THEN 1 ELSE 0 END) AS scored,
-                   SUM(CASE WHEN faith_alignment_score >= 60
+                   SUM(CASE WHEN faith_score_composite >= 60
                        THEN 1 ELSE 0 END) AS high_alignment,
+                   SUM(CASE WHEN application_status =
+                       'Accepting Applications'
+                       AND faith_score_composite > 30
+                       AND christian_dollars_3yr >= 100000
+                       AND (is_testamentary_trust = 0
+                            OR is_testamentary_trust IS NULL)
+                       THEN 1 ELSE 0 END) AS best_prospects,
+                   SUM(CASE WHEN application_status =
+                       'Accepting Applications'
+                       AND faith_score_composite > 30
+                       AND christian_dollars_3yr >= 100000
+                       AND (is_testamentary_trust = 0
+                            OR is_testamentary_trust IS NULL)
+                       THEN christian_dollars_3yr ELSE 0 END)
+                       AS best_prospect_dollars,
+                   SUM(is_testamentary_trust) AS testamentary_trusts,
+                   SUM(is_small_fund) AS small_funds,
+                   SUM(christian_dollars_3yr) AS christian_dollars_total,
                    SUM(CASE WHEN application_status =
                        'Accepting Applications' THEN 1 ELSE 0 END)
                        AS accepting,

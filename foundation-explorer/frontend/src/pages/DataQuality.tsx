@@ -83,14 +83,36 @@ export default function DataQuality() {
             </table>
           </Card>
           <Card>
-            <CardTitle>Classification status</CardTitle>
-            <div className="text-sm text-muted leading-relaxed">
-              {num(p.recipients_tagged)} recipients carry tags from seeds and
-              rule-based matching. {num(p.recipients_pending_llm_5k)} recipients
-              with a $5,000+ grant await LLM classification
-              (requires ANTHROPIC_API_KEY). Faith scores understate alignment
-              until that pass runs.
-            </div>
+            <CardTitle>Flagged foundations</CardTitle>
+            <table className="w-full text-sm">
+              <tbody>
+                <tr className="border-b border-line/60">
+                  <td className="py-2 text-muted">Testamentary / memorial trusts</td>
+                  <td className="text-right tabular font-medium">
+                    {num(u.testamentary_trusts)}</td>
+                </tr>
+                <tr>
+                  <td className="py-2 text-muted">Micro-funds (&lt;$10k/yr)</td>
+                  <td className="text-right tabular font-medium">
+                    {num(u.small_funds)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="text-xs text-muted mt-2">
+              Excluded from prospect views by default.
+            </p>
+          </Card>
+          <Card>
+            <CardTitle>Scope &amp; caveats</CardTitle>
+            <ul className="text-sm text-muted leading-relaxed list-disc pl-4 space-y-1">
+              <li><strong>Private foundations only</strong> (Form 990-PF).
+                Donor-advised-fund sponsors like the National Christian
+                Foundation file Form 990 and are out of scope by design.</li>
+              <li>Rule-based Christian classification is loose — Catholic health
+                infrastructure gets tagged, so some large secular funders appear
+                on volume lists. An LLM classification pass will refine this.</li>
+              <li>Data current as of 2023–2025 filings.</li>
+            </ul>
           </Card>
         </div>
       </div>

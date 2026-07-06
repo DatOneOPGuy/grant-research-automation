@@ -7,15 +7,87 @@ from db import get_conn, rows_to_dicts
 router = APIRouter(prefix='/api/analytics', tags=['analytics'])
 
 
+# Known major Christian PRIVATE foundations at verified EINs.
+VERIFY_EINS = [
+    ('626041468', 'Maclellan'),
+    ('621322826', 'Templeton'),
+    ('237456468', 'Murdock'),
+    ('350868122', 'Lilly'),
+    ('916020515', 'Stewardship'),
+]
+
+
 @router.get('/score-distribution')
 def score_distribution():
     conn = get_conn()
     try:
         rows = conn.execute("""
-            SELECT CAST(faith_alignment_score / 5 AS INT) * 5 AS bucket,
+            SELECT CAST(faith_score_composite / 5 AS INT) * 5 AS bucket,
                    COUNT(*) AS n
-            FROM universe WHERE faith_alignment_score IS NOT NULL
+            FROM universe WHERE faith_score_composite IS NOT NULL
             GROUP BY bucket ORDER BY bucket
+        """).fetchall()
+    finally:
+        conn.close()
+    return rows_to_dicts(rows)
+
+
+@router.get('/verification')
+def verification():
+    conn = get_conn()
+    try:
+        out = []
+        for ein, label in VERIFY_EINS:
+            r = conn.execute(
+                "SELECT foundation_name, faith_alignment_score, "
+                "faith_score_composite, christian_giving_pct, "
+                "christian_dollars_3yr FROM universe WHERE ein = ?",
+                (ein,),
+            ).fetchone()
+            if r:
+                d = dict(r)
+                d['label'] = label
+                out.append(d)
+    finally:
+        conn.close()
+    return out
+
+
+@router.get('/leaderboards')
+def leaderboards(limit: int = 10):
+    conn = get_conn()
+    try:
+        composite = rows_to_dicts(conn.execute(
+            "SELECT ein, foundation_name, city, state, "
+            "faith_score_composite, christian_dollars_3yr, "
+            "christian_giving_pct FROM universe "
+            "WHERE faith_score_composite IS NOT NULL "
+            "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL)"
+            " AND christian_dollars_3yr > 0 "
+            "ORDER BY faith_score_composite DESC, christian_dollars_3yr DESC "
+            "LIMIT ?", (limit,)).fetchall())
+        volume = rows_to_dicts(conn.execute(
+            "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
+            "faith_score_composite, christian_giving_pct FROM universe "
+            "WHERE christian_dollars_3yr > 0 "
+            "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
+            "ORDER BY christian_dollars_3yr DESC LIMIT ?",
+            (limit,)).fetchall())
+    finally:
+        conn.close()
+    return {'composite': composite, 'volume': volume}
+
+
+@router.get('/state-christian')
+def state_christian():
+    conn = get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT state, COUNT(*) AS foundations,
+                   SUM(christian_dollars_3yr) AS christian_dollars,
+                   SUM(distributions) AS distributions
+            FROM universe WHERE state != '' AND state IS NOT NULL
+            GROUP BY state ORDER BY christian_dollars DESC LIMIT 20
         """).fetchall()
     finally:
         conn.close()
@@ -122,7 +194,9 @@ def data_quality():
                     THEN 1 ELSE 0 END) AS scored,
                 SUM(CASE WHEN states_given_to != ''
                     AND states_given_to IS NOT NULL THEN 1 ELSE 0 END)
-                    AS with_states
+                    AS with_states,
+                SUM(is_testamentary_trust) AS testamentary_trusts,
+                SUM(is_small_fund) AS small_funds
             FROM universe
         """).fetchone()
         pipeline = conn.execute("""

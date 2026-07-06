@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  BarChart3, Building2, DollarSign, Home, ShieldCheck, Users,
+  BarChart3, Building2, DollarSign, Home, ShieldCheck, Target, Users,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../lib/api'
@@ -8,6 +8,7 @@ import { num } from '../../lib/format'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: Home },
+  { to: '/best-prospects', label: 'Best Prospects', icon: Target },
   { to: '/foundations', label: 'Foundations', icon: Building2 },
   { to: '/grants', label: 'Grants', icon: DollarSign },
   { to: '/recipients', label: 'Recipients', icon: Users },

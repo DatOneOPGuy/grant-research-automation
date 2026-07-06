@@ -9,7 +9,8 @@ class FoundationFilters(BaseModel):
     states: list[str] = []
     score_min: float | None = None
     score_max: float | None = None
-    tiers: list[str] = []
+    pct_min: float | None = None
+    christian_min: float | None = None
     status: list[str] = []
     sizes: list[str] = []
     has_filings: bool = False
@@ -17,7 +18,9 @@ class FoundationFilters(BaseModel):
     has_website: bool = False
     has_phone: bool = False
     has_deadline: bool = False
-    gives_state: str | None = None
+    include_trusts: bool = False
+    include_small: bool = False
+    preset: str | None = None
     sort: str | None = None
     direction: str | None = None
     page: int = 1
@@ -29,7 +32,8 @@ def foundation_filters_dep(
     states: list[str] = Query(default=[]),
     score_min: float | None = None,
     score_max: float | None = None,
-    tiers: list[str] = Query(default=[]),
+    pct_min: float | None = None,
+    christian_min: float | None = None,
     status: list[str] = Query(default=[]),
     sizes: list[str] = Query(default=[]),
     has_filings: bool = False,
@@ -37,7 +41,9 @@ def foundation_filters_dep(
     has_website: bool = False,
     has_phone: bool = False,
     has_deadline: bool = False,
-    gives_state: str | None = None,
+    include_trusts: bool = False,
+    include_small: bool = False,
+    preset: str | None = None,
     sort: str | None = None,
     direction: str | None = None,
     page: int = 1,
@@ -45,9 +51,10 @@ def foundation_filters_dep(
 ) -> FoundationFilters:
     return FoundationFilters(
         q=q, states=states, score_min=score_min, score_max=score_max,
-        tiers=tiers, status=status, sizes=sizes, has_filings=has_filings,
-        has_contact=has_contact, has_website=has_website,
-        has_phone=has_phone, has_deadline=has_deadline,
-        gives_state=gives_state, sort=sort, direction=direction,
-        page=max(1, page), page_size=page_size,
+        pct_min=pct_min, christian_min=christian_min, status=status,
+        sizes=sizes, has_filings=has_filings, has_contact=has_contact,
+        has_website=has_website, has_phone=has_phone,
+        has_deadline=has_deadline, include_trusts=include_trusts,
+        include_small=include_small, preset=preset, sort=sort,
+        direction=direction, page=max(1, page), page_size=page_size,
     )

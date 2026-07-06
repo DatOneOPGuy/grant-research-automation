@@ -25,7 +25,11 @@ UNIVERSE_CSV = Path(os.environ.get('UNIVERSE_CSV',
 NUMERIC_COLS = {
     'revenue', 'assets', 'distributions', 'faith_alignment_score',
     'christian_giving_pct', 'years_of_faith_giving', 'total_giving',
-    'faith_giving', 'latest_tax_year',
+    'faith_giving', 'latest_tax_year', 'faith_score_composite',
+    'christian_dollars_3yr', 'christian_dollars_2023',
+    'christian_dollars_2024', 'christian_dollars_2025',
+    'christian_grant_count_3yr', 'is_testamentary_trust', 'is_small_fund',
+    'is_actively_giving',
 }
 
 INDEXES = [
@@ -33,6 +37,9 @@ INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_u_state ON universe(state)",
     "CREATE INDEX IF NOT EXISTS idx_u_score "
     "ON universe(faith_alignment_score)",
+    "CREATE INDEX IF NOT EXISTS idx_u_composite "
+    "ON universe(faith_score_composite)",
+    "CREATE INDEX IF NOT EXISTS idx_u_cd ON universe(christian_dollars_3yr)",
     "CREATE INDEX IF NOT EXISTS idx_u_dist ON universe(distributions)",
     "CREATE INDEX IF NOT EXISTS idx_u_status "
     "ON universe(application_status)",
