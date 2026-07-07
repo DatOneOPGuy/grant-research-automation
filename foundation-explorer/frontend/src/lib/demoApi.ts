@@ -89,10 +89,8 @@ function foundationList(p: URLSearchParams, rows: any[]) {
 
   let out = rows.filter((r) => {
     if (preset && !preset.where(r)) return false
-    if (!preset) {
-      if (!STRONG(r)) return false
-      if (p.get('include_invite') !== 'true' && !REACHABLE(r)) return false
-    }
+    // Foundations page (no preset): all confirmed Christian funders.
+    if (!preset && r.verdict === 'No confirmed Christian giving') return false
     if (q && !(`${r.foundation_name} ${r.ein} ${r.city}`
       .toLowerCase().includes(q))) return false
     // depth

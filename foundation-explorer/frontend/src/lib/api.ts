@@ -160,8 +160,6 @@ export function activeFilterChips(f: FoundationFilterState):
     clear: { recently_active: false } })
   if (f.actively_giving) chips.push({ key: 'ag', label: 'Actively giving',
     clear: { actively_giving: false } })
-  if (f.include_invite) chips.push({ key: 'inv', label: 'Incl. invite-only',
-    clear: { include_invite: false } })
   for (const [k, label] of [['has_contact', 'Has contact'],
     ['has_website', 'Has website'], ['has_phone', 'Has phone'],
     ['has_deadline', 'Has deadline']] as const) {

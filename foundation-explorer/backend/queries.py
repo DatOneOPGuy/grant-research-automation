@@ -77,14 +77,11 @@ def foundation_filters(p) -> tuple[str, list]:
     if preset:
         where.extend(preset['where'])
 
-    # --- default scope: strong verdict (the verdict is no longer a filter,
-    # but customers still only see confirmed Christian funders) ---
+    # --- default scope (Foundations page, no preset): all confirmed
+    # Christian funders. The "good leads" narrowing (strong verdict +
+    # reachable) lives only on the Best Prospects preset. ---
     if not preset:
-        where.append(STRONG)
-
-    # --- reachability: exclude invite-only unless toggled on ---
-    if not preset and not p.include_invite:
-        where.append(REACHABLE)
+        where.append("verdict != 'No confirmed Christian giving'")
 
     # --- Christian-giving depth ---
     if p.min_orgs is not None:

@@ -132,14 +132,12 @@ export default function FilterPanel({ filters, onChange }: Props) {
       </Section>
 
       <Section title="Reachability">
+        <div className="text-xs text-muted mb-1">Accepts</div>
         {STATUSES.map((s) => (
           <Check key={s} label={s} checked={filters.status.includes(s)}
             onChange={() => toggleIn('status', s)} />
         ))}
         <div className="mt-1 pt-1 border-t border-line/60">
-          <Check label="Include invite-only foundations"
-            checked={filters.include_invite}
-            onChange={(v) => set({ include_invite: v })} />
           <Check label="Has contact person" checked={filters.has_contact}
             onChange={(v) => set({ has_contact: v })} />
           <Check label="Has website" checked={filters.has_website}
