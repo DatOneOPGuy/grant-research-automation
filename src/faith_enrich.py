@@ -71,6 +71,8 @@ def ensure_table(conn):
             christian_pct_display TEXT,
             verdict TEXT, christian_recipient_count INTEGER,
             most_recent_christian_year INTEGER, christian_preview TEXT,
+            predominant_tradition TEXT, typical_grant_size INTEGER,
+            largest_christian_grant INTEGER,
             faith_score_pct INTEGER, faith_score_composite INTEGER,
             volume_component INTEGER,
             is_testamentary_trust INTEGER, is_small_fund INTEGER,
@@ -82,6 +84,34 @@ def ensure_table(conn):
 # Verdict thresholds (confirmed Christian giving, 3-year window)
 VERDICT_MIN_DOLLARS = 100_000
 VERDICT_MIN_RECIPIENTS = 3
+
+
+def _median(vals: list) -> int:
+    if not vals:
+        return 0
+    s = sorted(vals)
+    n = len(s)
+    mid = n // 2
+    return int(s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2)
+
+
+def predominant_tradition(recipients: dict) -> str:
+    """recipients: norm -> [total$, year, name]. Returns the tradition with
+    >50% of confirmed Christian dollars, else 'Mixed'."""
+    from src.classifier import tradition
+    sums = defaultdict(int)
+    total = 0
+    for tot, _yr, name in recipients.values():
+        if tot <= 0:
+            continue
+        total += tot
+        sums[tradition(name) or 'Other'] += tot
+    if total <= 0:
+        return ''
+    for trad in ('Catholic', 'Evangelical/Protestant', 'Orthodox'):
+        if sums.get(trad, 0) > 0.5 * total:
+            return trad
+    return 'Mixed'
 
 
 def verdict_for(christian_dollars: int, recipient_count: int) -> str:
@@ -128,6 +158,7 @@ def run():
     # [total$, max_year, display_name]
     evidence = defaultdict(dict)
     recent_year = defaultdict(int)
+    cd_amounts = defaultdict(list)  # ein -> list of Christian grant amounts
     for ein, name, amount, year in conn.execute(
         "SELECT ein, grantee_name, amount, tax_year FROM grants "
         "WHERE grantee_name != ''"
@@ -142,6 +173,8 @@ def run():
         if st == 'christian':
             cd_total[ein] += amount
             cd_year[ein][year] += amount
+            if amount > 0:
+                cd_amounts[ein].append(amount)
             ev = evidence[ein].get(norm)
             if ev is None:
                 evidence[ein][norm] = [amount, year, name]
@@ -194,6 +227,7 @@ def run():
         rcount = cd_count.get(ein, 0)
         verdict = verdict_for(cdt, rcount)
         preview = ''
+        trad = ''
         if evidence.get(ein):
             top = sorted(evidence[ein].values(), key=lambda e: -e[0])
             top_names = [t[2] for t in top[:2]]
@@ -201,14 +235,19 @@ def run():
             preview = ', '.join(top_names)
             if more > 0:
                 preview += f', +{more} more'
+            trad = predominant_tradition(evidence[ein])
+        amounts = cd_amounts.get(ein, [])
+        typical = _median(amounts)
+        largest = max(amounts) if amounts else 0
         conn.execute(
             "INSERT OR REPLACE INTO foundation_enrich VALUES "
-            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ein,
              cd_year[ein].get(2023, 0), cd_year[ein].get(2024, 0),
              cd_year[ein].get(2025, 0), cdt, rcount, total3,
              ncr, unc, coverage, floor, ceiling, display,
              verdict, rcount, recent_year.get(ein) or None, preview,
+             trad, typical, largest,
              round(pct), comp, vol,
              1 if TRUST_RE.search(nm) else 0,
              small.get(ein, 0), active.get(ein, 0)),

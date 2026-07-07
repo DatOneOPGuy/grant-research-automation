@@ -11,9 +11,10 @@ from queries import foundation_filters, order_clause
 router = APIRouter(prefix='/api/foundations', tags=['foundations'])
 
 LIST_COLS = (
-    'ein, foundation_name, city, state, distributions, revenue, '
+    'ein, foundation_name, city, state, distributions, assets, '
     'christian_dollars_3yr, total_giving_3yr, verdict, christian_preview, '
     'christian_recipient_count, most_recent_christian_year, '
+    'predominant_tradition, typical_grant_size, largest_christian_grant, '
     'application_status, is_testamentary_trust, is_small_fund, data_found, '
     'propublica_url, latest_tax_year'
 )

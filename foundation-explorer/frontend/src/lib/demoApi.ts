@@ -47,45 +47,89 @@ const PRESETS: Record<string, Preset> = {
   },
 }
 
+const REGIONS: Record<string, string[]> = {
+  northeast: ['CT', 'ME', 'MA', 'NH', 'RI', 'VT', 'NJ', 'NY', 'PA'],
+  southeast: ['DE', 'FL', 'GA', 'MD', 'NC', 'SC', 'VA', 'DC', 'WV', 'AL',
+    'KY', 'MS', 'TN', 'AR', 'LA'],
+  midwest: ['IL', 'IN', 'MI', 'OH', 'WI', 'IA', 'KS', 'MN', 'MO', 'NE',
+    'ND', 'SD'],
+  southwest: ['AZ', 'NM', 'OK', 'TX'],
+  west: ['CO', 'ID', 'MT', 'NV', 'UT', 'WY', 'AK', 'CA', 'HI', 'OR', 'WA'],
+}
+const TYPICAL: Record<string, (n: number) => boolean> = {
+  'lt10k': (n) => n < 10000,
+  '10k-50k': (n) => n >= 10000 && n < 50000,
+  '50k-250k': (n) => n >= 50000 && n < 250000,
+  'gte250k': (n) => n >= 250000,
+}
+const ASSETS: Record<string, (n: number) => boolean> = {
+  'lt1m': (n) => n < 1e6, '1m-10m': (n) => n >= 1e6 && n < 1e7,
+  '10m-100m': (n) => n >= 1e7 && n < 1e8, 'gte100m': (n) => n >= 1e8,
+}
+
 function foundationList(p: URLSearchParams, rows: any[]) {
   const q = (p.get('q') || '').toLowerCase()
   const states = p.getAll('states')
   const sizes = p.getAll('sizes')
+  const traditions = p.getAll('traditions')
+  const typicalSizes = p.getAll('typical_sizes')
+  const status = p.getAll('status')
+  const assetBuckets = p.getAll('asset_buckets')
   const presetKey = p.get('preset') || ''
   const preset = PRESETS[presetKey]
-  const verdict = p.get('verdict') || 'strong'
-  const christianMin = (() => {
-    const v = p.get('christian_min')
+  const numOr = (k: string) => {
+    const v = p.get(k)
     return v === null || v === '' ? undefined : Number(v)
-  })()
+  }
+  const minOrgs = numOr('min_orgs')
+  const christianMin = numOr('christian_min')
+  const largestMin = numOr('largest_min')
+  const region = p.get('region')
+  const givesIn = p.get('gives_in_state')
 
   let out = rows.filter((r) => {
     if (preset && !preset.where(r)) return false
-    // verdict (customers only see Christian funders)
     if (!preset) {
-      if (verdict === 'some' && r.verdict !== 'Some Christian giving')
-        return false
-      if (verdict === 'any' && r.verdict === 'No confirmed Christian giving')
-        return false
-      if (verdict === 'strong' && !STRONG(r)) return false
-      // reachability: exclude invite-only unless toggled
+      if (!STRONG(r)) return false
       if (p.get('include_invite') !== 'true' && !REACHABLE(r)) return false
     }
     if (q && !(`${r.foundation_name} ${r.ein} ${r.city}`
       .toLowerCase().includes(q))) return false
-    if (states.length && !states.includes(r.state)) return false
+    // depth
+    if (minOrgs !== undefined && !(r.christian_recipient_count >= minOrgs))
+      return false
     if (christianMin !== undefined && !(r.christian_dollars_3yr >= christianMin))
       return false
     if (p.get('recently_active') === 'true'
       && !(r.most_recent_christian_year >= 2024)) return false
-    if (sizes.length && !sizes.some((s) => SIZES[s]?.(r.distributions)))
+    if (traditions.length && !traditions.includes(r.predominant_tradition))
       return false
+    // grant size
+    if (typicalSizes.length
+      && !typicalSizes.some((s) => TYPICAL[s]?.(r.typical_grant_size)))
+      return false
+    if (largestMin !== undefined && !(r.largest_christian_grant >= largestMin))
+      return false
+    // reachability detail
+    if (status.length && !status.includes(r.application_status)) return false
     for (const [flag, col] of [
       ['has_contact', 'contact_person'], ['has_website', 'website'],
-      ['has_phone', 'phone'],
+      ['has_phone', 'phone'], ['has_deadline', 'deadlines'],
     ] as const) {
       if (p.get(flag) === 'true' && !r[col]) return false
     }
+    // geography
+    if (states.length && !states.includes(r.state)) return false
+    if (region && REGIONS[region] && !REGIONS[region].includes(r.state))
+      return false
+    if (givesIn && !(r.states_given_to || '').includes(givesIn)) return false
+    // profile
+    if (sizes.length && !sizes.some((s) => SIZES[s]?.(r.distributions)))
+      return false
+    if (assetBuckets.length
+      && !assetBuckets.some((s) => ASSETS[s]?.(r.assets))) return false
+    if (p.get('actively_giving') === 'true' && !Number(r.is_actively_giving))
+      return false
     if (!preset) {
       if (p.get('include_trusts') !== 'true' && Number(r.is_testamentary_trust))
         return false

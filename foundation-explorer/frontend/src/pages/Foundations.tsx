@@ -1,15 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Download, ExternalLink } from 'lucide-react'
 import {
-  apiGet, DEMO, defaultFilters, filterParams,
+  ArrowDown, ArrowUp, Bookmark, Download, ExternalLink, X,
+} from 'lucide-react'
+import {
+  activeFilterChips, apiGet, DEMO, defaultFilters, filterParams,
   type FoundationFilterState, type FoundationRow, type Paged,
 } from '../lib/api'
+import {
+  loadPersistedFilters, persistFilters, useSavedFoundations,
+} from '../lib/savedStore'
 import { money, num, titleCase } from '../lib/format'
 import { Skeleton, StatusPill, VerdictBadge } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
 import DetailPanel from '../components/foundations/DetailPanel'
+
+const SORTS: [string, string][] = [
+  ['christian_dollars_3yr', 'Christian $ (3yr)'],
+  ['christian_recipient_count', 'Christian orgs funded'],
+  ['total_giving_3yr', 'Total giving (3yr)'],
+  ['assets', 'Total assets'],
+  ['typical_grant_size', 'Typical grant size'],
+  ['foundation_name', 'Name'],
+  ['state', 'State'],
+]
 
 const PRESETS: { key: string; label: string }[] = [
   { key: 'best-prospects', label: 'Best Prospects' },
@@ -18,23 +33,43 @@ const PRESETS: { key: string; label: string }[] = [
 ]
 
 const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
+  { key: 'save', label: '' },
   { key: 'foundation_name', label: 'Foundation', sortable: true },
   { key: 'state', label: 'Location', sortable: true },
   { key: 'verdict', label: 'Christian giving', sortable: false },
   { key: 'christian_dollars_3yr', label: 'Christian $ (3yr)', sortable: true },
+  { key: 'typical_grant_size', label: 'Typical grant', sortable: true },
   { key: 'application_status', label: 'Application', sortable: true },
   { key: 'actions', label: '' },
 ]
 
 export default function Foundations({ presetLock }: { presetLock?: string }) {
   const [urlParams, setUrlParams] = useSearchParams()
-  const [filters, setFilters] = useState<FoundationFilterState>({
+  const { isSaved, toggle } = useSavedFoundations()
+  const [filters, setFilters] = useState<FoundationFilterState>(() => ({
     ...defaultFilters,
+    ...(presetLock ? {} : loadPersistedFilters<FoundationFilterState>() || {}),
     preset: presetLock || urlParams.get('preset') || '',
-  })
-  const [search, setSearch] = useState('')
+    page: 1,
+  }))
+  const [search, setSearch] = useState(filters.q)
   const [selected, setSelected] = useState<string | null>(
     urlParams.get('ein'))
+
+  // persist filter state across navigation (session-scoped)
+  useEffect(() => { if (!presetLock) persistFilters(filters) }, [filters,
+    presetLock])
+
+  const { data: stats } = useQuery({
+    queryKey: ['stats'], queryFn: () => apiGet<any>('/api/foundations/stats'),
+    staleTime: Infinity,
+  })
+  const chips = activeFilterChips(filters)
+  const set = (patch: Partial<FoundationFilterState>) =>
+    setFilters((f) => ({ ...f, ...patch, page: 1 }))
+  const clearAll = () => setFilters((f) => ({
+    ...defaultFilters, preset: f.preset, page: 1,
+  }))
 
   // deep-link: ?ein= opens the detail panel
   useEffect(() => {
@@ -75,15 +110,27 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
             {presetLock === 'best-prospects' ? 'Best Prospects' : 'Foundations'}
           </h1>
           <div className="text-sm text-muted mt-1">
-            {data ? <>Showing {num(data.total)} foundations</> : 'Loading…'}
+            {data
+              ? <>Showing {num(data.total)}
+                {stats && <> of {num(stats.total)}</>} foundations</>
+              : 'Loading…'}
           </div>
         </div>
-        {!DEMO && (
-          <a href={`/api/export/foundations.csv?${params}`}
-            className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90">
-            <Download size={15} /> Export current view
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          <select className="border border-line rounded-md px-2 py-2 text-sm bg-surface"
+            value={filters.sort || 'christian_dollars_3yr'}
+            onChange={(e) => setFilters((f) => ({
+              ...f, sort: e.target.value, page: 1 }))}>
+            {SORTS.map(([v, label]) => (
+              <option key={v} value={v}>Sort: {label}</option>))}
+          </select>
+          {!DEMO && (
+            <a href={`/api/export/foundations.csv?${params}`}
+              className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90">
+              <Download size={15} /> Export
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Preset views */}
@@ -114,8 +161,26 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
         <div className="flex-1 min-w-0">
           <input
             placeholder="Search foundation name, EIN, or city…"
-            className="w-full border border-line rounded-md px-4 py-2.5 text-sm mb-4 bg-surface"
+            className="w-full border border-line rounded-md px-4 py-2.5 text-sm mb-3 bg-surface"
             value={search} onChange={(e) => setSearch(e.target.value)} />
+
+          {chips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-4">
+              <span className="text-xs text-muted mr-1">
+                {chips.length} filter{chips.length > 1 ? 's' : ''} active:
+              </span>
+              {chips.map((c) => (
+                <button key={c.key} onClick={() => set(c.clear)}
+                  className="flex items-center gap-1 text-xs bg-canvas border border-line rounded-full px-2 py-0.5 hover:border-primary">
+                  {c.label} <X size={11} />
+                </button>
+              ))}
+              <button onClick={clearAll}
+                className="text-xs text-primary underline ml-1">
+                Clear all
+              </button>
+            </div>
+          )}
 
           <div className="bg-surface border border-line rounded-lg overflow-hidden">
             <table className="w-full text-sm">
@@ -137,11 +202,11 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={6} className="px-3 py-2">
+                  <tr key={i}><td colSpan={8} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={8} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -149,6 +214,15 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                 {data?.rows.map((r) => (
                   <tr key={r.ein} onClick={() => setSelected(r.ein)}
                     className="border-b border-line/60 hover:bg-canvas/70 cursor-pointer">
+                    <td className="pl-3">
+                      <button onClick={(e) => { e.stopPropagation(); toggle(r.ein) }}
+                        title={isSaved(r.ein) ? 'Saved' : 'Save'}
+                        className="p-1 text-muted hover:text-accent">
+                        <Bookmark size={15}
+                          className={isSaved(r.ein)
+                            ? 'fill-accent text-accent' : ''} />
+                      </button>
+                    </td>
                     <td className="px-3 py-2.5 font-medium text-primary max-w-72 truncate">
                       {titleCase(r.foundation_name)}
                     </td>
@@ -166,6 +240,9 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                     </td>
                     <td className="px-3 tabular font-medium">
                       {money(r.christian_dollars_3yr)}
+                    </td>
+                    <td className="px-3 tabular text-muted">
+                      {money(r.typical_grant_size)}
                     </td>
                     <td className="px-3"><StatusPill status={r.application_status} /></td>
                     <td className="px-3">

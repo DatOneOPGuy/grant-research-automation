@@ -1,15 +1,18 @@
 import { NavLink } from 'react-router-dom'
 import {
-  BarChart3, Building2, DollarSign, Home, ShieldCheck, Target, Users,
+  BarChart3, Bookmark, Building2, DollarSign, Home, ShieldCheck, Target,
+  Users,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../lib/api'
+import { useSavedFoundations } from '../../lib/savedStore'
 import { num } from '../../lib/format'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: Home },
   { to: '/best-prospects', label: 'Best Prospects', icon: Target },
   { to: '/foundations', label: 'Foundations', icon: Building2 },
+  { to: '/saved', label: 'Saved', icon: Bookmark, badge: true },
   { to: '/grants', label: 'Grants', icon: DollarSign },
   { to: '/recipients', label: 'Recipients', icon: Users },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -17,6 +20,7 @@ const NAV = [
 ]
 
 export default function Sidebar() {
+  const { saved } = useSavedFoundations()
   const { data } = useQuery({
     queryKey: ['stats'],
     queryFn: () => apiGet<Record<string, number>>('/api/foundations/stats'),
@@ -33,7 +37,7 @@ export default function Sidebar() {
         </div>
       </div>
       <nav className="flex-1 px-3 space-y-1">
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {NAV.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
             key={to}
             to={to}
@@ -48,6 +52,11 @@ export default function Sidebar() {
           >
             <Icon size={16} />
             {label}
+            {badge && saved.length > 0 && (
+              <span className="ml-auto text-xs bg-accent text-primary rounded-full px-1.5 py-0.5 font-medium">
+                {saved.length}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

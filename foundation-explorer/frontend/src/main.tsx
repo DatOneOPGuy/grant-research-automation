@@ -3,9 +3,11 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
+import { SavedProvider } from './lib/savedStore'
 import Dashboard from './pages/Dashboard'
 import Foundations from './pages/Foundations'
 import BestProspects from './pages/BestProspects'
+import Saved from './pages/Saved'
 import Grants from './pages/Grants'
 import Recipients from './pages/Recipients'
 import Analytics from './pages/Analytics'
@@ -26,6 +28,7 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'best-prospects', element: <BestProspects /> },
       { path: 'foundations', element: <Foundations /> },
+      { path: 'saved', element: <Saved /> },
       { path: 'grants', element: <Grants /> },
       { path: 'recipients', element: <Recipients /> },
       { path: 'analytics', element: <Analytics /> },
@@ -37,7 +40,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <SavedProvider>
+        <RouterProvider router={router} />
+      </SavedProvider>
     </QueryClientProvider>
   </StrictMode>,
 )

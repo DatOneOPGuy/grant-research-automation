@@ -33,6 +33,7 @@ NUMERIC_COLS = {
     'unclassified_dollars_3yr', 'classification_coverage',
     'christian_pct_floor', 'christian_pct_ceiling',
     'christian_recipient_count', 'most_recent_christian_year',
+    'typical_grant_size', 'largest_christian_grant',
 }
 
 INDEXES = [

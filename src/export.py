@@ -73,8 +73,9 @@ ENRICH_COLS = ['faith_score_composite', 'christian_dollars_3yr',
                'christian_pct_floor', 'christian_pct_ceiling',
                'christian_pct_display', 'verdict',
                'christian_recipient_count', 'most_recent_christian_year',
-               'christian_preview', 'is_testamentary_trust',
-               'is_small_fund', 'is_actively_giving']
+               'christian_preview', 'predominant_tradition',
+               'typical_grant_size', 'largest_christian_grant',
+               'is_testamentary_trust', 'is_small_fund', 'is_actively_giving']
 
 
 def load_enrich(conn) -> dict[str, dict]:

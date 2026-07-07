@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ExternalLink, X } from 'lucide-react'
+import { Bookmark, ExternalLink, X } from 'lucide-react'
 import { apiGet } from '../../lib/api'
+import { useSavedFoundations } from '../../lib/savedStore'
 import { money, moneyFull, num, titleCase } from '../../lib/format'
 import { Badge, Skeleton, StatusPill, VerdictBadge } from '../ui/primitives'
 
@@ -11,6 +12,7 @@ const TABS = ['Overview', 'Grants', 'Recipients', 'Activities', 'Raw'] as const
 
 export default function DetailPanel({ ein, onClose }: Props) {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Overview')
+  const { isSaved, toggle } = useSavedFoundations()
   const { data } = useQuery({
     queryKey: ['foundation', ein],
     queryFn: () => apiGet<any>(`/api/foundations/${ein}`),
@@ -33,6 +35,15 @@ export default function DetailPanel({ ein, onClose }: Props) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={() => toggle(ein)}
+                className={`flex items-center gap-1 text-sm rounded-md px-2.5 py-1 border ${
+                  isSaved(ein)
+                    ? 'bg-accent/10 border-accent text-primary'
+                    : 'border-line text-muted hover:border-primary'}`}>
+                <Bookmark size={14}
+                  className={isSaved(ein) ? 'fill-accent text-accent' : ''} />
+                {isSaved(ein) ? 'Saved' : 'Save'}
+              </button>
               {data?.propublica_url && (
                 <a href={data.propublica_url} target="_blank" rel="noreferrer"
                   className="text-sm text-primary underline flex items-center gap-1">
