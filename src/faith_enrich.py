@@ -40,16 +40,21 @@ TRUST_RE = re.compile(
 )
 
 
-def load_tag_lookup(conn) -> dict[str, set]:
-    lookup = {}
+COVERAGE_DISPLAY_THRESHOLD = 85  # >= this coverage -> show a single %
+
+
+def load_tag_status(conn) -> dict[str, str]:
+    """name_norm -> 'christian' | 'nonchristian' (untagged names omitted)."""
+    status = {}
     for norm, tags_json in conn.execute(
         "SELECT name_norm, tags FROM recipients WHERE tags != '[]'"
     ):
-        tags = {t['name'] for t in json.loads(tags_json)
-                if t.get('confidence', 0) >= CONFIDENCE_MIN}
-        if tags:
-            lookup[norm] = tags
-    return lookup
+        names = {t['name'] for t in json.loads(tags_json)
+                 if t.get('confidence', 0) >= CONFIDENCE_MIN}
+        if not names:
+            continue
+        status[norm] = 'christian' if names & FAITH_TAG_SET else 'nonchristian'
+    return status
 
 
 def ensure_table(conn):
@@ -60,6 +65,10 @@ def ensure_table(conn):
             christian_dollars_2023 INTEGER, christian_dollars_2024 INTEGER,
             christian_dollars_2025 INTEGER, christian_dollars_3yr INTEGER,
             christian_grant_count_3yr INTEGER, total_giving_3yr INTEGER,
+            nonchristian_dollars_3yr INTEGER, unclassified_dollars_3yr INTEGER,
+            classification_coverage INTEGER,
+            christian_pct_floor INTEGER, christian_pct_ceiling INTEGER,
+            christian_pct_display TEXT,
             faith_score_pct INTEGER, faith_score_composite INTEGER,
             volume_component INTEGER,
             is_testamentary_trust INTEGER, is_small_fund INTEGER,
@@ -79,15 +88,25 @@ def composite(pct: float, christian_dollars: int) -> tuple[int, int]:
     return round(min(100.0, comp)), round(vol)
 
 
+def _display(floor, ceiling, coverage):
+    """Honest percentage string: single value if well-covered, else range."""
+    if coverage >= COVERAGE_DISPLAY_THRESHOLD:
+        return f"{floor}% Christian"
+    return (f"{floor}–{ceiling}% Christian "
+            f"({coverage}% of grants classified)")
+
+
 def run():
     conn = sqlite3.connect(DB_PATH)
-    tags = load_tag_lookup(conn)
-    log.info("Tagged recipients: %d", len(tags))
+    status = load_tag_status(conn)
+    log.info("Classified recipients: %d", len(status))
 
-    # accumulate per EIN from all grants (2023-2025 window)
+    # accumulate per EIN over the 2023-2025 window
     cd_year = defaultdict(lambda: defaultdict(int))   # ein -> year -> $
     cd_total = defaultdict(int)
     cd_count = defaultdict(int)
+    nonchr = defaultdict(int)
+    unclass = defaultdict(int)
     tot = defaultdict(int)
     for ein, name, amount, year in conn.execute(
         "SELECT ein, grantee_name, amount, tax_year FROM grants "
@@ -95,14 +114,18 @@ def run():
     ):
         ein = ein.zfill(9)
         amount = amount or 0
-        if year in (2023, 2024, 2025):
-            tot[ein] += amount
-        is_faith = bool(tags.get(normalize(name), set()) & FAITH_TAG_SET)
-        if is_faith:
+        if year not in (2023, 2024, 2025):
+            continue
+        tot[ein] += amount
+        st = status.get(normalize(name))
+        if st == 'christian':
             cd_total[ein] += amount
             cd_count[ein] += 1
-            if year in (2023, 2024, 2025):
-                cd_year[ein][year] += amount
+            cd_year[ein][year] += amount
+        elif st == 'nonchristian':
+            nonchr[ein] += amount
+        else:
+            unclass[ein] += amount
     log.info("Aggregated %d foundations with grants", len(tot))
 
     # foundation attributes for flags
@@ -124,16 +147,26 @@ def run():
     written = 0
     for ein in eins:
         total3 = tot.get(ein, 0)
-        cdt = cd_total.get(ein, 0)
-        pct = (100 * cdt / total3) if total3 > 0 else 0.0
+        # clamp buckets to >= 0 (some 990-PF grants carry negative
+        # correction amounts that would otherwise break the ratios)
+        cdt = max(0, cd_total.get(ein, 0))
+        ncr = max(0, nonchr.get(ein, 0))
+        unc = max(0, unclass.get(ein, 0))
+        denom = max(total3, cdt + ncr + unc, 1)
+        pct = 100 * cdt / denom
+        floor = min(100, max(0, round(pct)))
+        coverage = min(100, max(0, round(100 * (cdt + ncr) / denom)))
+        ceiling = min(100, max(floor, round(100 * (cdt + unc) / denom)))
+        display = _display(floor, ceiling, coverage) if total3 > 0 else ''
         comp, vol = composite(pct, cdt)
         nm = names.get(ein, '')
         conn.execute(
             "INSERT OR REPLACE INTO foundation_enrich VALUES "
-            "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ein,
              cd_year[ein].get(2023, 0), cd_year[ein].get(2024, 0),
              cd_year[ein].get(2025, 0), cdt, cd_count.get(ein, 0), total3,
+             ncr, unc, coverage, floor, ceiling, display,
              round(pct), comp, vol,
              1 if TRUST_RE.search(nm) else 0,
              small.get(ein, 0), active.get(ein, 0)),
@@ -143,13 +176,13 @@ def run():
 
     stats = conn.execute(
         "SELECT SUM(is_testamentary_trust), SUM(is_small_fund), "
-        "SUM(CASE WHEN faith_score_composite >= 60 THEN 1 ELSE 0 END), "
+        "SUM(CASE WHEN classification_coverage >= 85 THEN 1 ELSE 0 END), "
         "SUM(CASE WHEN christian_dollars_3yr > 0 THEN 1 ELSE 0 END) "
         "FROM foundation_enrich"
     ).fetchone()
     conn.close()
     log.info("Wrote %d enrich rows. Testamentary=%s, small=%s, "
-             "composite>=60=%s, any-christian-giving=%s",
+             "coverage>=85%%=%s, any-christian-giving=%s",
              written, *stats)
 
 

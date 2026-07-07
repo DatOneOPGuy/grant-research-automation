@@ -2,10 +2,11 @@
 
 SORTABLE = {
     'foundation_name', 'state', 'distributions', 'assets', 'revenue',
-    'faith_alignment_score', 'faith_score_composite', 'christian_dollars_3yr',
-    'application_status', 'latest_tax_year', 'christian_giving_pct',
-    'total_giving',
+    'christian_dollars_3yr', 'application_status', 'latest_tax_year',
+    'christian_pct_floor', 'christian_pct_ceiling', 'classification_coverage',
+    'total_giving', 'total_giving_3yr',
 }
+DEFAULT_SORT = 'christian_dollars_3yr'
 
 SIZE_BUCKETS = {
     'lt100k': 'distributions < 100000',
@@ -17,8 +18,8 @@ SIZE_BUCKETS = {
 # Preset views: (filter patch dict, sort, direction). Applied server-side.
 PRESETS = {
     'best-prospects': {
-        'where': ["application_status = 'Accepting Applications'",
-                  'faith_score_composite > 30',
+        'where': ["application_status IN ('Accepting Applications', "
+                  "'Contact First')",
                   'christian_dollars_3yr >= 100000',
                   'is_testamentary_trust = 0'],
         'sort': 'christian_dollars_3yr', 'direction': 'desc',
@@ -28,13 +29,14 @@ PRESETS = {
         'sort': 'christian_dollars_3yr', 'direction': 'desc',
     },
     'highest-alignment': {
-        'where': ['faith_score_composite > 90'],
-        'sort': 'faith_score_composite', 'direction': 'desc',
+        'where': ['christian_pct_floor >= 60', 'classification_coverage >= 50',
+                  'christian_dollars_3yr > 0'],
+        'sort': 'christian_pct_floor', 'direction': 'desc',
     },
     'accepting': {
         'where': ["application_status = 'Accepting Applications'",
                   'is_testamentary_trust = 0'],
-        'sort': 'faith_score_composite', 'direction': 'desc',
+        'sort': 'christian_dollars_3yr', 'direction': 'desc',
     },
 }
 
@@ -55,10 +57,10 @@ def foundation_filters(p) -> tuple[str, list]:
         where.append(f'state IN ({marks})')
         args += p.states
     if p.score_min is not None:
-        where.append('faith_score_composite >= ?')
+        where.append('christian_pct_ceiling >= ?')
         args.append(p.score_min)
     if p.score_max is not None:
-        where.append('faith_score_composite <= ?')
+        where.append('christian_pct_ceiling <= ?')
         args.append(p.score_max)
     if p.pct_min is not None:
         where.append('christian_giving_pct >= ?')
@@ -107,6 +109,6 @@ def order_clause(p) -> str:
     direction = p.direction
     if preset and not p.sort:
         sort, direction = preset['sort'], preset['direction']
-    col = sort if sort in SORTABLE else 'faith_score_composite'
+    col = sort if sort in SORTABLE else DEFAULT_SORT
     dirn = 'ASC' if (direction or '').lower() == 'asc' else 'DESC'
     return f'ORDER BY "{col}" {dirn} NULLS LAST'

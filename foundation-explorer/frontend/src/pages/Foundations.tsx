@@ -6,7 +6,7 @@ import {
   apiGet, DEMO, defaultFilters, filterParams,
   type FoundationFilterState, type FoundationRow, type Paged,
 } from '../lib/api'
-import { money, num, scoreColor, titleCase } from '../lib/format'
+import { christianPct, money, num, titleCase } from '../lib/format'
 import { Badge, Skeleton, StatusPill } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
 import DetailPanel from '../components/foundations/DetailPanel'
@@ -21,11 +21,10 @@ const PRESETS: { key: string; label: string }[] = [
 const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'foundation_name', label: 'Foundation', sortable: true },
   { key: 'state', label: 'Location', sortable: true },
-  { key: 'faith_score_composite', label: 'Composite', sortable: true },
   { key: 'christian_dollars_3yr', label: 'Christian $ (3yr)', sortable: true },
-  { key: 'christian_giving_pct', label: '% Christian', sortable: true },
+  { key: 'christian_pct_floor', label: '% Christian', sortable: true },
   { key: 'application_status', label: 'Application', sortable: true },
-  { key: 'total_giving', label: 'Total giving (3yr)', sortable: true },
+  { key: 'total_giving_3yr', label: 'Total giving (3yr)', sortable: true },
   { key: 'actions', label: '' },
 ]
 
@@ -158,21 +157,24 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                     <td className="px-3 text-muted whitespace-nowrap">
                       {titleCase(r.city)}, {r.state}
                     </td>
-                    <td className="px-3">
-                      <Badge className={scoreColor(r.faith_score_composite)}>
-                        {r.faith_score_composite ?? '—'}
-                      </Badge>
-                    </td>
-                    <td className="px-3 tabular">
+                    <td className="px-3 tabular font-medium">
                       {money(r.christian_dollars_3yr)}
                     </td>
-                    <td className="px-3 tabular text-muted">
-                      {r.christian_giving_pct != null
-                        ? `${r.christian_giving_pct}%` : '—'}
+                    <td className="px-3">
+                      {(() => {
+                        const c = christianPct(r)
+                        return (
+                          <Badge className={c.well
+                            ? 'bg-green-50 text-scorehigh'
+                            : 'bg-amber-50 text-scoremid'}>
+                            {c.short}
+                          </Badge>
+                        )
+                      })()}
                     </td>
                     <td className="px-3"><StatusPill status={r.application_status} /></td>
                     <td className="px-3 tabular text-muted">
-                      {money(r.total_giving)}
+                      {money(r.total_giving_3yr)}
                     </td>
                     <td className="px-3">
                       <a href={r.propublica_url} target="_blank" rel="noreferrer"

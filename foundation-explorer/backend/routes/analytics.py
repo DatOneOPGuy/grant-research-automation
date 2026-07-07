@@ -19,12 +19,13 @@ VERIFY_EINS = [
 
 @router.get('/score-distribution')
 def score_distribution():
+    """Classification-coverage distribution (composite retired from UI)."""
     conn = get_conn()
     try:
         rows = conn.execute("""
-            SELECT CAST(faith_score_composite / 5 AS INT) * 5 AS bucket,
+            SELECT CAST(classification_coverage / 10 AS INT) * 10 AS bucket,
                    COUNT(*) AS n
-            FROM universe WHERE faith_score_composite IS NOT NULL
+            FROM universe WHERE christian_dollars_3yr > 0
             GROUP BY bucket ORDER BY bucket
         """).fetchall()
     finally:
@@ -39,11 +40,10 @@ def verification():
         out = []
         for ein, label in VERIFY_EINS:
             r = conn.execute(
-                "SELECT foundation_name, faith_alignment_score, "
-                "faith_score_composite, christian_giving_pct, "
-                "christian_dollars_3yr FROM universe WHERE ein = ?",
-                (ein,),
-            ).fetchone()
+                "SELECT foundation_name, christian_pct_floor, "
+                "christian_pct_ceiling, classification_coverage, "
+                "christian_pct_display, christian_dollars_3yr "
+                "FROM universe WHERE ein = ?", (ein,)).fetchone()
             if r:
                 d = dict(r)
                 d['label'] = label
@@ -57,25 +57,17 @@ def verification():
 def leaderboards(limit: int = 10):
     conn = get_conn()
     try:
-        composite = rows_to_dicts(conn.execute(
-            "SELECT ein, foundation_name, city, state, "
-            "faith_score_composite, christian_dollars_3yr, "
-            "christian_giving_pct FROM universe "
-            "WHERE faith_score_composite IS NOT NULL "
-            "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL)"
-            " AND christian_dollars_3yr > 0 "
-            "ORDER BY faith_score_composite DESC, christian_dollars_3yr DESC "
-            "LIMIT ?", (limit,)).fetchall())
         volume = rows_to_dicts(conn.execute(
             "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
-            "faith_score_composite, christian_giving_pct FROM universe "
+            "christian_pct_floor, christian_pct_ceiling, "
+            "classification_coverage, christian_pct_display FROM universe "
             "WHERE christian_dollars_3yr > 0 "
             "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
             "ORDER BY christian_dollars_3yr DESC LIMIT ?",
             (limit,)).fetchall())
     finally:
         conn.close()
-    return {'composite': composite, 'volume': volume}
+    return {'volume': volume}
 
 
 @router.get('/state-christian')
@@ -141,12 +133,12 @@ def top_funders(limit: int = 100):
     conn = get_conn()
     try:
         rows = conn.execute(
-            "SELECT ein, foundation_name, city, state, "
-            "faith_alignment_score, faith_tier, christian_giving_pct, "
-            "faith_giving, total_giving, application_status "
-            "FROM universe WHERE faith_alignment_score IS NOT NULL "
-            "ORDER BY faith_alignment_score DESC, faith_giving DESC "
-            "LIMIT ?", (min(limit, 500),),
+            "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
+            "christian_pct_floor, christian_pct_ceiling, "
+            "classification_coverage, total_giving_3yr, application_status "
+            "FROM universe WHERE christian_dollars_3yr > 0 "
+            "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
+            "ORDER BY christian_dollars_3yr DESC LIMIT ?", (min(limit, 500),),
         ).fetchall()
     finally:
         conn.close()

@@ -68,8 +68,11 @@ def load_faith_scores(conn) -> dict[str, dict]:
 ENRICH_COLS = ['faith_score_composite', 'christian_dollars_3yr',
                'christian_dollars_2023', 'christian_dollars_2024',
                'christian_dollars_2025', 'christian_grant_count_3yr',
-               'is_testamentary_trust', 'is_small_fund',
-               'is_actively_giving']
+               'total_giving_3yr', 'nonchristian_dollars_3yr',
+               'unclassified_dollars_3yr', 'classification_coverage',
+               'christian_pct_floor', 'christian_pct_ceiling',
+               'christian_pct_display', 'is_testamentary_trust',
+               'is_small_fund', 'is_actively_giving']
 
 
 def load_enrich(conn) -> dict[str, dict]:
@@ -97,6 +100,9 @@ def build_row(u, profile, states, faith, enrich) -> dict:
         'application_status': application_status(
             profile.get('invite_only') or 0,
             profile.get('has_application_info') or 0,
+            profile.get('application_format') or '',
+            profile.get('restrictions') or '',
+            profile.get('deadlines') or '',
         ),
         'website': profile.get('website', ''),
         'phone': (profile.get('contact_phone')

@@ -14,9 +14,9 @@ export default function BestProspects() {
           Best Prospects
         </div>
         <p className="text-white/80 mt-2 max-w-3xl text-sm leading-relaxed">
-          Foundations that accept applications, score above 30 on the composite
-          Faith Alignment Score, and have given more than $100k to Christian
-          causes over the last three years.
+          Foundations that accept applications (or take a first contact) and
+          have given more than $100k to Christian causes over the last three
+          years.
           {stats && <> Total addressable: <strong className="text-white">
             {money(stats.best_prospect_dollars)}</strong> across{' '}
             <strong className="text-white">

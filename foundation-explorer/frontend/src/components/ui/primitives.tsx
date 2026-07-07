@@ -52,8 +52,11 @@ export function StatusPill({ status }: { status: string | null }) {
   if (status === 'Accepting Applications') {
     return <Badge className="bg-green-50 text-scorehigh">Accepting</Badge>
   }
+  if (status === 'Contact First') {
+    return <Badge className="bg-blue-50 text-blue-700">Contact first</Badge>
+  }
   if (status === 'Invite Only') {
-    return <Badge className="bg-amber-50 text-scoremid">Invite Only</Badge>
+    return <Badge className="bg-amber-50 text-scoremid">Invite only</Badge>
   }
   return <Badge className="bg-gray-100 text-scorelow">Unknown</Badge>
 }

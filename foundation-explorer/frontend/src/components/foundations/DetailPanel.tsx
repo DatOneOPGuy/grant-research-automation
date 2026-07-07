@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import { apiGet } from '../../lib/api'
-import { money, moneyFull, num, scoreColor, titleCase } from '../../lib/format'
+import { money, moneyFull, num, titleCase } from '../../lib/format'
 import { Badge, Skeleton, StatusPill } from '../ui/primitives'
 
 type Props = { ein: string; onClose: () => void }
@@ -89,28 +89,37 @@ function Overview({ d }: { d: any }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-4 gap-3">
-        <Stat label="Composite score"
-          value={d.faith_score_composite ?? '—'} />
         <Stat label="Christian $ (3yr)"
           value={money(d.christian_dollars_3yr)} />
+        <Stat label="Total giving (3yr)"
+          value={money(d.total_giving_3yr)} />
         <Stat label="Qualifying distributions"
           value={money(d.distributions)} />
-        <Stat label="% Christian"
-          value={d.christian_giving_pct != null
-            ? `${d.christian_giving_pct}%` : '—'} />
+        <Stat label="Grants classified"
+          value={d.classification_coverage != null
+            ? `${d.classification_coverage}%` : '—'} />
       </div>
       <div className="border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="font-display font-medium text-primary">
-            Faith Alignment
+            Christian giving
           </div>
-          <Badge className={scoreColor(d.faith_score_composite)}>
-            composite {d.faith_score_composite ?? '—'}
+          <Badge className={(d.classification_coverage ?? 0) >= 85
+            ? 'bg-green-50 text-scorehigh' : 'bg-amber-50 text-scoremid'}>
+            {d.christian_pct_floor != null
+              ? ((d.classification_coverage ?? 0) >= 85
+                ? `${d.christian_pct_floor}% Christian`
+                : `${d.christian_pct_floor}–${d.christian_pct_ceiling}% Christian`)
+              : '—'}
           </Badge>
         </div>
-        <div className="text-sm text-muted">{d.faith_tier ?? '—'}
-          {d.faith_alignment_score != null &&
-            ` · ${d.faith_alignment_score} on the older percentage-only score`}
+        <div className="text-sm text-muted">
+          {(d.classification_coverage ?? 0) >= 85
+            ? `We've classified ${d.classification_coverage}% of this `
+              + `foundation's grants.`
+            : `Range shown because we've classified `
+              + `${d.classification_coverage ?? 0}% of grants — the true `
+              + `figure sits between the floor and ceiling.`}
         </div>
         {(d.christian_dollars_2023 != null
           || d.christian_dollars_2024 != null) && (
@@ -123,15 +132,6 @@ function Overview({ d }: { d: any }) {
                 <div className="tabular font-medium">{money(v as number)}</div>
               </div>
             ))}
-          </div>
-        )}
-        {d.christian_giving_pct != null && (
-          <div className="text-sm mt-3">
-            <span className="tabular font-medium">
-              {d.christian_giving_pct}%
-            </span>{' '}
-            of {money(d.total_giving)} total giving went to identified
-            faith-based recipients.
           </div>
         )}
         {d.faith_categories && (

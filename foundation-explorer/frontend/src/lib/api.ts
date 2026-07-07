@@ -6,12 +6,12 @@ export type FoundationRow = {
   distributions: number | null
   assets: number | null
   revenue: number | null
-  faith_alignment_score: number | null
-  faith_score_composite: number | null
-  christian_giving_pct: number | null
   christian_dollars_3yr: number | null
-  total_giving: number | null
-  faith_tier: string | null
+  total_giving_3yr: number | null
+  christian_pct_floor: number | null
+  christian_pct_ceiling: number | null
+  classification_coverage: number | null
+  christian_pct_display: string | null
   application_status: string | null
   is_testamentary_trust: number | null
   is_small_fund: number | null

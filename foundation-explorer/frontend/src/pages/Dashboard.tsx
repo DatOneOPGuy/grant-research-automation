@@ -5,8 +5,8 @@ import {
 } from 'recharts'
 import { ArrowRight } from 'lucide-react'
 import { apiGet } from '../lib/api'
-import { money, num, scoreColor, titleCase } from '../lib/format'
-import { Badge, Card, CardTitle, KPI, Skeleton } from '../components/ui/primitives'
+import { money, num, titleCase } from '../lib/format'
+import { Card, CardTitle, KPI, Skeleton } from '../components/ui/primitives'
 
 export default function Dashboard() {
   const nav = useNavigate()
@@ -43,7 +43,7 @@ export default function Dashboard() {
         <KPI label="Qualifying distributions"
           value={stats ? money(stats.total_grants_dollars) : '…'}
           sub="grant dollars tracked" />
-        <KPI label="Faith-scored foundations"
+        <KPI label="Foundations giving to Christian causes"
           value={stats ? num(stats.scored) : '…'} />
         <KPI label="Best-prospect universe"
           value={stats ? num(stats.best_prospects) : '…'}
@@ -58,10 +58,10 @@ export default function Dashboard() {
           </div>
           <p className="text-white/80 mt-2 max-w-2xl text-sm leading-relaxed">
             {stats ? num(stats.best_prospects) : '—'} foundations that accept
-            applications, score above 30 on the composite Faith Alignment
-            Score, and have given more than $100k to Christian causes over the
-            last three years — {stats ? money(stats.best_prospect_dollars) : '—'}
-            {' '}in addressable Christian giving.
+            applications (or take a first contact) and have given more than
+            $100k to Christian causes over the last three years —
+            {' '}{stats ? money(stats.best_prospect_dollars) : '—'} in
+            addressable Christian giving.
           </p>
         </div>
         <button
@@ -71,19 +71,20 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Verification table */}
+      {/* Verification table — honest ranges */}
       <Card className="mb-6">
         <CardTitle>Verification — known major Christian funders</CardTitle>
         <p className="text-sm text-muted mb-3">
-          The old percentage-only score buried these known funders. The new
-          composite score surfaces them at their proper rank.
+          We report a floor–ceiling range and how much of each foundation's
+          giving we've classified, rather than a single false-precise
+          percentage. The ceiling tracks what these funders are known to give.
         </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted border-b border-line">
               <th className="py-2">Funder</th>
-              <th className="text-right">Old (%-only)</th>
-              <th className="text-right">New composite</th>
+              <th className="text-right">Christian % (range)</th>
+              <th className="text-right">Classified</th>
               <th className="text-right">Christian $ (3yr)</th>
             </tr>
           </thead>
@@ -93,15 +94,13 @@ export default function Dashboard() {
                 <td className="py-2 font-medium">
                   {titleCase(v.foundation_name)}
                 </td>
-                <td className="text-right tabular text-muted">
-                  {v.faith_alignment_score}
-                </td>
-                <td className="text-right">
-                  <Badge className={scoreColor(v.faith_score_composite)}>
-                    {v.faith_score_composite}
-                  </Badge>
-                </td>
                 <td className="text-right tabular font-medium">
+                  {v.christian_pct_floor}–{v.christian_pct_ceiling}%
+                </td>
+                <td className="text-right tabular text-muted">
+                  {v.classification_coverage}%
+                </td>
+                <td className="text-right tabular">
                   {money(v.christian_dollars_3yr)}
                 </td>
               </tr>
@@ -111,12 +110,9 @@ export default function Dashboard() {
         </table>
       </Card>
 
-      {/* Two leaderboards */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Leaderboard title="Top 10 by composite score"
-          rows={lb?.composite} metric="faith_score_composite"
-          fmt={(v) => String(v)} onClick={(e) => nav(`/foundations?ein=${e}`)} />
-        <Leaderboard title="Top 10 by Christian dollars (3yr)"
+      {/* Leaderboard by Christian dollars */}
+      <div className="mb-6">
+        <Leaderboard title="Top 10 by Christian dollars given (3-year)"
           rows={lb?.volume} metric="christian_dollars_3yr"
           fmt={money} onClick={(e) => nav(`/foundations?ein=${e}`)} />
       </div>

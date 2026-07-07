@@ -24,10 +24,12 @@ type Preset = {
   sort: string
   dir: 'asc' | 'desc'
 }
+const ACCEPTING = (r: any) =>
+  r.application_status === 'Accepting Applications'
+  || r.application_status === 'Contact First'
 const PRESETS: Record<string, Preset> = {
   'best-prospects': {
-    where: (r) => r.application_status === 'Accepting Applications'
-      && r.faith_score_composite > 30 && r.christian_dollars_3yr >= 100000
+    where: (r) => ACCEPTING(r) && r.christian_dollars_3yr >= 100000
       && !Number(r.is_testamentary_trust),
     sort: 'christian_dollars_3yr', dir: 'desc',
   },
@@ -37,13 +39,14 @@ const PRESETS: Record<string, Preset> = {
     sort: 'christian_dollars_3yr', dir: 'desc',
   },
   'highest-alignment': {
-    where: (r) => r.faith_score_composite > 90,
-    sort: 'faith_score_composite', dir: 'desc',
+    where: (r) => r.christian_pct_floor >= 60
+      && r.classification_coverage >= 50 && r.christian_dollars_3yr > 0,
+    sort: 'christian_pct_floor', dir: 'desc',
   },
   'accepting': {
     where: (r) => r.application_status === 'Accepting Applications'
       && !Number(r.is_testamentary_trust),
-    sort: 'faith_score_composite', dir: 'desc',
+    sort: 'christian_dollars_3yr', dir: 'desc',
   },
 }
 
@@ -68,11 +71,11 @@ function foundationList(p: URLSearchParams, rows: any[]) {
     if (q && !(`${r.foundation_name} ${r.ein} ${r.city}`
       .toLowerCase().includes(q))) return false
     if (states.length && !states.includes(r.state)) return false
-    if (scoreMin !== undefined && !(r.faith_score_composite >= scoreMin))
+    if (scoreMin !== undefined && !(r.christian_pct_ceiling >= scoreMin))
       return false
-    if (scoreMax !== undefined && !(r.faith_score_composite <= scoreMax))
+    if (scoreMax !== undefined && !(r.christian_pct_ceiling <= scoreMax))
       return false
-    if (pctMin !== undefined && !(r.christian_giving_pct >= pctMin))
+    if (pctMin !== undefined && !(r.christian_pct_floor >= pctMin))
       return false
     if (christianMin !== undefined && !(r.christian_dollars_3yr >= christianMin))
       return false
@@ -105,7 +108,7 @@ function foundationList(p: URLSearchParams, rows: any[]) {
   let sort = p.get('sort') || ''
   let dir = p.get('direction') === 'asc' ? 1 : -1
   if (preset && !sort) { sort = preset.sort; dir = preset.dir === 'asc' ? 1 : -1 }
-  if (!sort) sort = 'faith_score_composite'
+  if (!sort) sort = 'christian_dollars_3yr'
   out = out.sort((a, b) => {
     const av = a[sort], bv = b[sort]
     if (av == null) return 1

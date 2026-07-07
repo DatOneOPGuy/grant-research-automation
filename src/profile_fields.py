@@ -120,11 +120,36 @@ def extract_profile_fields(root, ns) -> dict:
     return fields
 
 
-def application_status(invite_only: int, has_application_info: int) -> str:
-    """Derive the display status from the Part XIV fields."""
+# De facto invite-only / relationship-driven language that appears even when
+# the Part XIV line-2 checkbox is left unchecked (e.g. Maclellan).
+_INVITE_TEXT = re.compile(
+    r'no unsolicited|not accept unsolicited|does not accept (unsolicited|'
+    r'application)|not accepting|by invitation|invitation only|preselected|'
+    r'pre-selected|pre-determined|predetermined|initiated by (the )?(found|'
+    r'trust|donor)|does not consider unsolicited|not solicit', re.IGNORECASE)
+_CONTACT_FIRST = re.compile(
+    r'upon (contact|request)|contacting|by (telephone|phone|referral)|'
+    r'must (first )?contact|provided upon|will be provided|by referral only',
+    re.IGNORECASE)
+
+
+def application_status(invite_only: int, has_application_info: int,
+                       fmt: str = '', restrictions: str = '',
+                       deadlines: str = '') -> str:
+    """Derive a customer-facing status from Part XIV.
+
+    Beyond the line-2 checkbox, scan the 2a-2d free text: many foundations
+    leave the checkbox unchecked but describe a relationship-driven /
+    'contact first' process, which is not the same as open applications.
+    """
     if invite_only:
         return 'Invite Only'
+    blob = f'{fmt} {restrictions} {deadlines}'
+    if _INVITE_TEXT.search(blob):
+        return 'Invite Only'
     if has_application_info:
+        if _CONTACT_FIRST.search(blob):
+            return 'Contact First'
         return 'Accepting Applications'
     return ''
 

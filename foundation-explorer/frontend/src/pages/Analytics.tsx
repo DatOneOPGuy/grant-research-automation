@@ -3,8 +3,8 @@ import {
   Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { apiGet } from '../lib/api'
-import { money, num, scoreColor } from '../lib/format'
-import { Badge, Card, CardTitle, Skeleton } from '../components/ui/primitives'
+import { money, num, titleCase } from '../lib/format'
+import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
 
 export default function Analytics() {
   const { data: states } = useQuery({
@@ -75,40 +75,42 @@ export default function Analytics() {
       </Card>
 
       <Card className="mb-6">
-        <CardTitle>How the composite score works</CardTitle>
+        <CardTitle>How we report Christian giving honestly</CardTitle>
         <p className="text-sm text-muted mb-3">
-          <strong>Composite Score = 40% × Percentage Christian Giving + 60% ×
-          log-scaled Christian Dollar Volume.</strong> The volume component
-          means a large foundation moving real money to Christian causes
-          outranks a tiny memorial trust giving 100% to one church.
+          We classify each grant recipient as Christian, non-Christian, or
+          not-yet-identified. When we've classified most of a foundation's
+          giving we show a single percentage; when coverage is lower we show a
+          floor–ceiling range so an unclassified recipient is never silently
+          counted as non-Christian.
         </p>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="border border-line rounded p-3">
-            <div className="font-medium">Small trust — 100% Christian</div>
-            <div className="text-muted">$10k total, all to one ministry</div>
-            <div className="mt-1">Percentage: 100 · Volume: ~20 →
-              <span className="font-medium text-scoremid"> composite ≈ 52</span></div>
+            <div className="font-medium">High coverage</div>
+            <div className="text-muted">92% of grants classified, 88% Christian</div>
+            <div className="mt-1">Shown as
+              <span className="font-medium text-scorehigh"> "88% Christian"</span></div>
           </div>
           <div className="border border-line rounded p-3">
-            <div className="font-medium">Large foundation — 15% Christian</div>
-            <div className="text-muted">$100M total, $15M to Christian causes</div>
-            <div className="mt-1">Percentage: 15 · Volume: ~86 →
-              <span className="font-medium text-scorehigh"> composite ≈ 58</span></div>
+            <div className="font-medium">Low coverage</div>
+            <div className="text-muted">41% classified, 38% confirmed Christian</div>
+            <div className="mt-1">Shown as
+              <span className="font-medium text-scoremid"> "38–97% Christian
+              (41% classified)"</span></div>
           </div>
         </div>
       </Card>
 
       <Card>
-        <CardTitle>Top 100 Christian funders</CardTitle>
+        <CardTitle>Top 100 Christian funders (by Christian $ given)</CardTitle>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted border-b border-line">
               <th className="py-2 pr-3">#</th>
               <th className="pr-3">Foundation</th>
               <th className="pr-3">Location</th>
-              <th className="text-right pr-3">Score</th>
-              <th className="text-right pr-3">Faith giving</th>
-              <th className="text-right pr-3">% of giving</th>
+              <th className="text-right pr-3">Christian $ (3yr)</th>
+              <th className="text-right pr-3">Christian %</th>
+              <th className="text-right pr-3">Classified</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -117,21 +119,19 @@ export default function Analytics() {
               <tr key={f.ein} className="border-b border-line/60">
                 <td className="py-1.5 pr-3 tabular text-muted">{i + 1}</td>
                 <td className="pr-3 font-medium max-w-72 truncate">
-                  {f.foundation_name}
+                  {titleCase(f.foundation_name)}
                 </td>
                 <td className="pr-3 text-muted">
                   {f.city}, {f.state}
                 </td>
-                <td className="text-right pr-3">
-                  <Badge className={scoreColor(f.faith_alignment_score)}>
-                    {f.faith_alignment_score}
-                  </Badge>
+                <td className="text-right tabular pr-3 font-medium">
+                  {money(f.christian_dollars_3yr)}
                 </td>
                 <td className="text-right tabular pr-3">
-                  {money(f.faith_giving)}
+                  {f.christian_pct_floor}–{f.christian_pct_ceiling}%
                 </td>
-                <td className="text-right tabular pr-3">
-                  {f.christian_giving_pct}%
+                <td className="text-right tabular pr-3 text-muted">
+                  {f.classification_coverage}%
                 </td>
                 <td className="text-xs text-muted">
                   {f.application_status || '—'}

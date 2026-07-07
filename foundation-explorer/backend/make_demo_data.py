@@ -40,8 +40,8 @@ MARQUEE_NAMES = ['MACLELLAN', 'LILLY ENDOWMENT', 'TEMPLETON FOUNDATION',
 def sample_eins(conn) -> list[str]:
     # rank by the corrected composite score
     top = [r[0] for r in conn.execute(
-        "SELECT ein FROM universe WHERE faith_score_composite IS NOT NULL "
-        "ORDER BY faith_score_composite DESC, christian_dollars_3yr DESC "
+        "SELECT ein FROM universe WHERE christian_dollars_3yr > 0 "
+        "ORDER BY christian_dollars_3yr DESC "
         "LIMIT 1500"
     )]
     # top Christian-dollar givers

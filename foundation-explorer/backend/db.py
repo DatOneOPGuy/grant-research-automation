@@ -29,7 +29,9 @@ NUMERIC_COLS = {
     'christian_dollars_3yr', 'christian_dollars_2023',
     'christian_dollars_2024', 'christian_dollars_2025',
     'christian_grant_count_3yr', 'is_testamentary_trust', 'is_small_fund',
-    'is_actively_giving',
+    'is_actively_giving', 'total_giving_3yr', 'nonchristian_dollars_3yr',
+    'unclassified_dollars_3yr', 'classification_coverage',
+    'christian_pct_floor', 'christian_pct_ceiling',
 }
 
 INDEXES = [
