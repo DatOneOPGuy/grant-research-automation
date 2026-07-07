@@ -27,7 +27,7 @@ def christian_evidence(conn, ein, bare):
     """Christian recipients for one foundation (matches the API endpoint)."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from src.classifier import tradition
     from src.faith_config import CONFIDENCE_MIN, FAITH_TAGS
     from src.matcher import normalize
