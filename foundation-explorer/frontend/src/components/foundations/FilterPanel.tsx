@@ -1,7 +1,11 @@
 import type { FoundationFilterState } from '../../lib/api'
 import { US_STATES } from '../../lib/format'
 
-const STATUSES = ['Accepting Applications', 'Invite Only', 'Unknown']
+const VERDICTS: [string, string][] = [
+  ['strong', 'Funds Christian organizations'],
+  ['some', 'Some Christian giving'],
+  ['any', 'Any Christian giving'],
+]
 const SIZES: [string, string][] = [
   ['lt100k', '<$100k'], ['100k-1m', '$100k–1M'],
   ['1m-10m', '$1M–10M'], ['gte10m', '$10M+'],
@@ -46,35 +50,26 @@ export default function FilterPanel({ filters, onChange }: Props) {
   const set = (patch: Partial<FoundationFilterState>) =>
     onChange({ ...filters, ...patch, page: 1 })
 
-  const toggle = (key: 'status' | 'sizes' | 'states', v: string) => {
+  const toggle = (key: 'sizes' | 'states', v: string) => {
     const cur = filters[key]
     set({ [key]: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] })
   }
 
   return (
     <div className="w-64 shrink-0">
-      <Section title="Faith Alignment">
-        <div className="text-xs text-muted mb-1">Composite score</div>
-        <div className="flex items-center gap-2 mb-3 text-sm">
-          <input type="number" min={0} max={100} placeholder="Min"
-            className="w-16 border border-line rounded px-2 py-1"
-            value={filters.score_min ?? ''}
-            onChange={(e) => set({ score_min: e.target.value === '' ? undefined
-              : Number(e.target.value) })} />
-          <span className="text-muted">to</span>
-          <input type="number" min={0} max={100} placeholder="Max"
-            className="w-16 border border-line rounded px-2 py-1"
-            value={filters.score_max ?? ''}
-            onChange={(e) => set({ score_max: e.target.value === '' ? undefined
-              : Number(e.target.value) })} />
+      <Section title="Christian Giving">
+        <div className="text-xs text-muted mb-1">Verdict</div>
+        {VERDICTS.map(([v, label]) => (
+          <label key={v}
+            className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+            <input type="radio" name="verdict" checked={filters.verdict === v}
+              onChange={() => set({ verdict: v })} className="accent-primary" />
+            {label}
+          </label>
+        ))}
+        <div className="text-xs text-muted mb-1 mt-3">
+          Min Christian $ (3yr)
         </div>
-        <div className="text-xs text-muted mb-1">Min % Christian giving</div>
-        <input type="number" min={0} max={100} placeholder="e.g. 25"
-          className="w-full border border-line rounded px-2 py-1 text-sm mb-3"
-          value={filters.pct_min ?? ''}
-          onChange={(e) => set({ pct_min: e.target.value === '' ? undefined
-            : Number(e.target.value) })} />
-        <div className="text-xs text-muted mb-1">Min Christian $ (3yr)</div>
         <div className="flex flex-wrap gap-1">
           {CHRISTIAN_MINS.map(([label, v]) => (
             <button key={label} onClick={() => set({ christian_min: v })}
@@ -86,19 +81,29 @@ export default function FilterPanel({ filters, onChange }: Props) {
             </button>
           ))}
         </div>
+        <div className="mt-3">
+          <Check label="Recently active (2024 grants)"
+            checked={filters.recently_active}
+            onChange={(v) => set({ recently_active: v })} />
+        </div>
       </Section>
 
-      <Section title="Application Access">
-        {STATUSES.map((s) => (
-          <Check key={s} label={s} checked={filters.status.includes(s)}
-            onChange={() => toggle('status', s)} />
-        ))}
-        <Check label="Has contact person" checked={filters.has_contact}
-          onChange={(v) => set({ has_contact: v })} />
-        <Check label="Has website" checked={filters.has_website}
-          onChange={(v) => set({ has_website: v })} />
-        <Check label="Has phone" checked={filters.has_phone}
-          onChange={(v) => set({ has_phone: v })} />
+      <Section title="Reachability">
+        <div className="text-xs text-muted mb-2">
+          Default shows foundations you can approach (accepting or contact
+          first).
+        </div>
+        <Check label="Include invite-only foundations"
+          checked={filters.include_invite}
+          onChange={(v) => set({ include_invite: v })} />
+        <div className="mt-2 pt-2 border-t border-line/60">
+          <Check label="Has contact person" checked={filters.has_contact}
+            onChange={(v) => set({ has_contact: v })} />
+          <Check label="Has website" checked={filters.has_website}
+            onChange={(v) => set({ has_website: v })} />
+          <Check label="Has phone" checked={filters.has_phone}
+            onChange={(v) => set({ has_phone: v })} />
+        </div>
       </Section>
 
       <Section title="Basic Info">

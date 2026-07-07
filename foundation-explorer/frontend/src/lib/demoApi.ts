@@ -24,27 +24,24 @@ type Preset = {
   sort: string
   dir: 'asc' | 'desc'
 }
-const ACCEPTING = (r: any) =>
+const REACHABLE = (r: any) =>
   r.application_status === 'Accepting Applications'
   || r.application_status === 'Contact First'
+const STRONG = (r: any) => r.verdict === 'Funds Christian organizations'
 const PRESETS: Record<string, Preset> = {
   'best-prospects': {
-    where: (r) => ACCEPTING(r) && r.christian_dollars_3yr >= 100000
+    where: (r) => STRONG(r) && REACHABLE(r)
       && !Number(r.is_testamentary_trust),
     sort: 'christian_dollars_3yr', dir: 'desc',
   },
   'top-christian-dollars': {
-    where: (r) => r.christian_dollars_3yr > 0
+    where: (r) => r.verdict !== 'No confirmed Christian giving'
       && !Number(r.is_testamentary_trust),
     sort: 'christian_dollars_3yr', dir: 'desc',
   },
-  'highest-alignment': {
-    where: (r) => r.christian_pct_floor >= 60
-      && r.classification_coverage >= 50 && r.christian_dollars_3yr > 0,
-    sort: 'christian_pct_floor', dir: 'desc',
-  },
   'accepting': {
-    where: (r) => r.application_status === 'Accepting Applications'
+    where: (r) => STRONG(r)
+      && r.application_status === 'Accepting Applications'
       && !Number(r.is_testamentary_trust),
     sort: 'christian_dollars_3yr', dir: 'desc',
   },
@@ -53,48 +50,41 @@ const PRESETS: Record<string, Preset> = {
 function foundationList(p: URLSearchParams, rows: any[]) {
   const q = (p.get('q') || '').toLowerCase()
   const states = p.getAll('states')
-  const status = p.getAll('status')
   const sizes = p.getAll('sizes')
   const presetKey = p.get('preset') || ''
   const preset = PRESETS[presetKey]
-  const numOr = (k: string) => {
-    const v = p.get(k)
+  const verdict = p.get('verdict') || 'strong'
+  const christianMin = (() => {
+    const v = p.get('christian_min')
     return v === null || v === '' ? undefined : Number(v)
-  }
-  const scoreMin = numOr('score_min')
-  const scoreMax = numOr('score_max')
-  const pctMin = numOr('pct_min')
-  const christianMin = numOr('christian_min')
+  })()
 
   let out = rows.filter((r) => {
     if (preset && !preset.where(r)) return false
+    // verdict (customers only see Christian funders)
+    if (!preset) {
+      if (verdict === 'some' && r.verdict !== 'Some Christian giving')
+        return false
+      if (verdict === 'any' && r.verdict === 'No confirmed Christian giving')
+        return false
+      if (verdict === 'strong' && !STRONG(r)) return false
+      // reachability: exclude invite-only unless toggled
+      if (p.get('include_invite') !== 'true' && !REACHABLE(r)) return false
+    }
     if (q && !(`${r.foundation_name} ${r.ein} ${r.city}`
       .toLowerCase().includes(q))) return false
     if (states.length && !states.includes(r.state)) return false
-    if (scoreMin !== undefined && !(r.christian_pct_ceiling >= scoreMin))
-      return false
-    if (scoreMax !== undefined && !(r.christian_pct_ceiling <= scoreMax))
-      return false
-    if (pctMin !== undefined && !(r.christian_pct_floor >= pctMin))
-      return false
     if (christianMin !== undefined && !(r.christian_dollars_3yr >= christianMin))
       return false
-    if (status.length) {
-      const ok = status.some((s) => s === 'Unknown'
-        ? !r.application_status : r.application_status === s)
-      if (!ok) return false
-    }
+    if (p.get('recently_active') === 'true'
+      && !(r.most_recent_christian_year >= 2024)) return false
     if (sizes.length && !sizes.some((s) => SIZES[s]?.(r.distributions)))
       return false
     for (const [flag, col] of [
-      ['has_filings', 'data_found'], ['has_contact', 'contact_person'],
-      ['has_website', 'website'], ['has_phone', 'phone'],
-      ['has_deadline', 'deadlines'],
+      ['has_contact', 'contact_person'], ['has_website', 'website'],
+      ['has_phone', 'phone'],
     ] as const) {
-      if (p.get(flag) === 'true') {
-        const v = r[col]
-        if (flag === 'has_filings' ? v !== 'Yes' : !v) return false
-      }
+      if (p.get(flag) === 'true' && !r[col]) return false
     }
     if (!preset) {
       if (p.get('include_trusts') !== 'true' && Number(r.is_testamentary_trust))
@@ -148,6 +138,10 @@ export async function demoGet(path: string): Promise<any> {
     if (parts[2] === 'recipients') {
       return { distinct_recipients: (d.recipients || []).length,
         top: d.recipients || [] }
+    }
+    if (parts[2] === 'christian-evidence') {
+      const ev = d.christian_evidence || []
+      return { count: ev.length, recipients: ev }
     }
   }
 

@@ -16,38 +16,63 @@ SIZE_BUCKETS = {
 }
 
 # Preset views: (filter patch dict, sort, direction). Applied server-side.
+STRONG = "verdict = 'Funds Christian organizations'"
+REACHABLE = ("application_status IN ('Accepting Applications', "
+             "'Contact First')")
+
 PRESETS = {
     'best-prospects': {
-        'where': ["application_status IN ('Accepting Applications', "
-                  "'Contact First')",
-                  'christian_dollars_3yr >= 100000',
-                  'is_testamentary_trust = 0'],
+        'where': [STRONG, REACHABLE, 'is_testamentary_trust = 0'],
         'sort': 'christian_dollars_3yr', 'direction': 'desc',
     },
     'top-christian-dollars': {
-        'where': ['christian_dollars_3yr > 0', 'is_testamentary_trust = 0'],
+        'where': ["verdict != 'No confirmed Christian giving'",
+                  'is_testamentary_trust = 0'],
         'sort': 'christian_dollars_3yr', 'direction': 'desc',
     },
-    'highest-alignment': {
-        'where': ['christian_pct_floor >= 60', 'classification_coverage >= 50',
-                  'christian_dollars_3yr > 0'],
-        'sort': 'christian_pct_floor', 'direction': 'desc',
-    },
     'accepting': {
-        'where': ["application_status = 'Accepting Applications'",
+        'where': [STRONG, "application_status = 'Accepting Applications'",
                   'is_testamentary_trust = 0'],
         'sort': 'christian_dollars_3yr', 'direction': 'desc',
     },
 }
 
 
-def foundation_filters(p) -> tuple[str, list]:
-    """Build WHERE clause from FoundationFilters params."""
-    where, args = ['1=1'], []
+LATEST_FILING_YEAR = 2024  # newest tax year with broad e-file coverage
 
+
+def foundation_filters(p) -> tuple[str, list]:
+    """Build WHERE clause from FoundationFilters params.
+
+    Customer model: foundations that fund Christian organizations and can be
+    approached. The default view is strong-verdict + reachable; explicit
+    filters widen it.
+    """
+    where, args = ['1=1'], []
     preset = PRESETS.get(p.preset or '')
     if preset:
         where.extend(preset['where'])
+
+    # --- Christian-giving verdict (customers only see Christian funders) ---
+    if not preset:
+        verdict = (p.verdict or 'strong').lower()
+        if verdict == 'some':
+            where.append("verdict = 'Some Christian giving'")
+        elif verdict == 'any':
+            where.append("verdict != 'No confirmed Christian giving'")
+        else:  # 'strong' (default)
+            where.append(STRONG)
+
+    # --- reachability: exclude invite-only unless toggled on ---
+    if not preset and not p.include_invite:
+        where.append(REACHABLE)
+
+    if p.christian_min is not None:
+        where.append('christian_dollars_3yr >= ?')
+        args.append(p.christian_min)
+    if p.recently_active:
+        where.append('most_recent_christian_year >= ?')
+        args.append(LATEST_FILING_YEAR)
 
     if p.q:
         where.append('(foundation_name LIKE ? OR ein LIKE ? OR city LIKE ?)')
@@ -56,44 +81,17 @@ def foundation_filters(p) -> tuple[str, list]:
         marks = ','.join('?' * len(p.states))
         where.append(f'state IN ({marks})')
         args += p.states
-    if p.score_min is not None:
-        where.append('christian_pct_ceiling >= ?')
-        args.append(p.score_min)
-    if p.score_max is not None:
-        where.append('christian_pct_ceiling <= ?')
-        args.append(p.score_max)
-    if p.pct_min is not None:
-        where.append('christian_giving_pct >= ?')
-        args.append(p.pct_min)
-    if p.christian_min is not None:
-        where.append('christian_dollars_3yr >= ?')
-        args.append(p.christian_min)
-    if p.status:
-        clauses = []
-        for s in p.status:
-            if s == 'Unknown':
-                clauses.append(
-                    "(application_status IS NULL OR application_status = '')")
-            else:
-                clauses.append('application_status = ?')
-                args.append(s)
-        where.append('(' + ' OR '.join(clauses) + ')')
     if p.sizes:
         clauses = [SIZE_BUCKETS[s] for s in p.sizes if s in SIZE_BUCKETS]
         if clauses:
             where.append('(' + ' OR '.join(clauses) + ')')
-    if p.has_filings:
-        where.append("data_found = 'Yes'")
     if p.has_contact:
         where.append("(contact_person != '' AND contact_person IS NOT NULL)")
     if p.has_website:
         where.append("(website != '' AND website IS NOT NULL)")
     if p.has_phone:
         where.append("(phone != '' AND phone IS NOT NULL)")
-    if p.has_deadline:
-        where.append("(deadlines != '' AND deadlines IS NOT NULL)")
-    # Exclude trusts/micro-funds by default unless explicitly included or a
-    # preset already set its own trust rule.
+    # Exclude trusts/micro-funds by default unless explicitly included.
     if not p.include_trusts and not preset:
         where.append('(is_testamentary_trust = 0 OR is_testamentary_trust '
                      'IS NULL)')

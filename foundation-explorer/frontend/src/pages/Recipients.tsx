@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiGet } from '../lib/api'
 import { moneyFull, num } from '../lib/format'
@@ -87,8 +87,8 @@ export default function Recipients() {
           </thead>
           <tbody>
             {data?.rows.map((r: any) => (
-              <>
-                <tr key={r.name_norm}
+              <Fragment key={r.name_norm}>
+                <tr
                   onClick={() => setExpanded(
                     expanded === r.name_norm ? null : r.name_norm,
                   )}
@@ -138,7 +138,7 @@ export default function Recipients() {
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>

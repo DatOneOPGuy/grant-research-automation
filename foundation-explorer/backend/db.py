@@ -32,6 +32,7 @@ NUMERIC_COLS = {
     'is_actively_giving', 'total_giving_3yr', 'nonchristian_dollars_3yr',
     'unclassified_dollars_3yr', 'classification_coverage',
     'christian_pct_floor', 'christian_pct_ceiling',
+    'christian_recipient_count', 'most_recent_christian_year',
 }
 
 INDEXES = [

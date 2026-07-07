@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import { apiGet } from '../../lib/api'
 import { money, moneyFull, num, titleCase } from '../../lib/format'
-import { Badge, Skeleton, StatusPill } from '../ui/primitives'
+import { Badge, Skeleton, StatusPill, VerdictBadge } from '../ui/primitives'
 
 type Props = { ein: string; onClose: () => void }
 
@@ -85,67 +85,94 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
+function ChristianEvidence({ ein }: { ein: string }) {
+  const [showAll, setShowAll] = useState(false)
+  const { data } = useQuery({
+    queryKey: ['evidence', ein],
+    queryFn: () => apiGet<any>(`/api/foundations/${ein}/christian-evidence`),
+  })
+  if (!data) return <Skeleton className="h-24" />
+  if (!data.count) {
+    return <div className="text-sm text-muted">
+      No confirmed Christian recipients in 2023–2025 filings.
+    </div>
+  }
+  const rows = showAll ? data.recipients : data.recipients.slice(0, 15)
+  return (
+    <div>
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((r: any, i: number) => (
+            <tr key={i} className="border-b border-line/50">
+              <td className="py-1.5 pr-2 font-medium">
+                {titleCase(r.name)}
+                {r.tradition && (
+                  <span className="text-xs text-muted font-normal ml-1">
+                    · {r.tradition}
+                  </span>
+                )}
+              </td>
+              <td className="text-right tabular pr-3 whitespace-nowrap">
+                {moneyFull(r.total)}
+              </td>
+              <td className="text-right tabular text-muted text-xs whitespace-nowrap">
+                most recent: {r.most_recent_year}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {data.count > 15 && (
+        <button onClick={() => setShowAll(!showAll)}
+          className="text-sm text-primary mt-2 hover:underline">
+          {showAll ? 'Show fewer'
+            : `Show all ${data.count} Christian organizations`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function Overview({ d }: { d: any }) {
+  const staleChristian = d.most_recent_christian_year
+    && d.latest_tax_year
+    && d.most_recent_christian_year < d.latest_tax_year
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-4 gap-3">
+      <div className="flex items-center justify-between">
+        <VerdictBadge verdict={d.verdict} />
+        <StatusPill status={d.application_status} />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
         <Stat label="Christian $ (3yr)"
           value={money(d.christian_dollars_3yr)} />
+        <Stat label="Christian orgs funded"
+          value={d.christian_recipient_count ?? '—'} />
         <Stat label="Total giving (3yr)"
           value={money(d.total_giving_3yr)} />
-        <Stat label="Qualifying distributions"
-          value={money(d.distributions)} />
-        <Stat label="Grants classified"
-          value={d.classification_coverage != null
-            ? `${d.classification_coverage}%` : '—'} />
       </div>
+
+      {/* Evidence — the Christian organizations funded */}
       <div className="border border-line rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="font-display font-medium text-primary">
-            Christian giving
-          </div>
-          <Badge className={(d.classification_coverage ?? 0) >= 85
-            ? 'bg-green-50 text-scorehigh' : 'bg-amber-50 text-scoremid'}>
-            {d.christian_pct_floor != null
-              ? ((d.classification_coverage ?? 0) >= 85
-                ? `${d.christian_pct_floor}% Christian`
-                : `${d.christian_pct_floor}–${d.christian_pct_ceiling}% Christian`)
-              : '—'}
-          </Badge>
+        <div className="font-display font-medium text-primary mb-1">
+          Christian organizations this foundation has funded (2023–2025)
         </div>
-        <div className="text-sm text-muted">
-          {(d.classification_coverage ?? 0) >= 85
-            ? `We've classified ${d.classification_coverage}% of this `
-              + `foundation's grants.`
-            : `Range shown because we've classified `
-              + `${d.classification_coverage ?? 0}% of grants — the true `
-              + `figure sits between the floor and ceiling.`}
-        </div>
-        {(d.christian_dollars_2023 != null
-          || d.christian_dollars_2024 != null) && (
-          <div className="flex gap-4 mt-3 text-sm">
-            {[['2023', d.christian_dollars_2023],
-              ['2024', d.christian_dollars_2024],
-              ['2025', d.christian_dollars_2025]].map(([y, v]) => (
-              <div key={y as string}>
-                <div className="text-xs text-muted">Christian $ {y}</div>
-                <div className="tabular font-medium">{money(v as number)}</div>
-              </div>
-            ))}
+        {staleChristian && (
+          <div className="text-xs text-scoremid mb-2">
+            Note: most recent Christian grant was {d.most_recent_christian_year}
+            {' '}(latest filing {d.latest_tax_year}) — Christian giving may have
+            decreased recently.
           </div>
         )}
-        {d.faith_categories && (
-          <div className="flex flex-wrap gap-1 mt-3">
-            {String(d.faith_categories).split('; ').slice(0, 8).map(
-              (c: string) => (
-                <Badge key={c} className="bg-canvas text-primary border border-line">
-                  {c}
-                </Badge>
-              ),
-            )}
-          </div>
-        )}
+        <ChristianEvidence ein={d.ein} />
       </div>
+
+      <div className="text-xs text-muted italic border-l-2 border-line pl-3">
+        Based on grants reported in IRS 990-PF filings, 2023–2025. We recommend
+        confirming current priorities and application requirements directly with
+        the foundation before applying.
+      </div>
+
       <div className="border border-line rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="font-display font-medium text-primary">

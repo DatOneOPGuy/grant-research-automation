@@ -6,25 +6,23 @@ import {
   apiGet, DEMO, defaultFilters, filterParams,
   type FoundationFilterState, type FoundationRow, type Paged,
 } from '../lib/api'
-import { christianPct, money, num, titleCase } from '../lib/format'
-import { Badge, Skeleton, StatusPill } from '../components/ui/primitives'
+import { money, num, titleCase } from '../lib/format'
+import { Skeleton, StatusPill, VerdictBadge } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
 import DetailPanel from '../components/foundations/DetailPanel'
 
 const PRESETS: { key: string; label: string }[] = [
   { key: 'best-prospects', label: 'Best Prospects' },
   { key: 'top-christian-dollars', label: 'Top Christian $ Givers' },
-  { key: 'highest-alignment', label: 'Highest Alignment' },
   { key: 'accepting', label: 'Accepting Applications' },
 ]
 
 const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'foundation_name', label: 'Foundation', sortable: true },
   { key: 'state', label: 'Location', sortable: true },
+  { key: 'verdict', label: 'Christian giving', sortable: false },
   { key: 'christian_dollars_3yr', label: 'Christian $ (3yr)', sortable: true },
-  { key: 'christian_pct_floor', label: '% Christian', sortable: true },
   { key: 'application_status', label: 'Application', sortable: true },
-  { key: 'total_giving_3yr', label: 'Total giving (3yr)', sortable: true },
   { key: 'actions', label: '' },
 ]
 
@@ -139,11 +137,11 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={8} className="px-3 py-2">
+                  <tr key={i}><td colSpan={6} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={6} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -157,25 +155,19 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                     <td className="px-3 text-muted whitespace-nowrap">
                       {titleCase(r.city)}, {r.state}
                     </td>
+                    <td className="px-3 py-2">
+                      <VerdictBadge verdict={r.verdict} />
+                      {r.christian_preview && (
+                        <div className="text-xs text-muted mt-1 max-w-72 truncate"
+                          title={titleCase(r.christian_preview)}>
+                          {titleCase(r.christian_preview)}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 tabular font-medium">
                       {money(r.christian_dollars_3yr)}
                     </td>
-                    <td className="px-3">
-                      {(() => {
-                        const c = christianPct(r)
-                        return (
-                          <Badge className={c.well
-                            ? 'bg-green-50 text-scorehigh'
-                            : 'bg-amber-50 text-scoremid'}>
-                            {c.short}
-                          </Badge>
-                        )
-                      })()}
-                    </td>
                     <td className="px-3"><StatusPill status={r.application_status} /></td>
-                    <td className="px-3 tabular text-muted">
-                      {money(r.total_giving_3yr)}
-                    </td>
                     <td className="px-3">
                       <a href={r.propublica_url} target="_blank" rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}

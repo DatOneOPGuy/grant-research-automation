@@ -4,14 +4,13 @@ export type FoundationRow = {
   city: string | null
   state: string | null
   distributions: number | null
-  assets: number | null
   revenue: number | null
   christian_dollars_3yr: number | null
   total_giving_3yr: number | null
-  christian_pct_floor: number | null
-  christian_pct_ceiling: number | null
-  classification_coverage: number | null
-  christian_pct_display: string | null
+  verdict: string | null
+  christian_preview: string | null
+  christian_recipient_count: number | null
+  most_recent_christian_year: number | null
   application_status: string | null
   is_testamentary_trust: number | null
   is_small_fund: number | null
@@ -30,17 +29,14 @@ export type Paged<T> = {
 export type FoundationFilterState = {
   q: string
   states: string[]
-  score_min?: number
-  score_max?: number
-  pct_min?: number
+  verdict: string            // strong (default) | some | any
   christian_min?: number
-  status: string[]
+  recently_active: boolean
   sizes: string[]
-  has_filings: boolean
   has_contact: boolean
   has_website: boolean
   has_phone: boolean
-  has_deadline: boolean
+  include_invite: boolean
   include_trusts: boolean
   include_small: boolean
   preset: string
@@ -53,13 +49,13 @@ export type FoundationFilterState = {
 export const defaultFilters: FoundationFilterState = {
   q: '',
   states: [],
-  status: [],
+  verdict: 'strong',
+  recently_active: false,
   sizes: [],
-  has_filings: false,
   has_contact: false,
   has_website: false,
   has_phone: false,
-  has_deadline: false,
+  include_invite: false,
   include_trusts: false,
   include_small: false,
   preset: '',
@@ -73,15 +69,12 @@ export function filterParams(f: FoundationFilterState): URLSearchParams {
   const p = new URLSearchParams()
   if (f.q) p.set('q', f.q)
   f.states.forEach((s) => p.append('states', s))
-  f.status.forEach((s) => p.append('status', s))
   f.sizes.forEach((s) => p.append('sizes', s))
-  if (f.score_min !== undefined) p.set('score_min', String(f.score_min))
-  if (f.score_max !== undefined) p.set('score_max', String(f.score_max))
-  if (f.pct_min !== undefined) p.set('pct_min', String(f.pct_min))
+  if (f.verdict) p.set('verdict', f.verdict)
   if (f.christian_min !== undefined)
     p.set('christian_min', String(f.christian_min))
-  for (const k of ['has_filings', 'has_contact', 'has_website',
-    'has_phone', 'has_deadline', 'include_trusts', 'include_small'] as const) {
+  for (const k of ['recently_active', 'has_contact', 'has_website',
+    'has_phone', 'include_invite', 'include_trusts', 'include_small'] as const) {
     if (f[k]) p.set(k, 'true')
   }
   if (f.preset) p.set('preset', f.preset)

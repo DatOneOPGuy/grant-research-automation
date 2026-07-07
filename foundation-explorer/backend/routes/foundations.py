@@ -12,8 +12,8 @@ router = APIRouter(prefix='/api/foundations', tags=['foundations'])
 
 LIST_COLS = (
     'ein, foundation_name, city, state, distributions, revenue, '
-    'christian_dollars_3yr, total_giving_3yr, christian_pct_floor, '
-    'christian_pct_ceiling, classification_coverage, christian_pct_display, '
+    'christian_dollars_3yr, total_giving_3yr, verdict, christian_preview, '
+    'christian_recipient_count, most_recent_christian_year, '
     'application_status, is_testamentary_trust, is_small_fund, data_found, '
     'propublica_url, latest_tax_year'
 )
@@ -56,18 +56,17 @@ def foundation_stats():
                        AS with_filings,
                    SUM(CASE WHEN faith_alignment_score IS NOT NULL
                        THEN 1 ELSE 0 END) AS scored,
-                   SUM(CASE WHEN christian_pct_floor >= 50
-                       AND classification_coverage >= 50
+                   SUM(CASE WHEN verdict = 'Funds Christian organizations'
                        THEN 1 ELSE 0 END) AS high_alignment,
-                   SUM(CASE WHEN application_status IN
+                   SUM(CASE WHEN verdict = 'Funds Christian organizations'
+                       AND application_status IN
                        ('Accepting Applications', 'Contact First')
-                       AND christian_dollars_3yr >= 100000
                        AND (is_testamentary_trust = 0
                             OR is_testamentary_trust IS NULL)
                        THEN 1 ELSE 0 END) AS best_prospects,
-                   SUM(CASE WHEN application_status IN
+                   SUM(CASE WHEN verdict = 'Funds Christian organizations'
+                       AND application_status IN
                        ('Accepting Applications', 'Contact First')
-                       AND christian_dollars_3yr >= 100000
                        AND (is_testamentary_trust = 0
                             OR is_testamentary_trust IS NULL)
                        THEN christian_dollars_3yr ELSE 0 END)
@@ -155,6 +154,56 @@ def foundation_grants(ein: str, page: int = 1, page_size: int = 50,
         conn.close()
     return {'total': total, 'total_dollars': dollars,
             'rows': rows_to_dicts(rows)}
+
+
+@router.get('/{ein}/christian-evidence')
+def christian_evidence(ein: str):
+    """The Christian organizations this foundation funded (2023-2025), with
+    total dollars, most recent grant year, and tradition — the evidence
+    behind the verdict."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from src.classifier import tradition
+    from src.faith_config import CONFIDENCE_MIN, FAITH_TAGS
+    from src.matcher import normalize
+    faith = set(FAITH_TAGS)
+
+    conn = get_conn()
+    try:
+        # recipient-tag lookup limited to this foundation's grantees
+        rows = conn.execute(
+            "SELECT grantee_name, amount, tax_year FROM pipeline.grants "
+            "WHERE ein IN (?, ?) AND grantee_name != '' "
+            "AND tax_year IN (2023, 2024, 2025)",
+            (ein, ein.lstrip('0'))).fetchall()
+        agg = {}
+        for gname, amount, year in rows:
+            norm = normalize(gname)
+            if norm not in agg:
+                tag = conn.execute(
+                    "SELECT tags FROM pipeline.recipients WHERE name_norm = ?",
+                    (norm,)).fetchone()
+                names = ({t['name'] for t in json.loads(tag[0])
+                          if t.get('confidence', 0) >= CONFIDENCE_MIN}
+                         if tag else set())
+                agg[norm] = {
+                    'is_christian': bool(names & faith),
+                    'name': gname, 'total': 0, 'recent': 0,
+                    'tradition': tradition(gname),
+                }
+            e = agg[norm]
+            if e['is_christian']:
+                e['total'] += amount or 0
+                e['recent'] = max(e['recent'], year)
+        evidence = sorted(
+            ({'name': e['name'], 'total': e['total'],
+              'most_recent_year': e['recent'], 'tradition': e['tradition']}
+             for e in agg.values() if e['is_christian'] and e['total'] > 0),
+            key=lambda x: -x['total'])
+    finally:
+        conn.close()
+    return {'count': len(evidence), 'recipients': evidence}
 
 
 @router.get('/{ein}/recipients')

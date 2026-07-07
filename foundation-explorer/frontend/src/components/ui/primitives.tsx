@@ -48,6 +48,19 @@ export function KPI({ label, value, sub }: {
   )
 }
 
+export function VerdictBadge({ verdict }: { verdict: string | null }) {
+  if (verdict === 'Funds Christian organizations') {
+    return <Badge className="bg-green-50 text-scorehigh whitespace-nowrap">
+      ✓ Funds Christian orgs</Badge>
+  }
+  if (verdict === 'Some Christian giving') {
+    return <Badge className="bg-amber-50 text-scoremid whitespace-nowrap">
+      Some Christian giving</Badge>
+  }
+  return <Badge className="bg-gray-100 text-scorelow whitespace-nowrap">
+    No confirmed</Badge>
+}
+
 export function StatusPill({ status }: { status: string | null }) {
   if (status === 'Accepting Applications') {
     return <Badge className="bg-green-50 text-scorehigh">Accepting</Badge>

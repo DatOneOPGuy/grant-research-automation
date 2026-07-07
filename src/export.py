@@ -71,7 +71,9 @@ ENRICH_COLS = ['faith_score_composite', 'christian_dollars_3yr',
                'total_giving_3yr', 'nonchristian_dollars_3yr',
                'unclassified_dollars_3yr', 'classification_coverage',
                'christian_pct_floor', 'christian_pct_ceiling',
-               'christian_pct_display', 'is_testamentary_trust',
+               'christian_pct_display', 'verdict',
+               'christian_recipient_count', 'most_recent_christian_year',
+               'christian_preview', 'is_testamentary_trust',
                'is_small_fund', 'is_actively_giving']
 
 

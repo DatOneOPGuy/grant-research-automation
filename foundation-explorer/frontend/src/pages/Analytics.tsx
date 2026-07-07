@@ -75,27 +75,29 @@ export default function Analytics() {
       </Card>
 
       <Card className="mb-6">
-        <CardTitle>How we report Christian giving honestly</CardTitle>
+        <CardTitle>How we decide "Funds Christian organizations"</CardTitle>
         <p className="text-sm text-muted mb-3">
-          We classify each grant recipient as Christian, non-Christian, or
-          not-yet-identified. When we've classified most of a foundation's
-          giving we show a single percentage; when coverage is lower we show a
-          floor–ceiling range so an unclassified recipient is never silently
-          counted as non-Christian.
+          We classify every grant recipient, then judge each foundation by the
+          Christian organizations it actually funds — and show you those orgs
+          as evidence. No percentages; a plain verdict you can verify.
         </p>
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-3 gap-4 text-sm">
           <div className="border border-line rounded p-3">
-            <div className="font-medium">High coverage</div>
-            <div className="text-muted">92% of grants classified, 88% Christian</div>
-            <div className="mt-1">Shown as
-              <span className="font-medium text-scorehigh"> "88% Christian"</span></div>
+            <div className="font-medium text-scorehigh">
+              ✓ Funds Christian organizations
+            </div>
+            <div className="text-muted">≥ $100k to Christian causes AND ≥ 3
+              distinct Christian recipients over 3 years</div>
           </div>
           <div className="border border-line rounded p-3">
-            <div className="font-medium">Low coverage</div>
-            <div className="text-muted">41% classified, 38% confirmed Christian</div>
-            <div className="mt-1">Shown as
-              <span className="font-medium text-scoremid"> "38–97% Christian
-              (41% classified)"</span></div>
+            <div className="font-medium text-scoremid">Some Christian giving</div>
+            <div className="text-muted">Confirmed Christian giving, but below
+              the strong-yes threshold</div>
+          </div>
+          <div className="border border-line rounded p-3">
+            <div className="font-medium text-scorelow">No confirmed</div>
+            <div className="text-muted">No identified Christian recipients —
+              hidden from default view</div>
           </div>
         </div>
       </Card>
@@ -109,8 +111,7 @@ export default function Analytics() {
               <th className="pr-3">Foundation</th>
               <th className="pr-3">Location</th>
               <th className="text-right pr-3">Christian $ (3yr)</th>
-              <th className="text-right pr-3">Christian %</th>
-              <th className="text-right pr-3">Classified</th>
+              <th className="text-right pr-3">Christian orgs</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -127,11 +128,8 @@ export default function Analytics() {
                 <td className="text-right tabular pr-3 font-medium">
                   {money(f.christian_dollars_3yr)}
                 </td>
-                <td className="text-right tabular pr-3">
-                  {f.christian_pct_floor}–{f.christian_pct_ceiling}%
-                </td>
                 <td className="text-right tabular pr-3 text-muted">
-                  {f.classification_coverage}%
+                  {f.christian_recipient_count}
                 </td>
                 <td className="text-xs text-muted">
                   {f.application_status || '—'}

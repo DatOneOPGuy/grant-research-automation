@@ -6,7 +6,9 @@ import {
 import { ArrowRight } from 'lucide-react'
 import { apiGet } from '../lib/api'
 import { money, num, titleCase } from '../lib/format'
-import { Card, CardTitle, KPI, Skeleton } from '../components/ui/primitives'
+import {
+  Card, CardTitle, KPI, Skeleton, VerdictBadge,
+} from '../components/ui/primitives'
 
 export default function Dashboard() {
   const nav = useNavigate()
@@ -71,20 +73,19 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Verification table — honest ranges */}
+      {/* Verification table — verdict + evidence */}
       <Card className="mb-6">
         <CardTitle>Verification — known major Christian funders</CardTitle>
         <p className="text-sm text-muted mb-3">
-          We report a floor–ceiling range and how much of each foundation's
-          giving we've classified, rather than a single false-precise
-          percentage. The ceiling tracks what these funders are known to give.
+          Every verdict is backed by the actual Christian organizations each
+          foundation funds — recognizable names a fundraiser can verify.
         </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted border-b border-line">
               <th className="py-2">Funder</th>
-              <th className="text-right">Christian % (range)</th>
-              <th className="text-right">Classified</th>
+              <th>Verdict</th>
+              <th className="text-right">Christian orgs</th>
               <th className="text-right">Christian $ (3yr)</th>
             </tr>
           </thead>
@@ -94,13 +95,11 @@ export default function Dashboard() {
                 <td className="py-2 font-medium">
                   {titleCase(v.foundation_name)}
                 </td>
-                <td className="text-right tabular font-medium">
-                  {v.christian_pct_floor}–{v.christian_pct_ceiling}%
-                </td>
+                <td><VerdictBadge verdict={v.verdict} /></td>
                 <td className="text-right tabular text-muted">
-                  {v.classification_coverage}%
+                  {v.christian_recipient_count}
                 </td>
-                <td className="text-right tabular">
+                <td className="text-right tabular font-medium">
                   {money(v.christian_dollars_3yr)}
                 </td>
               </tr>

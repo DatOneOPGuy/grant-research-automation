@@ -228,6 +228,25 @@ BIG_SECULAR = _rx([
 ])
 
 
+def tradition(name: str) -> str | None:
+    """For a Christian recipient, return which branch matched — a subtle
+    display hint. Returns 'Catholic' | 'Orthodox' | 'Evangelical/Protestant'
+    | None. Only meaningful when classify() returns 'christian'."""
+    if not name:
+        return None
+    n = f' {name.lower().strip()} '
+    if CATHOLIC.search(n):
+        return 'Catholic'
+    if ORTHODOX.search(n):
+        return 'Orthodox'
+    if (SALVATION_ARMY.search(n) or MESSIANIC.search(n)
+            or PROTESTANT.search(n)):
+        return 'Evangelical/Protestant'
+    if SAINT.search(n):
+        return 'Catholic'
+    return None
+
+
 def classify(name: str) -> str | None:
     """Return 'christian' | 'nonchristian' | None (uncategorized)."""
     if not name:

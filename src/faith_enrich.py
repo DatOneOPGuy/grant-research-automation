@@ -69,12 +69,28 @@ def ensure_table(conn):
             classification_coverage INTEGER,
             christian_pct_floor INTEGER, christian_pct_ceiling INTEGER,
             christian_pct_display TEXT,
+            verdict TEXT, christian_recipient_count INTEGER,
+            most_recent_christian_year INTEGER, christian_preview TEXT,
             faith_score_pct INTEGER, faith_score_composite INTEGER,
             volume_component INTEGER,
             is_testamentary_trust INTEGER, is_small_fund INTEGER,
             is_actively_giving INTEGER
         )
     """)
+
+
+# Verdict thresholds (confirmed Christian giving, 3-year window)
+VERDICT_MIN_DOLLARS = 100_000
+VERDICT_MIN_RECIPIENTS = 3
+
+
+def verdict_for(christian_dollars: int, recipient_count: int) -> str:
+    if recipient_count == 0 or christian_dollars <= 0:
+        return 'No confirmed Christian giving'
+    if (christian_dollars >= VERDICT_MIN_DOLLARS
+            and recipient_count >= VERDICT_MIN_RECIPIENTS):
+        return 'Funds Christian organizations'
+    return 'Some Christian giving'
 
 
 def composite(pct: float, christian_dollars: int) -> tuple[int, int]:
@@ -108,6 +124,10 @@ def run():
     nonchr = defaultdict(int)
     unclass = defaultdict(int)
     tot = defaultdict(int)
+    # per-foundation Christian-recipient evidence: ein -> recip_norm ->
+    # [total$, max_year, display_name]
+    evidence = defaultdict(dict)
+    recent_year = defaultdict(int)
     for ein, name, amount, year in conn.execute(
         "SELECT ein, grantee_name, amount, tax_year FROM grants "
         "WHERE grantee_name != ''"
@@ -117,15 +137,25 @@ def run():
         if year not in (2023, 2024, 2025):
             continue
         tot[ein] += amount
-        st = status.get(normalize(name))
+        norm = normalize(name)
+        st = status.get(norm)
         if st == 'christian':
             cd_total[ein] += amount
-            cd_count[ein] += 1
             cd_year[ein][year] += amount
+            ev = evidence[ein].get(norm)
+            if ev is None:
+                evidence[ein][norm] = [amount, year, name]
+            else:
+                ev[0] += amount
+                ev[1] = max(ev[1], year)
+            if year > recent_year[ein]:
+                recent_year[ein] = year
         elif st == 'nonchristian':
             nonchr[ein] += amount
         else:
             unclass[ein] += amount
+    for ein, recips in evidence.items():
+        cd_count[ein] = len(recips)
     log.info("Aggregated %d foundations with grants", len(tot))
 
     # foundation attributes for flags
@@ -160,13 +190,25 @@ def run():
         display = _display(floor, ceiling, coverage) if total3 > 0 else ''
         comp, vol = composite(pct, cdt)
         nm = names.get(ein, '')
+        # verdict + evidence preview
+        rcount = cd_count.get(ein, 0)
+        verdict = verdict_for(cdt, rcount)
+        preview = ''
+        if evidence.get(ein):
+            top = sorted(evidence[ein].values(), key=lambda e: -e[0])
+            top_names = [t[2] for t in top[:2]]
+            more = rcount - len(top_names)
+            preview = ', '.join(top_names)
+            if more > 0:
+                preview += f', +{more} more'
         conn.execute(
             "INSERT OR REPLACE INTO foundation_enrich VALUES "
-            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ein,
              cd_year[ein].get(2023, 0), cd_year[ein].get(2024, 0),
-             cd_year[ein].get(2025, 0), cdt, cd_count.get(ein, 0), total3,
+             cd_year[ein].get(2025, 0), cdt, rcount, total3,
              ncr, unc, coverage, floor, ceiling, display,
+             verdict, rcount, recent_year.get(ein) or None, preview,
              round(pct), comp, vol,
              1 if TRUST_RE.search(nm) else 0,
              small.get(ein, 0), active.get(ein, 0)),

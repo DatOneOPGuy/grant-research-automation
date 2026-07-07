@@ -19,7 +19,43 @@ def dump(name: str, data):
     path = OUT / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, default=str))
-    print(f"  {name}: {path.stat().st_size / 1024:.0f} KB")
+    if name in ('foundations.json', 'analytics.json', 'stats.json'):
+        print(f"  {name}: {path.stat().st_size / 1024:.0f} KB")
+
+
+def christian_evidence(conn, ein, bare):
+    """Christian recipients for one foundation (matches the API endpoint)."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from src.classifier import tradition
+    from src.faith_config import CONFIDENCE_MIN, FAITH_TAGS
+    from src.matcher import normalize
+    faith = set(FAITH_TAGS)
+    agg = {}
+    for gname, amount, year in conn.execute(
+        "SELECT grantee_name, amount, tax_year FROM pipeline.grants "
+        "WHERE ein IN (?, ?) AND grantee_name != '' "
+        "AND tax_year IN (2023, 2024, 2025)", (ein, bare)):
+        norm = normalize(gname)
+        if norm not in agg:
+            tag = conn.execute(
+                "SELECT tags FROM pipeline.recipients WHERE name_norm = ?",
+                (norm,)).fetchone()
+            names = ({t['name'] for t in json.loads(tag[0])
+                      if t.get('confidence', 0) >= CONFIDENCE_MIN}
+                     if tag else set())
+            agg[norm] = {'is_christian': bool(names & faith), 'name': gname,
+                         'total': 0, 'recent': 0, 'tradition': tradition(gname)}
+        e = agg[norm]
+        if e['is_christian']:
+            e['total'] += amount or 0
+            e['recent'] = max(e['recent'], year)
+    return sorted(
+        ({'name': e['name'], 'total': e['total'],
+          'most_recent_year': e['recent'], 'tradition': e['tradition']}
+         for e in agg.values() if e['is_christian'] and e['total'] > 0),
+        key=lambda x: -x['total'])[:30]
 
 
 # Marquee foundations that must be searchable in the demo regardless of
@@ -31,6 +67,7 @@ MARQUEE_EINS = [
     '237456468',  # M J Murdock
     '916020515',  # Stewardship
     '205132900',  # The Rees-Jones Foundation
+    '830590263',  # Mother Cabrini Health Foundation
 ]
 MARQUEE_NAMES = ['MACLELLAN', 'LILLY ENDOWMENT', 'TEMPLETON FOUNDATION',
                  'MURDOCK CHARITABLE', 'STEWARDSHIP FOUNDATION',
@@ -110,6 +147,7 @@ def main():
             'grants': grants, 'grants_total': totals[0],
             'grants_dollars': totals[1],
             'recipients': recipients, 'activities': acts,
+            'christian_evidence': christian_evidence(conn, ein, bare),
         })
 
     # flat samples for the Grants and Recipients pages

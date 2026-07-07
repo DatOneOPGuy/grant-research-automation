@@ -40,10 +40,10 @@ def verification():
         out = []
         for ein, label in VERIFY_EINS:
             r = conn.execute(
-                "SELECT foundation_name, christian_pct_floor, "
-                "christian_pct_ceiling, classification_coverage, "
-                "christian_pct_display, christian_dollars_3yr "
-                "FROM universe WHERE ein = ?", (ein,)).fetchone()
+                "SELECT foundation_name, verdict, christian_recipient_count, "
+                "christian_dollars_3yr, application_status, "
+                "christian_preview FROM universe WHERE ein = ?",
+                (ein,)).fetchone()
             if r:
                 d = dict(r)
                 d['label'] = label
@@ -59,8 +59,8 @@ def leaderboards(limit: int = 10):
     try:
         volume = rows_to_dicts(conn.execute(
             "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
-            "christian_pct_floor, christian_pct_ceiling, "
-            "classification_coverage, christian_pct_display FROM universe "
+            "verdict, christian_recipient_count, christian_preview, "
+            "application_status FROM universe "
             "WHERE christian_dollars_3yr > 0 "
             "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
             "ORDER BY christian_dollars_3yr DESC LIMIT ?",
@@ -134,8 +134,8 @@ def top_funders(limit: int = 100):
     try:
         rows = conn.execute(
             "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
-            "christian_pct_floor, christian_pct_ceiling, "
-            "classification_coverage, total_giving_3yr, application_status "
+            "verdict, christian_recipient_count, christian_preview, "
+            "total_giving_3yr, application_status "
             "FROM universe WHERE christian_dollars_3yr > 0 "
             "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
             "ORDER BY christian_dollars_3yr DESC LIMIT ?", (min(limit, 500),),
