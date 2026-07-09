@@ -40,7 +40,6 @@ const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'christian_dollars_3yr', label: 'Christian $ (3yr)', sortable: true },
   { key: 'typical_grant_size', label: 'Typical grant', sortable: true },
   { key: 'application_status', label: 'Application', sortable: true },
-  { key: 'actions', label: '' },
 ]
 
 export default function Foundations({ presetLock }: { presetLock?: string }) {
@@ -151,7 +150,7 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
         </div>
       )}
 
-      <div className="flex gap-8">
+      <div className="flex gap-6">
         <FilterPanel filters={filters} onChange={(f) => {
           setFilters(f)
           if (f.preset) urlParams.set('preset', f.preset)
@@ -182,7 +181,7 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
             </div>
           )}
 
-          <div className="bg-surface border border-line rounded-lg overflow-hidden">
+          <div className="bg-surface border border-line rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted border-b border-line bg-canvas/50">
@@ -202,11 +201,11 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={8} className="px-3 py-2">
+                  <tr key={i}><td colSpan={7} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={7} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -223,8 +222,18 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                             ? 'fill-accent text-accent' : ''} />
                       </button>
                     </td>
-                    <td className="px-3 py-2.5 font-medium text-primary max-w-72 truncate">
-                      {titleCase(r.foundation_name)}
+                    <td className="px-3 py-2.5 max-w-56">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-primary truncate">
+                          {titleCase(r.foundation_name)}
+                        </span>
+                        <a href={r.propublica_url} target="_blank" rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="View on ProPublica"
+                          className="text-muted hover:text-primary shrink-0">
+                          <ExternalLink size={13} />
+                        </a>
+                      </div>
                     </td>
                     <td className="px-3 text-muted whitespace-nowrap">
                       {titleCase(r.city)}, {r.state}
@@ -232,25 +241,20 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                     <td className="px-3 py-2">
                       <VerdictBadge verdict={r.verdict} />
                       {r.christian_preview && (
-                        <div className="text-xs text-muted mt-1 max-w-72 truncate"
+                        <div className="text-xs text-muted mt-1 max-w-48 truncate"
                           title={titleCase(r.christian_preview)}>
                           {titleCase(r.christian_preview)}
                         </div>
                       )}
                     </td>
-                    <td className="px-3 tabular font-medium">
+                    <td className="px-3 tabular font-medium whitespace-nowrap">
                       {money(r.christian_dollars_3yr)}
                     </td>
-                    <td className="px-3 tabular text-muted">
+                    <td className="px-3 tabular text-muted whitespace-nowrap">
                       {money(r.typical_grant_size)}
                     </td>
-                    <td className="px-3"><StatusPill status={r.application_status} /></td>
-                    <td className="px-3">
-                      <a href={r.propublica_url} target="_blank" rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-muted hover:text-primary inline-block p-1">
-                        <ExternalLink size={14} />
-                      </a>
+                    <td className="px-3 whitespace-nowrap text-left">
+                      <StatusPill status={r.application_status} />
                     </td>
                   </tr>
                 ))}

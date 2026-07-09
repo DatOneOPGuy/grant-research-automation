@@ -91,7 +91,7 @@ export default function FilterPanel({ filters, onChange }: Props) {
   }
 
   return (
-    <div className="w-64 shrink-0">
+    <div className="w-56 shrink-0">
       <Section title="Christian Giving">
         <div className="text-xs text-muted mb-1"># Christian orgs funded</div>
         <Pills options={ORG_COUNTS} value={filters.min_orgs}

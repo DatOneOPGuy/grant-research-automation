@@ -6,7 +6,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 min-w-0 p-8">
+      <main className="flex-1 min-w-0 px-6 py-6">
         {DEMO && (
           <div className="mb-6 rounded-md border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm text-primary">
             <strong>Demo build.</strong> Dashboard and analytics numbers are
