@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   BarChart3, Bookmark, Building2, DollarSign, Home, ShieldCheck, Target,
-  Users,
+  Users, BadgeInfo,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../lib/api'
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/recipients', label: 'Recipients', icon: Users },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/data-quality', label: 'Data Quality', icon: ShieldCheck },
+  { to: '/trust', label: 'Trust & Data', icon: BadgeInfo },
 ]
 
 export default function Sidebar() {

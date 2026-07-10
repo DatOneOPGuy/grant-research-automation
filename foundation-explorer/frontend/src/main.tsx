@@ -12,6 +12,7 @@ import Grants from './pages/Grants'
 import Recipients from './pages/Recipients'
 import Analytics from './pages/Analytics'
 import DataQuality from './pages/DataQuality'
+import Trust from './pages/Trust'
 import './styles/index.css'
 
 const queryClient = new QueryClient({
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
       { path: 'recipients', element: <Recipients /> },
       { path: 'analytics', element: <Analytics /> },
       { path: 'data-quality', element: <DataQuality /> },
+      { path: 'trust', element: <Trust /> },
     ],
   },
 ])
