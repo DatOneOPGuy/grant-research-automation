@@ -3,4 +3,5 @@ lxml
 thefuzz
 python-Levenshtein
 requests
-anthropic
+ollama
+tqdm

@@ -4,16 +4,17 @@ As of 2026-07-02, after the Phase 2 build and full-country rebuild.
 
 ## Blocked on a decision or resource
 
-1. **LLM recipient classification — not run.** Needs `ANTHROPIC_API_KEY`.
+1. **Local LLM recipient classification — not run.** The local Ollama model
+   and validation harness must be installed/run first.
    ~905k recipients are pending tags (the $5k-threshold subset — the ones
    that would actually be classified — to be recounted after the final
    pass; it will be well above the earlier ~150k estimate since the grant
    set grew from 963k to 4.4M+). Until this runs, faith scores are
    computed from rule/seed tags only (~7% of recipients) and
    **systematically understate** Christian alignment — expect many false
-   "No Significant Pattern" labels. Also worth switching the classifier
-   to the Batch API before running (50% cheaper, ~1h turnaround);
-   current code is sequential `messages.create`.
+   "No Significant Pattern" labels. The local pipeline now uses strict
+   500-row SQLite batches, bounded checkpoint journaling, and a mandatory
+   rule/NTEE validation harness before full execution.
 2. **ProPublica gap-fill — paused by Drake** at ~600 / 17,016 EINs.
    Resume is free (disk cache). Open decision: do the 17k
    no-e-file foundations matter to the client? (Mix of filing-deadline
@@ -26,7 +27,7 @@ As of 2026-07-02, after the Phase 2 build and full-country rebuild.
 
 4. **Website-discovery fallback** (plan step 6): web search for
    high-faith-score foundations whose 990 lists no website. Not built.
-5. **Batch API mode for the classifier** — see item 1.
+5. **Prompt/model tuning after validation** — see item 1.
 6. **Automated refresh pipeline.** Everything so far is a one-off build.
    No scheduled job to: pull the monthly BMF (universe changes), pull new
    IRS index months (late filers arrive continuously), download/parse new

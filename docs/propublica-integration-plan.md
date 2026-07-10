@@ -2,8 +2,8 @@
 
 **Status: BUILT (2026-07-02).** All Phase 2 modules implemented and
 verified against the on-disk test bed. Outstanding: full-universe XML
-download (~30 GB, blocked on disk space), ProPublica gap-fill sweep
-(~4.7 h throttled), LLM classification pass (needs ANTHROPIC_API_KEY).
+download (~30 GB, blocked on disk space), paper-filer review, and the
+local Ollama recipient-classification validation pass.
 Universe correction: the true "130k" is all private foundations on the
 BMF (139,965); NTEE-T alone covers only 61k of them.
 
@@ -64,7 +64,9 @@ The existing pipeline, built and verified against tax years 2023–2024:
 6. **Expanded Christian search criteria**: denominations, theological
    vocabulary, NTEE X-codes, and a larger grantee fingerprint list —
    demoted to secondary signals behind actual giving history.
-7. **ProPublica API gap-filler** for paper filers with no e-file XML.
+7. **Paper-filer review** for foundations with no e-file XML. No third-party
+   aggregation API is used; the product may provide an outbound public profile
+   link only as a convenience citation.
 
 ## Existing infrastructure → Phase 2 leverage
 
@@ -160,7 +162,7 @@ stores data (a `grants` table with recipient name/city/state/amount/purpose):
    inherits the tags. Seed it with the client doc's table (Samaritan's
    Purse, Wycliffe, FCA, Compassion, Catholic Charities, Prison Fellowship,
    Cru, YWAM, Joshua Fund, WorldVenture, …) plus our 53 target orgs.
-2. **Classification**: batch LLM calls (Claude API) returning JSON tags
+2. **Classification**: local Ollama inference returning JSON tags
    from the fixed vocabulary: Christian Ministry, Church, Bible
    Translation, Evangelism, Church Planting, Pregnancy Center, Christian
    School, International Missions, Disaster Relief, Jewish Ministry,
@@ -265,7 +267,8 @@ grants for the giving detector — comes from the IRS 990-PF XMLs directly.
    (keep `active`/`stale` flag logic here).
 4. **Recipient knowledge base + classifier**: rule-tag obvious names, seed
    known orgs, LLM-classify the rest, dollar-weighted Faith Alignment Score.
-5. **ProPublica API gap-filler + NTEE enrichment** (only runtime API usage).
+5. **Local paper-filer review + NTEE enrichment** (no runtime third-party API
+   usage; ProPublica remains outbound-link-only).
 6. **Website discovery fallback** for high-scoring foundations without
    `WebsiteAddressTxt`.
 

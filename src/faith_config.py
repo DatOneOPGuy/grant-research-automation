@@ -11,7 +11,7 @@ CONFIDENCE_MIN = 70
 FAITH_TAGS = [
     "Christian Ministry", "Church", "Bible Translation", "Evangelism",
     "Church Planting", "Pregnancy Center", "Christian School",
-    "International Missions", "Jewish Ministry", "Faith-Based Education",
+    "International Missions", "Faith-Based Education",
     "Rescue Mission", "Youth Ministry", "Medical Missions",
 ]
 SECULAR_TAGS = [
@@ -192,8 +192,3 @@ SEED_RECIPIENTS = {
     "Campus Crusade for Christ": ["Evangelism", "Youth Ministry"],
     "Billy Graham": ["Evangelism", "Christian Ministry"],
 }
-
-# --- LLM classification ---
-CLASSIFY_MODEL = "claude-haiku-4-5-20251001"
-CLASSIFY_BATCH_SIZE = 20
-CACHE_PATH = "data/recipient_tags_cache.json"

@@ -46,9 +46,21 @@ COVERAGE_DISPLAY_THRESHOLD = 85  # >= this coverage -> show a single %
 def load_tag_status(conn) -> dict[str, str]:
     """name_norm -> 'christian' | 'nonchristian' (untagged names omitted)."""
     status = {}
-    for norm, tags_json in conn.execute(
-        "SELECT name_norm, tags FROM recipients WHERE tags != '[]'"
-    ):
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(recipients)")}
+    has_tradition = 'faith_classification' in columns
+    select = 'name_norm, tags, faith_classification' if has_tradition else 'name_norm, tags'
+    for row in conn.execute(f"SELECT {select} FROM recipients WHERE tags != '[]'"):
+        norm, tags_json = row[:2]
+        tradition = row[2] if has_tradition else None
+        if tradition in {'evangelical_protestant', 'catholic', 'orthodox_christian'}:
+            status[norm] = 'christian'
+            continue
+        if tradition in {
+            'christian_science', 'mormon_lds', 'jewish', 'muslim',
+            'other_religion', 'secular',
+        }:
+            status[norm] = 'nonchristian'
+            continue
         names = {t['name'] for t in json.loads(tags_json)
                  if t.get('confidence', 0) >= CONFIDENCE_MIN}
         if not names:
