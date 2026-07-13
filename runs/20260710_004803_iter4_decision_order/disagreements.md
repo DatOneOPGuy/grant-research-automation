@@ -1,0 +1,89 @@
+# Disagreements (87)
+
+- **[catholic → unknown]** BOYS HOPE-GIRLS HOPE OF ST LOUIS — _No religious signals in the name._
+- **[catholic → unknown]** ST CATHERINE BY THE SEA — _No clear religious or organizational signal in the name._
+- **[catholic → unknown]** ST LOUIS UNIVERSITY - SCHOLARSHIP - — _No clear religious or secular signals in the name._
+- **[catholic → secular]** KENNESAW ST UNIV FBO EMILY MATTHEWS — _FBO acronym without a religious context_
+- **[catholic → unknown]** SAINT DAVID'S CREATION STEWARDSHIP FUND — _No clear religious or organizational signals in the name._
+- **[catholic → unknown]** CAPUCHINS SOUP KITCHEN — _No religious signals in the name._
+- **[catholic → secular]** BIG BROTHERS BIG SISTERS OF INDIAN RIVER — _No religious signals in the name._
+- **[catholic → evangelical_protestant]** SOC OF ST JOHN THE EVANGELIST — _Contains 'St John' which is a common name for evangelical Protestant churches but no Catholic saint names are present._
+- **[catholic → unknown]** DON BOSCO CRISTO REY HIGH SCHOOL MD — _No clear religious or organizational signals in the name._
+- **[catholic → secular]** ST JUDE CHILCREN'S RESEARCH HOSPITAL — _Explicitly secular research hospital name_
+- **[catholic → unknown]** MOUNT CARMEL FOUNDATION — _No clear religious or organizational signal in the name._
+- **[catholic → secular]** NORTH CAROLINA ST UNIV FBO KERA — _FBO abbreviation without a religious context_
+- **[catholic → orthodox_christian]** St Lukes Antichian Orthodox Church — _Contains 'Antichian Orthodox' which indicates an Orthodox Christian denomination._
+- **[catholic → unknown]** XITLALI ESPINOSA CO GONZAGA — _No religious signals in the provided name._
+- **[catholic → secular]** Duquesne University 2 — _No religious signals in the name._
+- **[catholic → secular]** BIG BROTHERS BIG SISTERS OF SM — _No religious signals in the name._
+- **[catholic → secular]** CHARITYVEST - WASHINGTON UNIVERSITY IN ST LOUIS — _No religious signals in the name and purpose context._
+- **[catholic → unknown]** ST LUKES CORNWALL HEALTH SYSTEM FOUNDATION INC — _No clear religious signals in the name._
+- **[catholic → secular]** FORDHAM UNIVERSITY SCHOOL OF LAW — _No religious signals in the name._
+- **[catholic → evangelical_protestant]** Don Bosco Cristo Rey School — _No clear religious signal, but evangelical ministry names can be present in secular contexts._
+- **[catholic → unknown]** JEANNE JUGAN RESIDENCE OF THE LITTLE SISTERS OF THE POOR INC — _No clear religious or organizational signal in the name._
+- **[catholic → unknown]** Order of Saint Helena — _No clear religious or organizational signal in the name._
+- **[catholic → secular]** VILLANOVA LAW SCHOOL — _No religious signals in the name._
+- **[catholic → secular]** UNITED WAY OF MARQUETTE COUNTY — _No religious signals in the name._
+- **[catholic → unknown]** St Mary's Ukrainian Church — _No clear religious or organizational signal in the name._
+- **[catholic → unknown]** 92ND ST Y - SECURITY FUND — _No distinct religious signals in the name._
+- **[evangelical_protestant → unknown]** Anderson Interfaith Ministries Inc — _No specific religious signal in the name and no context provided._
+- **[evangelical_protestant → unknown]** JESUS NOLASCO — _No religious or organizational signal in the name._
+- **[evangelical_protestant → unknown]** CHRIST COMMUNITY HEALTH SERVICESA — _No distinct religious signal in the name._
+- **[evangelical_protestant → unknown]** San Antonio Rescue Mission — _No clear religious or secular signal in the name._
+- **[evangelical_protestant → christian_science]** CONNEAUT CHURCH OF CHRIST — _Bare 'Church of Christ' is a specific signal for Christian Science._
+- **[evangelical_protestant → unknown]** Southeast Gwinnett Cooperative Ministries — _No specific religious signals present in the name._
+- **[evangelical_protestant → unknown]** THE BIBLICAL MUSEUM OF NATURAL HIST — _No clear religious or organizational signals in the name._
+- **[evangelical_protestant → unknown]** AGAPE MEALS FOR KIDS — _No specific religious or organizational signals present._
+- **[evangelical_protestant → unknown]** PIPE CREEK BRETHREN CEM FUND — _No religious signals in the name._
+- **[evangelical_protestant → unknown]** IOWA MENNONITE SCHOOL DBA HILLCREST ACADEMY — _No religious signals in the name._
+- **[evangelical_protestant → unknown]** BETHEL COLLEGE MENNONITE CHURCH — _No clear religious or organizational signal in the name._
+- **[evangelical_protestant → unknown]** CONDUIT MINISTRIES — _No specific religious signals in the name._
+- **[evangelical_protestant → secular]** MINISTRY OF FINANCE — _No religious signals in the name._
+- **[evangelical_protestant → unknown]** SUNSHINE MINISTRIES — _No religious or specific tradition signals in the name._
+- **[evangelical_protestant → catholic]** COMBONI MISSIONARIES OF THE HEART OF JESUS — _Combini Missionaries refer to a Catholic religious order._
+- **[evangelical_protestant → unknown]** VARIOUS MINISTRIES — _No specific religious or organizational signal in the name provided._
+- **[evangelical_protestant → unknown]** APPLE OF HIS EYE MISSION SOCIETY — _No clear religious or organizational signals in the name._
+- **[evangelical_protestant → unknown]** SANTA CRUZ PARKINSON'S COMMUNITY (EASE PD INC) — _No clear religious signals in the name._
+- **[evangelical_protestant → unknown]** CARENET PREGNANCY CENTER OF SOUTHERN MARYLAND INC — _No religious signals present in the name._
+- **[evangelical_protestant → unknown]** CHRISTIAN COUNSELING AND EDUCATION FOUNDATION — _No specific religious signals in the name._
+- **[jewish → unknown]** AISHEL CLIFTON NJ — _No religious or organizational signals in the name._
+- **[jewish → unknown]** Minneapolis Kollel — _No clear religious or organizational signal in the name._
+- **[jewish → unknown]** HILLEL WASHINGTON U — _No specific religious or organizational signals in the name._
+- **[jewish → unknown]** THE ACKMERMAN CENTER FOR HOLOCAUST STUDIES — _No religious signals present in the name._
+- **[jewish → unknown]** LAWRENCE FAR ROCKAWAY COMMUNITY KOLLEL — _No clear religious signal in the name._
+- **[jewish → unknown]** NC HILLEL — _No specific religious signal in the name._
+- **[jewish → unknown]** OSHER MARIN JCC — _No specific religious or secular signals in the name._
+- **[other_religion → unknown]** INTERNATIONAL GAUDIYA VEDANTA SOCIETY — _No specific religious signals present; purpose and location are unavailable._
+- **[other_religion → secular]** HELMHOLTZ ZENTRUM MUNCHEN DEUTSCHES FORSCHUNGSZENTRUM FUR GESUNDHEIT UND UM — _No religious signals in the name._
+- **[secular → unknown]** FDN FOR UNIVERSITY HOSPITAL NJ — _No religious signals in the provided information._
+- **[secular → unknown]** OJAI VALLEY LAND CONSERVANCY — _No religious signals in the name._
+- **[secular → unknown]** PLANNED PARENTHOOD - NEW JERSEY — _No religious signals present; purpose and location context unavailable._
+- **[secular → unknown]** Valley Childrens Hospital Foundatio — _No clear religious or organizational signals in the name._
+- **[secular → other_religion]** JAPANESE MUSEUM — _No religious signals present; specifically named as a Japanese museum._
+- **[secular → unknown]** Fahim Sediqi CO University of Utah — _No clear religious or secular signals in the name._
+- **[secular → unknown]** AYALA YASMIN EREZ - UNIVERSITY OF F — _No religious signals in the name._
+- **[secular → unknown]** MERCED COLLEGE AG DIVISION — _No religious or clear secular signals in the name._
+- **[secular → unknown]** BLACKFORD UNITED WAY INC — _No religious or specific organization signal in the name._
+- **[secular → unknown]** OPERATION WHITE STORK - UNITED STATES LTD — _No religious or organizational signal in the name._
+- **[secular → unknown]** NOVANT HEALTH MEDICAL CENTER FDN — _No religious signals in the name._
+- **[secular → unknown]** PINEBELT COMMUNITY FOUNDATION — _No religious or specific tradition signals in the name._
+- **[secular → unknown]** COLORADO COLLEGE TH — _No religious signals in the name and no additional context provided._
+- **[secular → unknown]** Underworld Opera Company — _No religious or specific religious tradition signals in the name._
+- **[secular → unknown]** Salina Family Healthcare Center — _No religious signals in the name._
+- **[secular → unknown]** HADLEY-LAKE LUZER HISTORICAL SOCIETY — _No religious signals in the name._
+- **[secular → unknown]** HOWARD UNIVERSITY ANNUAL FUND — _No religious signals in the name._
+- **[secular → unknown]** THE COMMUNITY FOUNDATION OF THE VI — _No religious or specific tradition signals in the name._
+- **[secular → unknown]** UNITED NEGRO COLLEGE FUND INC — _No religious signals present; purpose and location context unavailable._
+- **[secular → unknown]** HOSITAL HOSPITALITY HOUSE — _No clear religious or organizational signals in the name._
+- **[secular → unknown]** CHILDREN MERCY HOSPITAL — _No distinct religious or secular signals in the name._
+- **[secular → unknown]** MY CREDIT UNION COMMUNITY FOUNDATION — _No religious signals in the name._
+- **[secular → unknown]** WENDELL GILLEY MUSEUM OF BIRD CARVING THE — _No religious signals in the name._
+- **[secular → unknown]** Raghad Aljassimi CO University of U — _No specific religious signals in the name._
+- **[secular → unknown]** MERITUS COLLEGE FUND — _No religious signals in the name and no additional context provided._
+- **[secular → unknown]** GAVIN TAWFULL — _No religious or organizational signals in the provided name._
+- **[secular → unknown]** PIEDMONT HEALTHCARE FOUND — _No religious signals in the name and context is unavailable._
+- **[secular → unknown]** TRINITY HEALTH SYSTEM OUTPATIENT RE — _No distinct religious signals in the name._
+- **[secular → unknown]** UH - RAINBOW BABIES & CHILDRENS HOSPITAL — _No religious signals in the name._
+- **[secular → unknown]** CENTRE COLLEGE SCHOLARSHIP RECIPIEN — _No religious signals in the name._
+- **[secular → unknown]** ISRAEL HEALTHCARE FOUNDATION — _No religious signals in the name._
+- **[secular → unknown]** GENESEO KIWANIS FOUNDATION — _No clear religious or denominational signals in the name._

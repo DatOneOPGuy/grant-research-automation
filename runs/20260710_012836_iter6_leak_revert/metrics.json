@@ -1,0 +1,86 @@
+{
+  "config": {
+    "model": "qwen2.5:7b",
+    "sample_size": 300,
+    "seed": 20260709,
+    "note": "Iter 6: reverted STEP 5 widening (leak source), added Kollel/Hillel guard, fixed institution+person=secular not unknown",
+    "timestamp": "2026-07-10T01:28:36"
+  },
+  "overall_agreement": 0.7833333333333333,
+  "gate": {
+    "passed": false,
+    "major_recall": 0.7929084967320261,
+    "weak_f1": [
+      "catholic"
+    ],
+    "present": 4,
+    "required": 4
+  },
+  "safety": {
+    "jewish_as_christian": 0,
+    "catholic_evangelical": 4,
+    "nonchristian_as_christian": 1
+  },
+  "report": {
+    "catholic": {
+      "support": 51,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "f1": 0.8
+    },
+    "christian_science": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "evangelical_protestant": {
+      "support": 68,
+      "precision": 0.9152542372881356,
+      "recall": 0.7941176470588235,
+      "f1": 0.8503937007874015
+    },
+    "jewish": {
+      "support": 25,
+      "precision": 1.0,
+      "recall": 0.92,
+      "f1": 0.9583333333333334
+    },
+    "mormon_lds": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "muslim": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "orthodox_christian": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "other_religion": {
+      "support": 1,
+      "precision": 0.25,
+      "recall": 1.0,
+      "f1": 0.4
+    },
+    "secular": {
+      "support": 153,
+      "precision": 0.952755905511811,
+      "recall": 0.7908496732026143,
+      "f1": 0.8642857142857142
+    },
+    "unknown": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  }
+}

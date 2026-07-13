@@ -1,0 +1,38 @@
+# Disagreements (36)
+
+- **[catholic → secular]** SAINT GREGORY THE GREAT — _The name includes a saint but there is no information about a religious mission._
+- **[catholic → unknown]** PHOEBE FORDHAM — _Insufficient information to classify_
+- **[catholic → unknown]** ST GABRIEL'S FRATERNUS — _The name suggests a religious context with a saint's name but lacks sufficient information to determine the specific religious affiliation or if it is secular._
+- **[catholic → unknown]** NORTH DAKOTA ST UNIV FBO MORGAN LEBLANC — _Insufficient information to determine religious affiliation or secular status._
+- **[catholic → secular]** ST RAYMONDS HIGH SCHOOL FOR BOYS — _The name includes a saint's name but the context suggests it is an educational institution without a religious mission._
+- **[catholic → secular]** ST JOSEPH HOSPITAL FUNDATION — _The name contains a saint's name but the context suggests it is a secular foundation without a religious mission._
+- **[catholic → secular]** 501 ST JUDE — _The name includes 'ST JUDE' which refers to Jude in Christianity, but the context indicates there is no religious mission, aligning it with a secular organization._
+- **[catholic → orthodox_christian]** ST GEORGE MALANKARA ORTHODOX CHURCH (INACTIVE) (INACTIVE) — _The name includes 'Orthodox Church', which is a clear indicator of the Orthodox Christian tradition._
+- **[catholic → secular]** ST MARTIN DE PORRES SENIOR CENTER — _The name contains a saint's name but there is no information indicating a religious mission._
+- **[catholic → unknown]** PROJECT GRAD ST VINCENT — _insufficient information to determine religious or secular nature_
+- **[evangelical_protestant → christian_science]** CHRIST CHURCH-ITHAN — _The name 'CHRIST CHURCH' is reminiscent of the Christian Science Church, and without additional context, this is the most likely classification._
+- **[evangelical_protestant → unknown]** ADORATION CONVENT OF CHRIST THE KING (PINK SISTERS) — _Insufficient information to determine the classification with high confidence._
+- **[evangelical_protestant → unknown]** NEW YORK PRESBYTERIANWEIL CORNELL — _Insufficient information to determine religious affiliation; could be secular or religious but purpose context is unavailable._
+- **[muslim → unknown]** AMERICAN ISLAMIC OUTREACH — _Insufficient information to determine the classification with high confidence._
+- **[secular → unknown]** EDINBORO UNIVERSITY FBO MORGAN WISSNER — _Insufficient information to classify_
+- **[secular → unknown]** CLEVELAND COUNCIL OF BLACK COLLEGES ALUMNI ASSOC — _Insufficient information to classify as a religious or secular organization based on the provided context._
+- **[secular → unknown]** MISSOURI STATE UNIVERSITY - TYLER C — _Insufficient information to classify as a religious or secular organization based on provided context._
+- **[secular → unknown]** Nina Scholars Program at Indiana University — _insufficient information to classify_
+- **[secular → unknown]** STANFORD UNIVERSITY FBO LANE BAKER — _Insufficient information to determine religious affiliation; could be secular or related to a person with a religious name._
+- **[secular → unknown]** UNITED WAY OF THE MIDLANDS - OMAHA NE — _Insufficient information to classify as a religious or secular organization based on provided context._
+- **[secular → unknown]** UNIVERSITY OF PENNSYLVANIA - THE WATER CENTER AT PENN — _Insufficient information to determine religious affiliation; could be secular or have a religious name for non-religious purposes._
+- **[secular → unknown]** DEAL SCHOOL DISTRICT — _Insufficient information to classify as a religious or secular organization based on the provided name._
+- **[secular → unknown]** UNIVERSITY OF MASSACHUSETTS DARTMOUTH FBO ELIZABETH PROTOPAPAS — _The provided information does not indicate a religious affiliation._
+- **[secular → unknown]** DEPAUL ART MUSEUM — _insufficient information to determine religious or secular affiliation_
+- **[secular → unknown]** SOUTH SEATTLE COLLEGE FOUNDATION — _Insufficient information to classify as a religious or secular organization._
+- **[secular → unknown]** COMMUNITY FOUNDATION OF MONTEREY — _No religious affiliation or mission indicated._
+- **[secular → unknown]** WILDFLOWER MONTESSORI PUBLIC SCHOOLS OF COLORADO — _No religious affiliation or mission indicated._
+- **[secular → unknown]** COLLEGE UNBOUND — _Insufficient information to determine a religious or secular affiliation._
+- **[secular → unknown]** INWOOD LITTLE LEAGUE BASEBALL INC — _Insufficient information to classify as a religious or secular organization based on the provided name and context._
+- **[secular → unknown]** THE UNIVERSITY OF TEXAS RIO GRANDE VALLEY FOUNDATI — _The provided information does not indicate any religious affiliation or mission._
+- **[secular → unknown]** THE DALLAS FOUNDATION EARLY MATTERS OPERATION FUND — _Insufficient information to determine religious affiliation or secular nature._
+- **[secular → unknown]** OPERATION FANCY FREE INC — _Insufficient information to determine religious or secular affiliation._
+- **[secular → unknown]** UNITED WAY OF WESTERN CRAWFORD INC — _Insufficient information to categorize as a religious or secular organization._
+- **[secular → unknown]** FRIENDS OF SUMNER REGIONAL MEDICAL CENTER — _Insufficient information to determine religious or secular affiliation._
+- **[secular → unknown]** NEXT DOOR RECOVERY (OPERATING REQUEST) — _Insufficient information to determine religious or secular classification._
+- **[secular → unknown]** LADIES HOSPITAL AID SOCIETY — _Insufficient information to determine religious or secular affiliation._

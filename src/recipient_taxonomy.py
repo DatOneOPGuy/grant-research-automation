@@ -37,17 +37,30 @@ CHRISTIAN_TRADITIONS = frozenset({
 SYSTEM_PROMPT = """You are a strict nonprofit religious-tradition labeling API.
 Return only a minified JSON object matching this schema exactly:
 {"classification":"evangelical_protestant"|"catholic"|"orthodox_christian"|"christian_science"|"mormon_lds"|"jewish"|"muslim"|"other_religion"|"secular"|"unknown","confidence":float,"reason":"string"}
+The reason must be 8 words or fewer - just the key signal, e.g. "Baptist church", "secular hospital", "bare person name".
 
-Classification rules:
-- Christian Science (Church of Christ Scientist, Principia) is christian_science.
-- Mormon/LDS (Latter-day Saints, Brigham Young, Deseret) is mormon_lds.
-- Jewish organizations (Yeshiva, Chabad, Hebrew, synagogue, Jewish Federation) are jewish.
-- Catholic organizations (Diocese, Jesuit, Franciscan, Catholic Charities, Notre Dame, saint-named parishes) are catholic.
-- Orthodox churches and ministries are orthodox_christian.
-- Evangelical/Protestant organizations (Baptist, Methodist, missions, ministries, Bible, gospel, Cru, Wycliffe, World Vision) are evangelical_protestant.
-- Messianic organizations (Jews for Jesus, Chosen People Ministries) are evangelical_protestant, not jewish.
-- A secular organization with a saint or religious-sounding name but no religious mission, such as St. Jude Children's Research Hospital, is secular.
-- When genuinely unsure, return unknown. Never guess that an ambiguous name is Christian.
+Apply these steps IN ORDER and stop at the first match. The vocabulary lists are illustrative, NOT exhaustive: at every step also use your general knowledge of well-known organizations, religious orders, movements, and Hebrew or Islamic terms. Recognizing a real signal from knowledge is required; inventing a signal where none exists is forbidden.
+
+STEP 1 - Jewish: Yeshiva, Chabad, Hebrew, synagogue, Jewish Federation, Hillel, Kollel, JCC, Hadassah, B'nai, Menorah, Holocaust centers -> jewish. A congregation or temple with a Hebrew name is a synagogue -> jewish, NEVER a Christian label: "Congregation Beth-El" -> jewish, "Temple Israel" -> jewish, "Minneapolis Kollel" -> jewish, "NC Hillel" -> jewish. Exception: Messianic organizations (Jews for Jesus, Chosen People Ministries) -> evangelical_protestant.
+
+STEP 2 - Muslim: Islamic, Muslim, mosque, masjid in the name -> muslim.
+
+STEP 3 - Other specific traditions: christian_science ONLY on explicit signals ("Church of Christ, Scientist", "First Church of Christ Scientist", "Christian Science", "Principia"); a bare "Christ Church [placename]" -> evangelical_protestant, never christian_science. Latter-day Saints, Brigham Young, Deseret -> mormon_lds. Buddhist/Hindu temples and monasteries -> other_religion.
+
+STEP 4 - Orthodox: Orthodox churches and ministries (Greek, Russian, Coptic, Malankara, Antiochian), and Greek saint names like Nektarios -> orthodox_christian.
+
+STEP 5 - Protestant denomination word present? Baptist, Methodist, Presbyterian, Lutheran, Episcopal, Wesleyan, Pentecostal, or evangelical ministry names (Bible, gospel, Cru, Wycliffe, World Vision) -> evangelical_protestant. This wins even with a saint name: "St. Peter's Evangelical Lutheran Church" -> evangelical_protestant, "St. John Missionary Baptist Church" -> evangelical_protestant. GUARD: a name containing Kollel, Hillel, or any other Hebrew/Jewish term belongs to STEP 1 -> jewish and is NEVER evangelical_protestant, even when no other signal is present. evangelical_protestant is never a bucket for generic or unfamiliar religious-sounding words.
+
+STEP 6 - Catholic. Two triggers:
+(a) Catholic vocabulary: Diocese, Parish, Catholic Charities, "Our Lady", "Holy Cross", "Sacred Heart", "Immaculate", "Blessed", "Offertory", "Mount Carmel", "Cristo Rey", "Don Bosco", convents, and religious orders known to you (Jesuit, Franciscan, Capuchin, Carmelite, Dominican, Passionist, Vincentian, Salesian, Augustinian, Friars, Christian Brothers, Little Sisters of the Poor, "Order of Saint...", "Society of St..."). Catholic universities are catholic: Notre Dame, Georgetown, Fordham, Villanova, Duquesne, Gonzaga, Marquette, Boston College, St Louis University, DePaul, Loyola. A Catholic order word wins over the word Mission/Missionary: "Franciscan Mission Outreach" -> catholic, "Capuchins Soup Kitchen" -> catholic, "Missionary Sisters of the Sacred Heart" -> catholic.
+(b) THE SAINT RULE: "Saint", "St.", "St", or all-caps "ST" before a personal name means Saint ("ST JOSEPH", "ST VITO", "ST FRANCIS", "ST SEBASTIAN"). IF the name contains a saint prefix AND no Protestant denomination word appeared in STEP 5, THEN the answer is catholic - this is the default for saint names, whatever the organization type: schools, academies, sports projects, shelters, pantries, food banks, endowment funds, youth programs, PTAs, communities, universities. "ST PATRICK ACADEMY" -> catholic. "ST FRANCIS SHELTER" -> catholic. "ST SEBASTIAN SPORTS PROJECT" -> catholic. "ST GEORGE ENDOWMENT FUND" -> catholic. "UNIVERSITY OF SAINT JOSEPH" -> catholic. "ST JOSEPH HOSPITAL" -> catholic. A saint name with no denomination is NEVER evangelical_protestant and NEVER unknown.
+Exceptions to the saint rule (require a positive signal, not mere absence of mission): "ST"/"St" abbreviating State or a place name ("Oregon St Univ" -> secular state university; "St Louis Children's Hospital", "St Joseph County Parks", "Go St Louis Marathon" -> secular place references); an explicitly secular research hospital ("St. Jude Children's Research Hospital" -> secular).
+
+STEP 7 - Secular: ANY organization of ANY type whose name contains no religious words is secular - universities, colleges, hospitals, health systems, foundations, museums, conservancies, land trusts, advocacy groups, civic and community organizations, sports clubs: "Beacon College Prep" -> secular, "Planned Parenthood" -> secular, "Ojai Valley Land Conservancy" -> secular, "Foundation for University Hospital NJ" -> secular. "FBO" means "for the benefit of" a named person or fund - never faith-based organization, never a religious signal: "Elizabethtown College FBO Aidan Chapple" -> secular. Classify from the name alone; missing purpose text is never a reason to answer unknown.
+
+STEP 8 - unknown: a last resort for truly opaque names only - a bare person's name alone, an unexplained acronym, or an unreadable fragment. A recognizable institution is NEVER unknown: a university, college, hospital, or school paired with a person's name ("University of Connecticut ITF [person]", "Western New England University on behalf of [person]", "Trustees of Columbia University") is still that institution -> secular.
+
+ABSOLUTE RULE: NEVER use evangelical_protestant, catholic, or any Christian label as a fallback when religious signals are absent. Never guess that an ambiguous name is Christian.
 """
 
 
@@ -142,13 +155,31 @@ def infer_legacy_tradition(name: str) -> str | None:
         return "muslim"
     if legacy.OTHER_RELIGION.search(normalized) or legacy.JW.search(normalized):
         return "other_religion"
-    if legacy.CATHOLIC.search(normalized) or legacy.SAINT.search(normalized):
-        return "catholic"
+    # "Big Brothers Big Sisters" is secular; must not hit Catholic 'sisters of'.
+    if legacy.BBBS.search(normalized):
+        return "secular"
+    # An explicit Protestant denomination beats saint/Catholic vocabulary
+    # ("St. Peter's Evangelical Lutheran", "Episcopal Diocese of...").
+    if legacy.PROT_DENOMINATION.search(normalized):
+        return "evangelical_protestant"
+    # Orthodox markers beat the Catholic saint/monastery vocabulary.
     if legacy.ORTHODOX.search(normalized):
         return "orthodox_christian"
+    if legacy.CATHOLIC.search(normalized):
+        return "catholic"
+    # Saint prefix -> catholic, unless the "St" is a street/state/place name
+    # or a medical/research org with no other Christian signal (St. Jude rule).
+    if legacy.SAINT.search(normalized) and not legacy.SAINT_PLACE.search(normalized):
+        if legacy.MEDICAL_OVERRIDE.search(normalized) and not legacy.PROTESTANT.search(normalized):
+            return "secular"
+        return "catholic"
     if legacy.PROTESTANT.search(normalized):
         return "evangelical_protestant"
     if legacy.SECULAR.search(normalized) or legacy.BIG_SECULAR.search(normalized):
+        # An explicit religious word blocks the secular institution override
+        # ("Heritage Christian University", "Revive College Church").
+        if legacy.RELIGIOUS_WORD.search(normalized):
+            return "evangelical_protestant"
         return "secular"
     return None
 

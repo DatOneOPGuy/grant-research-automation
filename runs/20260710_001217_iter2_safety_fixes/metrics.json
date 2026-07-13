@@ -1,0 +1,86 @@
+{
+  "config": {
+    "model": "qwen2.5:7b",
+    "sample_size": 300,
+    "seed": 20260709,
+    "note": "Iter 2: anti-default rule, FBO=for-benefit-of, Catholic markers (Our Lady/Holy Cross), saint+denomination split",
+    "timestamp": "2026-07-10T00:12:17"
+  },
+  "overall_agreement": 0.81,
+  "gate": {
+    "passed": false,
+    "major_recall": 0.7398714759535655,
+    "weak_f1": [
+      "catholic"
+    ],
+    "present": 4,
+    "required": 4
+  },
+  "safety": {
+    "jewish_as_christian": 1,
+    "catholic_evangelical": 8,
+    "nonchristian_as_christian": 2
+  },
+  "report": {
+    "catholic": {
+      "support": 54,
+      "precision": 1.0,
+      "recall": 0.3888888888888889,
+      "f1": 0.56
+    },
+    "christian_science": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "evangelical_protestant": {
+      "support": 67,
+      "precision": 0.855072463768116,
+      "recall": 0.8805970149253731,
+      "f1": 0.8676470588235295
+    },
+    "jewish": {
+      "support": 28,
+      "precision": 1.0,
+      "recall": 0.75,
+      "f1": 0.8571428571428571
+    },
+    "mormon_lds": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "muslim": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "orthodox_christian": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "other_religion": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "secular": {
+      "support": 150,
+      "precision": 0.9155844155844156,
+      "recall": 0.94,
+      "f1": 0.9276315789473684
+    },
+    "unknown": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  }
+}

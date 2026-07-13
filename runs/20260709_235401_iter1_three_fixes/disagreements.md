@@ -1,0 +1,69 @@
+# Disagreements (67)
+
+- **[catholic → unknown]** Providence St Joseph Hosp Foundatio — _The name contains a saint's name but lacks any clear religious or secular context._
+- **[catholic → evangelical_protestant]** ST PETER'S EVANGELICAL LUTHERAN CHURCH AND SCHOOL — _Evangelical Lutheran church and school name_
+- **[catholic → evangelical_protestant]** ST VIATOR SCHOOL — _Saint-named institution without additional secular context_
+- **[catholic → secular]** St Petersburg Theatre — _No religious signals in the name and no purpose context provided._
+- **[catholic → unknown]** C G JUNG SOCIETY OF ST LOUIS — _The name does not contain any clear religious or organizational signals._
+- **[catholic → unknown]** PASSIONISTS INTERNATIONAL — _No definitive religious signal in the name._
+- **[catholic → unknown]** HUGS ST JOHNS COUNTY — _No religious signals in the name or purpose context._
+- **[catholic → evangelical_protestant]** ST MARY TRINITY CHURCH — _Saint-named organization without additional context_
+- **[catholic → evangelical_protestant]** ST JOHN MISSIONARY BAPTIST CHURCH WPB — _Missionary Baptist Church indicates an Evangelical/Protestant affiliation._
+- **[catholic → orthodox_christian]** Fr Mikhail Thabet St George Chur — _Contains 'St George', which is a common saint name associated with Orthodox Christian churches._
+- **[catholic → evangelical_protestant]** PROVIDENCE COLLEGE SCHOOL OF BUSINESS — _The name 'Providence College School of Business' does not contain any explicitly religious terms and could be secular, but the context of a college or school name often defaults to Protestant evangelical due to the historical prevalence of such institutions in the United States._
+- **[catholic → evangelical_protestant]** ST BARNABAS PRESBYTERIAN — _Bare saint name followed by a Christian denomination in the organization's name._
+- **[catholic → secular]** St John's University - McCarthy Center — _Named after a saint but no explicit religious mission or secular signal present._
+- **[catholic → evangelical_protestant]** MISSION OF OUR LADY OF THE ANGELS — _Contains the word 'Mission' and a saint's name, which defaults to Catholic unless explicitly Protestant._
+- **[catholic → unknown]** ST CLAIR COUNTY CHILD — _No religious signals in the name and no additional context provided._
+- **[catholic → secular]** ST MUNGOS HOUSING CHARITY — _Bare name with no religious or specific organizational signals._
+- **[catholic → evangelical_protestant]** EPISCOPAL DIOCESE OF SW FLORIDA — _Bare name of an Episcopal diocese, which is part of evangelical Protestant tradition._
+- **[catholic → secular]** SAINT LOUIS COUNSELING — _Named after a saint but no explicit religious mission in the context provided._
+- **[catholic → unknown]** GIANT STEPS OF ST LOUIS INC — _No religious or specific purpose context cues are present in the name._
+- **[catholic → secular]** St Paul Chamber of Commerce Foundation Inc — _No religious signals in the name and no additional context provided._
+- **[catholic → evangelical_protestant]** GEORGETOWN COUNTY BOYS MENTOR GROUP — _Bare name without specific religious indicator, defaults to evangelical_protestant_
+- **[catholic → secular]** WOMAN'S CLUB OF ST CLOUD & HERITAGE MUSEUM — _No religious signals in the name and no purpose context provided._
+- **[catholic → orthodox_christian]** Archdiocese of the Syrian Orthodox Church for the Eastern United States — _Syrian Orthodox Church name clearly indicates an Orthodox Christian organization_
+- **[catholic → secular]** Habitat for Humanity - St Paul — _No religious affiliations in the name and no context to suggest otherwise._
+- **[catholic → evangelical_protestant]** ST ROSE DELIMA CHURCH — _Saint-named organization without additional context_
+- **[catholic → evangelical_protestant]** SAINT PAUL'S EVANGELICAL LUTHERAN CHURCH — _Bare name matches an evangelical_protestant denomination without any contradictory information._
+- **[catholic → unknown]** ST JDC CHARITABLE FUND — _No religious signal in the name or context._
+- **[catholic → secular]** BIG BROTHERS BIG SISTERS OF SW MICHIGAN — _No religious signals in the name or context._
+- **[catholic → unknown]** ST MALACHY CONFERENCE TEHACHAPI — _No religious signal in the name and no additional context provided._
+- **[catholic → evangelical_protestant]** HOLY CROSS COLLEGE ADVANCEMENT — _The name 'Holy Cross' is a common name for Catholic institutions, but in the absence of additional context or explicit religious signals, it is safest to classify as evangelical_protestant due to the lack of clear contradictory information._
+- **[catholic → evangelical_protestant]** HOLY CROSS ACADEMY — _Saint-named organization without additional context or purpose_
+- **[catholic → secular]** ST HELENA GULLAH COMMUNITY HOUSING — _No religious signals in the name and no additional context provided._
+- **[catholic → evangelical_protestant]** SAINT PETER THE APOSTLE OFFERTORY AND CFA — _Saint-named organization without a clear secular signal_
+- **[catholic → secular]** PENNSYLVANIA ST U — _Named after a state with no explicit religious affiliation and no available purpose context._
+- **[catholic → evangelical_protestant]** ST STEPHEN'S LUTHERAN CHURCH - BEAVER DAM (NON CASH AAPL 67 SH) — _Bare name matches Lutheran, which is Evangelical/Protestant_
+- **[evangelical_protestant → unknown]** AGAPE ACERS INC — _No religious or organizational signal in the name._
+- **[evangelical_protestant → jewish]** CONGREGATION YESHUAT ISRAEL — _The name 'CONGREGATION YESHUAT ISRAEL' includes the term 'Israel,' which is commonly associated with Jewish organizations._
+- **[evangelical_protestant → christian_science]** ROLLING HILLS CHURCH OF CHRIST — _The full name 'Church of Christ' explicitly indicates a Christian Science organization._
+- **[evangelical_protestant → unknown]** THE POTTER'S PLACE — _No religious or organizational signals in the name._
+- **[evangelical_protestant → unknown]** MARION COUNTY GOOD SAMARITAN FOUNDATION — _No religious signals in the name or purpose context._
+- **[evangelical_protestant → jewish]** BNEI HANEURIM YESHUAT ELIEZER — _Messianic organization names are classified as evangelical_protestant by default, but the name 'BNEI HANEURIM YESHUAT ELIEZER' suggests a Jewish context._
+- **[evangelical_protestant → unknown]** PAGOSA CRISIS PREGNANCY CENTER — _No religious or organizational signals in the name or context._
+- **[evangelical_protestant → christian_science]** KANAWHA CITY CHURCH OF CHRIST — _The name 'Church of Christ' explicitly indicates a Christian Science organization._
+- **[evangelical_protestant → unknown]** QUAKER HILL BURIAL SOCIETY — _No religious signal in the name and no additional context provided._
+- **[evangelical_protestant → secular]** SAMARITAN HOMELESS INTERIM PROGRAM (SHIP) — _No religious signals in the name or context._
+- **[jewish → unknown]** Sharee Torah — _No signal in the name for a specific religious tradition and no additional context provided._
+- **[jewish → unknown]** WISDOM IN TORAH — _No religious signal in the name and no additional context provided._
+- **[jewish → unknown]** RABBI BLOKSTEIN — _The name alone does not provide enough context to classify as Jewish or secular._
+- **[jewish → unknown]** ANTI DEFAMATION LEAGE OF B'NAI BIRTH — _No religious or specific organization signal in the name._
+- **[jewish → unknown]** FRIENDS OF TORAH — _The name 'FRIENDS OF TORAH' does not provide enough context to classify it as a specific religious tradition._
+- **[other_religion → unknown]** HH DALAI LAMA LIBRARY & MUSEUM — _No religious or organizational signal in the name._
+- **[other_religion → unknown]** SIKH COALITION INC — _No religious or organization-specific signals in the name._
+- **[secular → evangelical_protestant]** BEACON COLLEGE PREP INC — _Bare institution name with no religious identifiers; defaults to evangelical_protestant due to lack of other classification signals._
+- **[secular → unknown]** ALABAMA FIRE COLLEGE FOUNDATION INC — _No religious signals in the name or purpose context._
+- **[secular → unknown]** COMMUNITY FOUNDATION OF THE CSRA — _No religious signals in the name and no additional context provided._
+- **[secular → evangelical_protestant]** Amridge University FBO Pablo Homa — _Bare institution name without religious context, but 'FBO' typically denotes a Faith-Based Organization which aligns with evangelical Protestantism._
+- **[secular → unknown]** OPERATION ONE VOICE — _No religious or organizational signals in the name or provided context._
+- **[secular → unknown]** UMD COLLEGE PARK FOUNDATION — _No religious signal in the name and no additional context provided._
+- **[secular → unknown]** OPERATION WALK CHICAGO — _No religious or specific purpose context signals are present in the name._
+- **[secular → evangelical_protestant]** ELIZABETHTOWN COLLEGE FBO AIDAN CHAPPLE — _Baptist institutions are typically classified as evangelical_protestant._
+- **[secular → unknown]** SPECIAL OPERATORS TRANSITION FND — _No religious signals in the name or purpose context._
+- **[secular → unknown]** OPERATION DEPLOYED INC — _No religious or organization-specific signals in the name or purpose context._
+- **[secular → unknown]** NORTH CENTRAL COMMUNITY FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** VANTAGE HEALTH SYSTEMS — _No religious signals in the name or context._
+- **[secular → evangelical_protestant]** Heritage Christian University — _The name 'Christian University' strongly indicates it is an evangelical Protestant institution._
+- **[secular → unknown]** HUNTSVILLE HOSPITAL FOUNDATION - MIDDLEFORK FUND — _No religious signal in the name or purpose context._
+- **[secular → unknown]** OCEAN REEF MEDICAL CENTER FNDN — _No religious signals in the name or purpose context._

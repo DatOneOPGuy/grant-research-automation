@@ -81,9 +81,11 @@ def print_report(truth: list[str], predicted: list[str], report: dict[str, dict[
                   f"precision={values['precision']:.1%} recall={values['recall']:.1%} "
                   f"f1={values['f1']:.1%}")
     print("\nConfusion matrix (truth -> prediction):")
-    for (actual, predicted), count in sorted(Counter(zip(truth, predicted)).items()):
-        if actual != predicted:
-            print(f"  {actual:24} -> {predicted:24} {count}")
+    # NOTE: loop variables must not shadow the `predicted` list, or every
+    # targeted safety check below silently zips against a string and prints 0.
+    for (true_label, pred_label), count in sorted(Counter(zip(truth, predicted)).items()):
+        if true_label != pred_label:
+            print(f"  {true_label:24} -> {pred_label:24} {count}")
     jewish_as_christian = sum(
         actual == "jewish" and predicted in CHRISTIAN_TRADITIONS
         for actual, predicted in zip(truth, predicted)
@@ -110,6 +112,22 @@ def print_report(truth: list[str], predicted: list[str], report: dict[str, dict[
         print("\nRecommendation: TUNE THE PROMPT FIRST. Major-category coverage or agreement is below the required threshold.")
 
 
+def classify_with_retries(model: str, row: dict, attempts: int = 3):
+    """Mirror the production pipeline's record-error tolerance: retry, then skip.
+
+    Malformed model responses are per-record failures in recipient_batching;
+    one bad JSON string must not crash a thousand-row validation run.
+    """
+    import json as json_module
+
+    for _ in range(attempts):
+        try:
+            return classify_row(model, row)
+        except (KeyError, TypeError, ValueError, json_module.JSONDecodeError):
+            continue
+    return None
+
+
 def main() -> None:
     args = parse_args()
     if not args.db.exists():
@@ -121,14 +139,19 @@ def main() -> None:
     from tqdm import tqdm
 
     ensure_model_available(args.model)
-    truth, predicted = [], []
+    truth, predicted, skipped = [], [], 0
     try:
         for row in tqdm(sample, desc="Validating local classifier", unit="recipient"):
-            result = classify_row(args.model, row)
+            result = classify_with_retries(args.model, row)
+            if result is None:
+                skipped += 1
+                continue
             truth.append(row["faith_classification"])
             predicted.append(result[0])
     finally:
         unload_model(args.model)
+    if skipped:
+        print(f"\nSkipped {skipped} record(s) whose responses stayed malformed after 3 attempts.")
     print_report(truth, predicted, metrics(truth, predicted))
 
 

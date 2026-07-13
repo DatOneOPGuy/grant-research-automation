@@ -1,0 +1,89 @@
+{
+  "config": {
+    "model": "qwen2.5:7b",
+    "sample_size": 300,
+    "seed": 20260709,
+    "note": "Iter 5: authorize world knowledge in ladder (lists illustrative not exhaustive); jewish vocab (Hillel/Kollel/JCC); secular=any org type; Catholic orders+universities",
+    "timestamp": "2026-07-10T01:11:03"
+  },
+  "overall_agreement": 0.69,
+  "gate": {
+    "passed": false,
+    "major_recall": 0.6909797348376232,
+    "weak_f1": [
+      "evangelical_protestant",
+      "catholic",
+      "jewish",
+      "secular"
+    ],
+    "present": 4,
+    "required": 4
+  },
+  "safety": {
+    "jewish_as_christian": 3,
+    "catholic_evangelical": 4,
+    "nonchristian_as_christian": 3
+  },
+  "report": {
+    "catholic": {
+      "support": 53,
+      "precision": 1.0,
+      "recall": 0.6415094339622641,
+      "f1": 0.7816091954022989
+    },
+    "christian_science": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "evangelical_protestant": {
+      "support": 70,
+      "precision": 0.8771929824561403,
+      "recall": 0.7142857142857143,
+      "f1": 0.7874015748031495
+    },
+    "jewish": {
+      "support": 33,
+      "precision": 1.0,
+      "recall": 0.7272727272727273,
+      "f1": 0.8421052631578948
+    },
+    "mormon_lds": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "muslim": {
+      "support": 1,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "orthodox_christian": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "other_religion": {
+      "support": 2,
+      "precision": 0.6666666666666666,
+      "recall": 1.0,
+      "f1": 0.8
+    },
+    "secular": {
+      "support": 141,
+      "precision": 0.9320388349514563,
+      "recall": 0.6808510638297872,
+      "f1": 0.7868852459016392
+    },
+    "unknown": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  }
+}

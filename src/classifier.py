@@ -77,7 +77,8 @@ CATHOLIC = _rx([
     'order of preachers', 'salesian', 'don bosco', 'benedictine', 'abbey',
     'monastery', 'priory', 'carmelite', 'augustinian', 'vincentian',
     'marianist', 'marist', 'redemptorist', 'passionist', 'oratorian',
-    'opus dei', 'legionaries of christ', 'christian brothers', 'de la salle',
+    'opus dei', 'legionaries of christ', 'jesus crucified', 'sister servants',
+    'christian brothers', 'de la salle',
     'lasallian', 'sisters of', 'daughters of charity', 'missionaries of charity',
     'little sisters of the poor', 'poor clares', 'felician', 'ursuline',
     'knights of columbus', 'knights of malta', 'catholic charities',
@@ -85,9 +86,12 @@ CATHOLIC = _rx([
     'aid to the church', 'food for the poor', 'st vincent de paul',
     'society of st vincent', 'our lady', 'notre dame', 'sacred heart',
     'blessed sacrament', 'immaculate', 'annunciation', 'corpus christi',
-    'guadalupe', 'fatima', 'lourdes', 'mount carmel', 'perpetual adoration',
-    'loyola', 'gonzaga', 'villanova', 'georgetown', 'fordham', 'marquette',
-    'st bonaventure', 'st louis university', 'creighton', 'xavier', 'duquesne',
+    'guadalupe', 'of fatima', 'fatima shrine', 'lourdes', 'mount carmel',
+    'perpetual adoration',
+    'loyola', 'gonzaga', 'villanova', 'georgetown university',
+    'georgetown prep', 'fordham', 'marquette university',
+    'st bonaventure', 'st louis university', 'creighton',
+    'xavier university', 'st xavier', 'duquesne',
     'seton hall', 'providence college', 'boston college', 'holy cross',
     'franciscan university', 'ave maria', 'thomas aquinas', 'christendom',
     'benedictine college', 'catholic university', 'pontifical', 'vatican',
@@ -100,7 +104,8 @@ ORTHODOX = _rx([
     'armenian apostolic', 'ethiopian orthodox', 'syriac orthodox',
     'orthodox church', 'orthodox christian', 'st vladimir', 'st tikhon',
     'theotokos', 'orthodox christian mission', 'iocc',
-    'orthodox church in america',
+    'orthodox church in america', 'malankara', 'antiochian', 'philoptochos',
+    'st nektarios',
 ])
 
 # --- 4. Protestant / Evangelical -----------------------------------------
@@ -175,11 +180,35 @@ CHRISTIAN_SIGNAL = _rx([
     'kingdom', 'disciple', 'evangel', 'mission', 'chapel', 'parish',
 ])
 
+# Explicit Protestant denominations. These must beat the saint/Catholic
+# vocabulary: "St. Peter's Evangelical Lutheran Church" is Lutheran, and an
+# "Episcopal Diocese" is Episcopal, not Catholic.
+PROT_DENOMINATION = _rx([
+    'baptist', 'methodist', 'presbyterian', 'lutheran', 'episcopal',
+    'epsicopal',  # (sic) recurring typo in 990-PF grant schedules
+    'anglican', 'wesleyan', 'pentecostal', 'nazarene', 'mennonite',
+    'moravian', 'adventist', 'ame zion', 'assemblies of god',
+    'assembly of god', 'evangelical',
+])
+
 # Saint prefix and the medical/secular override for it.
 SAINT = re.compile(r'\b(st\.?|saint|sts\.?)\s+[a-z]', re.IGNORECASE)
+# "ST"/"Saint" that is a street, state, or place name — NOT a saint prefix:
+# "92ND ST Y", "KENNESAW ST UNIV", "ST LOUIS MARATHON", "ST JOSEPH COUNTY".
+SAINT_PLACE = re.compile(
+    r'\b(?:\d+(?:st|nd|rd|th)\s+st\b'
+    r'|(?:st\.?|saint)\s+(?:louis|petersburg|croix|simons?\s+island)\b'
+    r'|st\.?\s+\w+s?\s+county\b'
+    r'|st\s+univ(?:ersity)?\b)', re.IGNORECASE)
+# Secular-sounding "Big Brothers Big Sisters" must never match 'sisters of'.
+BBBS = re.compile(r'\bbig\s+brothers[\s-]+big\s+sisters\b', re.IGNORECASE)
+# An explicit religious word blocks the secular institution-word override:
+# "Heritage Christian University" and "Revive College Church" are churches.
+RELIGIOUS_WORD = _rx(['church', 'chapel', 'christian', 'ministry', 'ministries'])
+# Research institutions only: a plain "St. Joseph Hospital" IS a Catholic
+# hospital; "St. Jude Children's Research Hospital" is the secular exception.
 MEDICAL_OVERRIDE = _rx([
-    'hospital', 'medical center', 'health system', 'healthcare',
-    'research', "children's research", 'medical research',
+    'research',
 ])
 
 # --- 5. Secular override -------------------------------------------------
@@ -235,14 +264,18 @@ def tradition(name: str) -> str | None:
     if not name:
         return None
     n = f' {name.lower().strip()} '
-    if CATHOLIC.search(n):
-        return 'Catholic'
+    # An explicit Protestant denomination beats saint/Catholic vocabulary.
+    if PROT_DENOMINATION.search(n):
+        return 'Evangelical/Protestant'
+    # Orthodox markers beat the Catholic saint/monastery vocabulary.
     if ORTHODOX.search(n):
         return 'Orthodox'
+    if CATHOLIC.search(n) and not BBBS.search(n):
+        return 'Catholic'
     if (SALVATION_ARMY.search(n) or MESSIANIC.search(n)
             or PROTESTANT.search(n)):
         return 'Evangelical/Protestant'
-    if SAINT.search(n):
+    if SAINT.search(n) and not SAINT_PLACE.search(n):
         return 'Catholic'
     return None
 
@@ -269,19 +302,26 @@ def classify(name: str) -> str | None:
                OTHER_RELIGION):
         if rx.search(n):
             return 'nonchristian'
-    if CATHOLIC.search(n) or ORTHODOX.search(n):
+    # "Big Brothers Big Sisters" must not fall into Catholic 'sisters of'.
+    if BBBS.search(n):
+        return 'nonchristian'
+    if (CATHOLIC.search(n) or ORTHODOX.search(n)):
         return 'christian'
     if PROTESTANT.search(n):
         return 'christian'
-    # saint names -> Catholic, unless medical/research override w/o signal
-    if SAINT.search(n):
+    # saint names -> Catholic, unless the "St" is a street/state/place name
+    # or a medical/research override with no other Christian signal applies
+    if SAINT.search(n) and not SAINT_PLACE.search(n):
         if MEDICAL_OVERRIDE.search(n) and not PROTESTANT.search(n):
             return 'nonchristian'
         return 'christian'
     # ambiguous words need a co-occurring Christian signal
     if AMBIGUOUS.search(n) and CHRISTIAN_SIGNAL.search(n):
         return 'christian'
-    # secular override (only reached if no religious signal matched)
+    # secular override — blocked by an explicit religious word in the name
+    # ("Heritage Christian University", "Revive College Church" are churches)
     if SECULAR.search(n):
+        if RELIGIOUS_WORD.search(n):
+            return 'christian'
         return 'nonchristian'
     return None

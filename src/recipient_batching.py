@@ -6,9 +6,16 @@ import json
 import os
 import sqlite3
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+# Number of concurrent local-LLM requests per 500-row batch. 1 preserves the
+# original strictly-sequential behavior; higher values parallelize inference
+# against Ollama's own request concurrency (OLLAMA_NUM_PARALLEL on the server).
+CONCURRENCY = max(1, int(os.environ.get("CLASSIFY_CONCURRENCY", "1")))
 
 from src.recipient_context import hydrate_records
 from src.recipient_taxonomy import (
@@ -118,23 +125,64 @@ def commit_batch(
     return len(successes), sum(update[1] == "llm_failed" for update in failures)
 
 
+def record_result(row, result_or_error, max_attempts, successes, failures, latencies) -> None:
+    """Route one finished inference into the success or retry-failure buckets."""
+    if isinstance(result_or_error, BaseException):
+        if not is_record_error(result_or_error):
+            raise result_or_error
+        failures.append(failure_update(row, result_or_error, max_attempts))
+    else:
+        successes.append(success_update(row, result_or_error))
+        latencies.append(result_or_error[3])
+
+
+def classify_sequential(records, context, model, max_attempts, successes, failures, latencies):
+    """Original one-at-a-time path; a bare Ctrl-C commits the partial batch."""
+    for row in records:
+        try:
+            record_result(row, classify_row(model, row), max_attempts, successes, failures, latencies)
+        except KeyboardInterrupt:
+            raise BatchInterrupted(successes, failures, context) from None
+        except Exception as error:
+            record_result(row, error, max_attempts, successes, failures, latencies)
+
+
+def classify_parallel(records, context, model, max_attempts, successes, failures, latencies):
+    """Fan a 500-row batch across CONCURRENCY workers; Ctrl-C commits what finished."""
+    pool = ThreadPoolExecutor(max_workers=CONCURRENCY)
+    futures = {pool.submit(classify_row, model, row): row for row in records}
+    consumed = set()
+    try:
+        for future in as_completed(futures):
+            consumed.add(future)
+            row = futures[future]
+            try:
+                record_result(row, future.result(), max_attempts, successes, failures, latencies)
+            except Exception as error:
+                record_result(row, error, max_attempts, successes, failures, latencies)
+        pool.shutdown(wait=True)
+    except KeyboardInterrupt:
+        # Cancel queued work so Ctrl-C stops within seconds, not a full batch;
+        # harvest results that finished but were not yet consumed above.
+        pool.shutdown(wait=True, cancel_futures=True)
+        for future, row in futures.items():
+            if future in consumed or future.cancelled() or not future.done():
+                continue
+            try:
+                record_result(row, future.result(), max_attempts, successes, failures, latencies)
+            except Exception as error:
+                record_result(row, error, max_attempts, successes, failures, latencies)
+        raise BatchInterrupted(successes, failures, context) from None
+
+
 def classify_dataframe(conn, dataframe, model: str, max_attempts: int) -> tuple[list[tuple], list[tuple], list[tuple[str, str, str, str]], list[float]]:
     """Hydrate a strict 500-row chunk and return pending writes without committing."""
     records, context = hydrate_records(conn, dataframe.to_dict("records"))
     successes: list[tuple] = []
     failures: list[tuple] = []
     latencies: list[float] = []
-    for row in records:
-        try:
-            result = classify_row(model, row)
-            successes.append(success_update(row, result))
-            latencies.append(result[3])
-        except KeyboardInterrupt:
-            raise BatchInterrupted(successes, failures, context) from None
-        except Exception as error:
-            if not is_record_error(error):
-                raise
-            failures.append(failure_update(row, error, max_attempts))
+    runner = classify_parallel if CONCURRENCY > 1 else classify_sequential
+    runner(records, context, model, max_attempts, successes, failures, latencies)
     return successes, failures, context, latencies
 
 

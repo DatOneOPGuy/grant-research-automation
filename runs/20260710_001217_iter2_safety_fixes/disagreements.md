@@ -1,0 +1,59 @@
+# Disagreements (57)
+
+- **[catholic → unknown]** ST JOESPH'S INDIAN SCHOOL — _No religious signals in the name or purpose context._
+- **[catholic → evangelical_protestant]** ST PETER'S EPISCOPAL — _St. Peter's with no explicit Catholic or secular signals_
+- **[catholic → unknown]** ST VITO'S CHURCH COVID RELIEF — _No religious signals in the name or context._
+- **[catholic → unknown]** St Augustine Health Center — _No religious signals in the name and no additional context provided._
+- **[catholic → evangelical_protestant]** SAINT MARGARET'S EPISCOPAL CHURCH — _The name includes 'Saint' and 'Episcopal', which defaults to evangelical_protestant as Episcopal refers to the Anglican tradition, a branch of Christianity._
+- **[catholic → unknown]** Birthright of St Joseph's County — _No religious signals in the name or purpose context._
+- **[catholic → secular]** St Mary's Food Bank Alliance Depository — _No religious signals in the name and purpose context is unavailable._
+- **[catholic → unknown]** Elegant Sisters of Houston — _No religious signals in the name or context._
+- **[catholic → orthodox_christian]** HELLENIC COLLAGE & HOLY CROSS SCH — _Contains 'Holy Cross', which defaults to Orthodox Christian._
+- **[catholic → unknown]** ST CATHERINE LABOURE SCHOOL FOR THE SHIRLEY GLASSMAN SCHOLARSHIP FUND — _No religious signals in the name and no additional context provided._
+- **[catholic → secular]** OREGON ST UNIV FBO COOPER JOHNSON — _The name contains 'FBO' which stands for 'for the benefit of', indicating it is related to a specific person (Cooper Johnson) rather than a religious organization. The name does not contain any religious signals and thus is classified as secular._
+- **[catholic → unknown]** ST JOACHIM & ANNE SCHOOL — _Bare saint name without a clear religious organization or additional context._
+- **[catholic → evangelical_protestant]** ST SIMON STOCK - ST JOSEPH CHURCH — _Saint names without a specified Protestant denomination default to evangelical_protestant._
+- **[catholic → unknown]** ST STEPHENS WAY — _No religious or organizational signals in the name._
+- **[catholic → evangelical_protestant]** SAINT VINCENT DEPAUL — _Default to evangelical_protestant due to lack of specific Catholic or other religious signals in the name._
+- **[catholic → evangelical_protestant]** SAINT MICHAELS HIGH SCHOOL ALUMNI ASSOCIATION — _The name 'Saint Michael's' follows the general rule for saint-named organizations and defaults to evangelical_protestant as there is no explicit Protestant denomination specified._
+- **[catholic → unknown]** TAY PHUONG MONASTERY — _No religious signal in the name or context._
+- **[catholic → unknown]** ST VINCENT FRANKFORT HOSP FOUND — _No religious signals in the name or context._
+- **[catholic → unknown]** GEORGETOWN LAW - NIGHT OWL FUND — _No religious signals in the name and no purpose context provided._
+- **[catholic → secular]** Georgetown Island Education Foundation — _No religious signals in the name and no context provided._
+- **[catholic → unknown]** ST STEPHEN'S YOUTH PROGRAM — _No religious signals in the name or purpose context._
+- **[catholic → unknown]** ST JOSEPH CENTER FOR SPECIAL — _No religious signals in the name and no purpose context provided._
+- **[catholic → secular]** Loyola Arrupe Centre for Seniors — _No religious signals in the name and purpose context._
+- **[catholic → unknown]** IOWA ST UNIV FBO EMILY CASPERS — _No religious signals in the name._
+- **[catholic → orthodox_christian]** ST MARK'S COPTIC ORTHODOX CHURCH — _St Mark's Coptic Orthodox Church explicitly identifies as an Orthodox Christian church._
+- **[catholic → evangelical_protestant]** THE CHRISTIAN BROTHERS INSTITUTE — _Bare 'Christian' in the name suggests evangelical_protestant._
+- **[catholic → unknown]** AUGUSTINIAN FRIARS PROVINCE OF SAINT THOMAS OF VILLANOVA — _No explicit religious signal in the name and no additional context provided._
+- **[catholic → secular]** ST JUDES RANCH FOR CHILDREN TEXAS — _No religious signals in the name and no additional context provided._
+- **[catholic → secular]** ST LOUIS CHILDREN'S HOSPITAL KIDSTRUCTION — _Named after a saint but no explicit religious mission and purpose context is unavailable._
+- **[catholic → evangelical_protestant]** ST PETER AND PAUL PARISH — _Saint-named parish without a specified Protestant denomination_
+- **[catholic → secular]** FRIENDS OF THE ANIMAL CLINIC OF ST JOSEPH — _The name 'Friends of the Animal Clinic' contains no religious signals and is clearly related to veterinary services for animals._
+- **[catholic → evangelical_protestant]** MISSIONARY SISTERS OF THE SACRED HEART OF JESUS AND MARY — _The name includes 'Missionary Sisters' which is a religious order, and 'Sacred Heart of Jesus and Mary' are Catholic saints, but the context suggests it aligns more with Protestant missionary work._
+- **[catholic → secular]** Domestic Sexual Abuse Services St Joseph County — _No religious signals in the name or context._
+- **[evangelical_protestant → unknown]** FELLOWSHIP OF ISRAEL RELATED MINISTRIES — _The name does not contain any clear religious or organizational signals._
+- **[evangelical_protestant → secular]** NATIONAL SCHOOL CHAPLAIN ASSOCIATION — _No religious signals in the name and purpose context is unavailable._
+- **[evangelical_protestant → unknown]** WHEATON COLLEGE FBO GRACYN OELKE — _The name and context do not provide any clear religious or secular signal._
+- **[evangelical_protestant → secular]** SANTA CRUZ MOUNTAIN TRAIL STEWARDSHIP — _No religious signals in the name or context._
+- **[evangelical_protestant → unknown]** LOCKPORT CARE NET PREGANCY CTR — _The name does not contain any clear religious or organizational signals._
+- **[evangelical_protestant → orthodox_christian]** HELLENIC ORTHODOX COMMUNITY CHURCH — _Orthodox church name_
+- **[evangelical_protestant → unknown]** GADIEL GOSPEL LONGASA MANALO — _No religious signals in the name or context._
+- **[evangelical_protestant → secular]** POCATELLO PIONEERS CYCLING CLUB INC — _The name contains no religious signals and does not indicate any faith-based organization._
+- **[jewish → secular]** UNIVERSITY OF NORTH CAPOLINA ARTS & SCIENCES - CENTER FOR JEWISH STUDIES — _No religious signals in the name and purpose context is unavailable._
+- **[jewish → secular]** Rocky Mountain House Rabbit Rescue — _No religious signals in the organization's name or context._
+- **[jewish → unknown]** BNOS YAAKOV HIGH SCHOOL — _The name does not contain any explicit religious signals and there is no additional context to determine a classification._
+- **[jewish → unknown]** JCC OF HARRISON — _The name does not contain any clear religious or organizational signals._
+- **[jewish → unknown]** FRIENDS OF THE GA HOLOCAUST COMMISSION — _No religious or organizational signals in the name or context._
+- **[jewish → evangelical_protestant]** NORTH SUBURBAN CONGREGATION BETH-EL — _Biblical names often align with evangelical Protestant traditions._
+- **[jewish → unknown]** BNAI BRITH HILLEL FOUNDATION AT UCB — _No religious signal in the name or context._
+- **[secular → unknown]** CHARLOTTE HUNGERFORD HOSPITAL — _No religious or explicit secular signals in the name._
+- **[secular → unknown]** HOSPITALS OF REGINA FOUNDATION INC — _No religious signals in the name or purpose context._
+- **[secular → unknown]** THE CHARLES KOINER CONSERVANCY — _No religious signals in the name or purpose context._
+- **[secular → evangelical_protestant]** AUGUSTANA COLLEGE CROSS COUNTRY — _The name 'Augustana' is typically associated with Lutheran affiliations, which fall under evangelical_protestant._
+- **[secular → unknown]** HAMILTON COLLEGE FBO LAUREN PRINS — _No religious signals in the name or context._
+- **[secular → unknown]** BOCA HOSPITAL (BRRH) FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** GREATER TOMS RIVER CHAMBER OF COMMERCE FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** CHILDRENS MERCY HOSPITAL WICHITA CLINIC — _No religious signals in the name or context._
+- **[secular → unknown]** WABASHA KELLOGG AREA COMMUNITY FOUNDATION — _No religious signals in the name and no additional context provided._

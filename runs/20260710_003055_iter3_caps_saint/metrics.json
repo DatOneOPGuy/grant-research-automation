@@ -1,0 +1,86 @@
+{
+  "config": {
+    "model": "qwen2.5:7b",
+    "sample_size": 300,
+    "seed": 20260709,
+    "note": "Iter 3: ALL-CAPS ST=Saint recognition, ST=State/city disambiguation, Congregation Beth-El->jewish, Catholic orders vocab",
+    "timestamp": "2026-07-10T00:30:55"
+  },
+  "overall_agreement": 0.81,
+  "gate": {
+    "passed": false,
+    "major_recall": 0.7712532271313736,
+    "weak_f1": [
+      "catholic"
+    ],
+    "present": 4,
+    "required": 4
+  },
+  "safety": {
+    "jewish_as_christian": 0,
+    "catholic_evangelical": 7,
+    "nonchristian_as_christian": 0
+  },
+  "report": {
+    "catholic": {
+      "support": 39,
+      "precision": 0.9473684210526315,
+      "recall": 0.46153846153846156,
+      "f1": 0.6206896551724138
+    },
+    "christian_science": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "evangelical_protestant": {
+      "support": 76,
+      "precision": 0.92,
+      "recall": 0.9078947368421053,
+      "f1": 0.913907284768212
+    },
+    "jewish": {
+      "support": 40,
+      "precision": 1.0,
+      "recall": 0.875,
+      "f1": 0.9333333333333333
+    },
+    "mormon_lds": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "muslim": {
+      "support": 3,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "orthodox_christian": {
+      "support": 1,
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.6666666666666666
+    },
+    "other_religion": {
+      "support": 3,
+      "precision": 1.0,
+      "recall": 0.3333333333333333,
+      "f1": 0.5
+    },
+    "secular": {
+      "support": 138,
+      "precision": 0.943089430894309,
+      "recall": 0.8405797101449275,
+      "f1": 0.888888888888889
+    },
+    "unknown": {
+      "support": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
+  }
+}

@@ -23,6 +23,10 @@ __pycache__/
 venv/
 .venv/
 
+# Transient run logs and scratch output
+logs/
+scratch_*.log
+
 # OS / editor
 .DS_Store
 

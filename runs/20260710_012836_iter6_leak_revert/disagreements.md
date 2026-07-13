@@ -1,0 +1,67 @@
+# Disagreements (65)
+
+- **[catholic → secular]** ST LOUIS FIREFIGHTERS COMMUNITY OUTREACH — _No religious signals present in the name._
+- **[catholic → evangelical_protestant]** ST LUKES EPISCOPAL — _Contains 'St' and no clear Catholic or other Christian denomination signal_
+- **[catholic → unknown]** BIG BROTHERS BIG SISTERS OF TAMPA B — _No clear religious or secular signal in the name._
+- **[catholic → evangelical_protestant]** CHAPEL OF THE HOLY CROSS LUTHERAN C — _Contains 'Holy Cross' and no Catholic signals_
+- **[catholic → episcopal]** THE EPISCOPAL DIOCESE OF AR — _Episcopal diocese vocabulary_
+- **[catholic → unknown]** GUADALUPE CENTER EDUCATIONAL — _Barely recognizable as potentially religious due to the name 'Guadalupe,' but no clear Christian or Catholic signals are present._
+- **[catholic → secular]** ST LOUIS CHILDRENS HOSPITAL FDNTN — _Contains 'ST' which likely abbreviates 'Saint', but no other religious signals are present._
+- **[catholic → secular]** UF HEALTH ST JOHNS FOUNDATION — _Contains 'UF HEALTH' which suggests it is related to a university or health system, and 'ST JOHNS' does not indicate a Christian denomination in this context._
+- **[catholic → unknown]** MEHNAZ FATIMA EDUCATION AND WELFARE — _No clear religious or organizational signals in the provided name._
+- **[catholic → unknown]** ST LOUIS QUEER SUPPORT & HEALING — _No clear religious or organizational signal present._
+- **[catholic → evangelical_protestant]** HELPING HANDS FOR THE HUNGRY SOUP KITCHEN ST CYPRIAN CHURCH — _Contains 'St Cyprian Church', which is a saint name and lacks other clear Christian denomination signals._
+- **[catholic → unknown]** ST STEPHENS WAY — _Bare street name without any clear religious or organizational signal._
+- **[catholic → unknown]** ST AIDAN'S CHAPEL OF DARTMOUTH — _No clear religious or organizational context provided._
+- **[catholic → evangelical_protestant]** St Benedicts Classical Academy — _No clear religious signal, but the name 'St' before a saint's name typically indicates Catholicism or other Christian traditions, and in absence of more context, evangelical_protestant is chosen as the default Christian label._
+- **[catholic → unknown]** ST SIMON ISLAND ATHLETIC ASSOCIATION — _Bare organization name with no religious or specific secular signals._
+- **[catholic → unknown]** ST VINCENT'S INSTITUTE OF MEDICAL RESEARCH — _No religious signals present and purpose context unavailable._
+- **[catholic → secular]** MARQUETTE UNIVERSITY HS — _The name 'Marquette University HS' contains 'University', which is a common term for secular educational institutions and does not indicate a religious affiliation._
+- **[evangelical_protestant → unknown]** SAVANNAH CRUZ — _Bare person's name without any religious or organizational context._
+- **[evangelical_protestant → secular]** UNION RESCUE MISSION - LA — _No religious signals in the name._
+- **[evangelical_protestant → unknown]** INTERFAITH MINISTRY — _Bare term without specific religious affiliation or clear context._
+- **[evangelical_protestant → secular]** ISLAND FOOD PANTRY OF MARTHA'S VINEYARD — _No religious signals present in the name._
+- **[evangelical_protestant → unknown]** Turning Point Pregnancy Resource Center — _No clear religious or secular signal in the name._
+- **[evangelical_protestant → unknown]** The Salvation Army of Greater Cleveland — _No clear religious or organizational signal in the name._
+- **[evangelical_protestant → unknown]** FOR THE LOVE SKATE MINISTRY — _No clear religious or organizational signal present._
+- **[evangelical_protestant → christian_science]** CHURCH OF CHRIST INDIA MISSION — _Bare 'Church of Christ' with no specific denomination and no other signals._
+- **[evangelical_protestant → christian_science]** MARTINEZ CHURCH OF CHRIST — _Explicit signal 'Church of Christ'_
+- **[evangelical_protestant → unknown]** GARY WOODS MINISTRIES — _No specific religious signal and no additional context provided._
+- **[evangelical_protestant → unknown]** MONSERRAT CRUZ — _No recognizable religious or organizational context provided._
+- **[evangelical_protestant → unknown]** THE REFORMED CHURCH OF LOCUST — _No clear religious or organizational signals present._
+- **[evangelical_protestant → unknown]** SUDAN INTER MINISTRY — _No recognizable religious or organizational signals in the provided information._
+- **[evangelical_protestant → unknown]** WEST BRANCH FRIENDS CHURCH — _No clear religious signal and no additional context provided._
+- **[jewish → unknown]** MESORAH NEW JERSEY — _No clear religious or organizational context provided._
+- **[jewish → unknown]** RABBI ELI BEN HAIM — _No clear organizational context or religious signal present._
+- **[secular → unknown]** CHICAGO COMMUNITY FOUNDATION IBIC COUNCIL — _No clear religious or organizational signals in the name._
+- **[secular → unknown]** AMERICAN FRIENDS OF HERIOT-WATT UNIVERSITY — _No clear religious or organizational signals in the name._
+- **[secular → unknown]** NORTH HAVEN ROTARY SCHOLARSHIP FNDTN — _No religious signals present and no clear purpose provided._
+- **[secular → evangelical_protestant]** REVIVE COLLEGE CHURCH — _Contains 'College Church', which is often used in evangelical Protestant contexts._
+- **[secular → unknown]** AMERICAN UNIVERSITY-M — _ambiguous name without clear purpose or location_
+- **[secular → unknown]** GIRL SCOUTS HEART OF THE SOUTH — _No clear religious or organizational signals in the name._
+- **[secular → unknown]** MED ALUMNI ASSOCIATION OF UNIVERSITY OF MARYLAND — _No clear religious signals and no additional context provided._
+- **[secular → unknown]** AMERICAN FESTIVAL ORCHESTRA AND CHORUS — _No religious signals present; purpose and location unavailable._
+- **[secular → unknown]** ROGER MILLER MUSEUM — _No religious or specific organizational signals present._
+- **[secular → unknown]** WOMEN'S AUXILIARY TO CHILDREN'S MEDICAL CENTER — _Bare description without clear religious or organizational context_
+- **[secular → unknown]** University of Dublin - Trinity — _No clear religious or secular identifying markers in the name._
+- **[secular → unknown]** CT HOSPITALITY EDUCATION FOUNDATION (CT) — _No clear religious or organizational signals present._
+- **[secular → unknown]** ALZHEIMER'S DISEASE AND RELATED DISORDERS ASSOCIATION INC PITTSBURGH OFFI — _No religious signals in the name._
+- **[secular → unknown]** UNIVERSITY OF MIAMI FBO DOMINIC — _Bare institution name with no specific religious signals_
+- **[secular → unknown]** River Region Ballet — _No religious or specific organizational signals present._
+- **[secular → unknown]** RIVERVIEW HOSPITAL FUNDATION — _Unreadable fragment with no clear religious or organizational context_
+- **[secular → unknown]** PACE AT NATIONAL LOUIS UNIVERSITY — _No clear religious or organizational signal in the name._
+- **[secular → other_religion]** VIA COLLEGE OF OSTEOPATHIC MED — _No clear religious signal, could be related to osteopathic medicine which is a medical profession rather than a religious organization._
+- **[secular → unknown]** AFRO AMERICAN CULTURAL AND HISTORICAL SOCIETY — _No clear religious signals and purpose context unavailable._
+- **[secular → unknown]** HERLEV OG GENTOFTE HOSPITAL — _No clear religious or organizational signal present._
+- **[secular → unknown]** THE KING'S COLLEGE — _No clear religious or secular signal in the name._
+- **[secular → other_religion]** WISCONSIN ASSOCIATION OF INDEPENDENT COLLEGES AND UNIVERSITIES (WAICU) — _No specific religious signals present; could be related to any religion but lacks clear indication._
+- **[secular → unknown]** IHCF - AFRICAN CHRISTIAN HOSPITALS — _No clear religious or organizational signals in the name._
+- **[secular → unknown]** FT MYER'S KIWANIS CLUB — _No clear religious or organizational signals present._
+- **[secular → other_religion]** MUSEUM OF LATIN AMERICAN — _No clear religious signals present; could be related to culture or history but not explicitly religious._
+- **[secular → unknown]** university of Belize — _Unreadable fragment_
+- **[secular → unknown]** DEAN'S FUND FOR ALZHEIMER'S RESEARCH — _No clear religious signals and the name does not indicate a specific organization type._
+- **[secular → unknown]** HAMPTON UNIVERSITY — _Bare institution name without additional context or religious signals._
+- **[secular → unknown]** EANES ORCHESTRA PARENTS ASSOCIATION — _No religious signals present and purpose context unavailable._
+- **[secular → unknown]** Ramzia Jalali - CO College of Weste — _Bare person's name without a clear institutional context_
+- **[secular → unknown]** ALZHEIMER'S ASSOCIATION IOWA CHAPTE — _No clear religious signals and the name indicates a non-religious purpose._
+- **[secular → unknown]** Queens College Foundation AAARI Support — _No clear religious or organizational signal in the provided name._

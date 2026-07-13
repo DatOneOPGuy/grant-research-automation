@@ -32,7 +32,8 @@ WHERE source = 'pending'
   AND (faith_classification IS NULL OR faith_classification = 'pending')
   AND (classification_method IS NULL OR classification_method NOT IN ('rule', 'ntee', 'llm', 'llm_failed'))
   AND COALESCE(classification_attempts, 0) < 3
-  AND COALESCE(max_grant, 0) >= 5000;
+  AND COALESCE(max_grant, 0) >= 5000
+ORDER BY COALESCE(max_grant, 0) DESC;
 """
 
 

@@ -1,0 +1,59 @@
+# Disagreements (57)
+
+- **[catholic → unknown]** ST SEBASTION SPORTS PROJECT — _No religious signals in the name or context._
+- **[catholic → unknown]** ST ANDREWS SCHOOL-BECKERER FAMILY FUND — _No religious signals in the name and no additional context provided._
+- **[catholic → evangelical_protestant]** ST STEPHENS EPSICOPAL CHURCH — _Bare saint name followed by an explicitly Protestant denomination_
+- **[catholic → unknown]** ST FRANCIS SHELTER — _No religious signals in the name or context._
+- **[catholic → secular]** ST MARTIN'S PANTRY — _No religious signals in the name and no additional context provided._
+- **[catholic → secular]** BIG BROTHERS BIG SISTERS OF ORANGE COUNT — _Name contains a secular organization name without any religious affiliations._
+- **[catholic → unknown]** ST GEORGE ENDOWMENT FUND — _No religious signals in the name or purpose context._
+- **[catholic → unknown]** FOOD CONNECTION OF ST LEO'S — _No religious signals in the name or purpose context._
+- **[catholic → evangelical_protestant]** FRANCISCAN MISSION OUTREACH — _Mission is a term often used in evangelical contexts and the Franciscan order is Catholic but the combination with 'Mission' leans towards an evangelical mission._
+- **[catholic → evangelical_protestant]** DELPHOS ST JOHNS CROSS COUNTRY — _Contains 'St' and 'Cross', which are Protestant markers_
+- **[catholic → unknown]** ST JOHN OF GOD COMMUNITY — _No religious signals in the name and no additional context provided._
+- **[catholic → secular]** ST JOSEPH COUNTY PARKS AND RECREATION — _Saint-named organization with no religious words in the name and context._
+- **[catholic → evangelical_protestant]** ST PAUL LUTHERAN SCHOOL - GRAFTON — _Saint-named organization with a Lutheran denomination_
+- **[catholic → evangelical_protestant]** St Mary of the Hills — _Saint-named organization without a clear Protestant or Catholic denomination_
+- **[catholic → secular]** FRIENDS OF ST LAWRENCE-WATTS YOUTH CENTER — _No religious signals in the name._
+- **[catholic → secular]** UNIVERSITY OF SAINT JOSEPH ITF CHRI — _No religious signals in the name and no additional context provided._
+- **[catholic → secular]** GO ST LOUIS MARATHON — _No religious signals in the name or context._
+- **[catholic → orthodox_christian]** ST NEKTARIOS MONASTERY — _Saint-named and implies a religious institution without contradicting Christian affiliation_
+- **[catholic → evangelical_protestant]** ST PATRICK ACADEMY — _Saint-named organization with no Protestant denomination specified_
+- **[catholic → unknown]** St Mary Avon PTU — _No religious signals in the name and no additional context provided._
+- **[catholic → unknown]** ST BARBE DEVELOPMENT ASSOCIATION — _No religious signals in the name or purpose context._
+- **[evangelical_protestant → unknown]** CANCER NAVIGATORS INC — _No religious signals in the name or purpose context._
+- **[evangelical_protestant → catholic]** COMMUNITY OF JESUS CRUCIFIED - PRIEST BROTHER AND SISTER SERVANTS — _The name includes 'Jesus Crucified' and 'Priest Brother and Sister Servants', which are typically Catholic titles and roles._
+- **[evangelical_protestant → secular]** NORTHWEST NAZARENE UNIVERSITY INC — _No religious words in the name._
+- **[evangelical_protestant → unknown]** Jesus Said Love — _No religious signal in the name._
+- **[evangelical_protestant → unknown]** TARSONN JEAN BAPTISTE — _No religious signals in the name or purpose context._
+- **[evangelical_protestant → unknown]** VIET HOPE INTERNATIONAL — _No religious signals in the name or purpose context._
+- **[evangelical_protestant → unknown]** U C Santa Cruz Foundation — _No religious signals in the name and no additional context provided._
+- **[jewish → unknown]** KOLLEL INSTITUTE OF GREAT DETROIT — _No religious signals in the name or context._
+- **[jewish → unknown]** HOLOCAUST AND HUMANITY CENTER — _No religious signals in the name or purpose context._
+- **[jewish → unknown]** AMERICAN FRIENDS OF JEWISH STATEMANSHIP CENTER INC — _No religious signals in the name or purpose context._
+- **[jewish → unknown]** HOP ON HOME RABBIT SANCTUARY — _No religious signals in the name or context._
+- **[jewish → unknown]** MIZRAHI TORAH ACADEMY — _No religious signals in the name or context._
+- **[other_religion → unknown]** WORLD HINDU COUNCIL — _No religious signal in the name._
+- **[other_religion → unknown]** Hindu Temple Society of NA — _No religious signals in the name and no additional context provided._
+- **[secular → unknown]** GULF COAST COMMUNITY FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** NORTHSIDE HOSPITAL BREAST CANCER FUND — _No religious signals in the name and no context provided._
+- **[secular → unknown]** GAVIN MILLER WATKINS — _No religious signals in the name or purpose context._
+- **[secular → unknown]** COMMUNITY FOUNDATION OF THE VALLEYS — _No religious signals in the name and no purpose context provided._
+- **[secular → unknown]** AUBURN HILLS COMMUNITY FOUNDATION — _No religious signals in the name and no purpose context provided._
+- **[secular → unknown]** MOSAIC COMMUNITY LAND TRUST — _No religious signals in the name or purpose context._
+- **[secular → unknown]** ARIZONA COMMUNITY FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** (302) ESSEX COUNTY COMMUNITY FOUNDATION INC — _No religious signals in the name or context._
+- **[secular → unknown]** N D HOSPITAL FOUNDATION — _No religious signals in the name or context._
+- **[secular → unknown]** TRINITY HEALTH SYSTEMS — _No religious signals in the name and no additional context provided._
+- **[secular → unknown]** TOWN SQUARE COMMUNITY FOUNDATION — _No religious signals in the name and no purpose context provided._
+- **[secular → unknown]** COMMUNITY FOUNDATION OF GREATER FLI — _No religious signals in the name and no additional context provided._
+- **[secular → unknown]** GAVIN NGUYEN — _No religious signals in the name or purpose context._
+- **[secular → unknown]** GIRL SCOUTS HEART OF THE HUDSON — _No religious signals in the name or context._
+- **[secular → unknown]** LEGACY FUND OF LE SUEUR ROTARY — _No religious signals in the name or purpose context._
+- **[secular → unknown]** UNITED NEGRO COLLEGE FUND SCHOLARSHIP PROGRAM — _No religious signals in the name and purpose context is unavailable._
+- **[secular → unknown]** College Hype — _No religious signals in the name and no additional context provided._
+- **[secular → unknown]** MONTROSE COMMUNITY FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** NORTH TEXAS COMMUNITY FOUNDATION — _No religious signals in the name or purpose context._
+- **[secular → unknown]** ANDREA VASQUEZ CO UNIVERSITY — _No religious signals in the name and no purpose context provided._
+- **[secular → unknown]** Highland Park Community Foundation - HP Magnet Foundation — _No religious signals in the name or purpose context._
+- **[secular → unknown]** Joe DiMiaggio Children's Hospital Foundation Inc — _No religious signals in the name or purpose context._
