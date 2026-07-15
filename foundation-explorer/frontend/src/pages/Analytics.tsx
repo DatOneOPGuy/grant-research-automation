@@ -3,7 +3,7 @@ import {
   Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { apiGet } from '../lib/api'
-import { money, num, titleCase } from '../lib/format'
+import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
 import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
 
 export default function Analytics() {
@@ -42,7 +42,7 @@ export default function Analytics() {
           ) : <Skeleton className="h-60" />}
         </Card>
         <Card>
-          <CardTitle>Faith funders (score ≥ 40) by state (top 15)</CardTitle>
+          <CardTitle>Confirmed Christian funders by state (top 15)</CardTitle>
           {states ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={[...states]
@@ -87,7 +87,7 @@ export default function Analytics() {
               ✓ Funds Christian organizations
             </div>
             <div className="text-muted">≥ $100k to Christian causes AND ≥ 3
-              distinct Christian recipients over 3 years</div>
+              distinct Christian recipients during {TAX_WINDOW_LABEL}</div>
           </div>
           <div className="border border-line rounded p-3">
             <div className="font-medium text-scoremid">Some Christian giving</div>
@@ -110,7 +110,9 @@ export default function Analytics() {
               <th className="py-2 pr-3">#</th>
               <th className="pr-3">Foundation</th>
               <th className="pr-3">Location</th>
-              <th className="text-right pr-3">Christian $ (3yr)</th>
+              <th className="text-right pr-3">
+                Christian $ ({TAX_WINDOW_LABEL})
+              </th>
               <th className="text-right pr-3">Christian orgs</th>
               <th>Status</th>
             </tr>

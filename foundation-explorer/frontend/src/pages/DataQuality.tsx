@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../lib/api'
 import { money, num } from '../lib/format'
+import { taxWindow } from '../lib/format'
 import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
 
 function CoverageBar({ label, value, total }: {
@@ -32,6 +33,23 @@ export default function DataQuality() {
   if (!data) return <Skeleton className="h-96" />
   const u = data.universe
   const p = data.pipeline
+  const years = taxWindow(p.tax_year_start, p.tax_year_end)
+  const pipelineRows = [
+    ['Foundation filings parsed', num(p.foundation_filings)],
+    [`Positive paid grant rows in ${years}`, num(p.grants)],
+    ['Positive paid grant dollars', money(p.grant_dollars)],
+    ['Distinct recipient entities', num(p.recipients)],
+    ['Recipients with classification evidence', num(p.recipients_tagged)],
+    ['Unclassified recipients above $5k',
+      num(p.recipients_unclassified_5k ?? p.recipients_pending_llm_5k)],
+  ]
+  if (p.pipeline_version === 2) {
+    pipelineRows.push(
+      ['Identity collisions retained for review', num(p.identity_collisions)],
+      ['Future commitments kept out of paid totals', num(p.future_commitments)],
+      ['Zero/negative/invalid paid rows retained', num(p.paid_adjustments)],
+    )
+  }
 
   return (
     <div>
@@ -42,14 +60,15 @@ export default function DataQuality() {
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card>
           <CardTitle>Field coverage (of {num(u.total)} foundations)</CardTitle>
-          <CoverageBar label="Has 2023–2025 filing" value={u.with_filings}
+          <CoverageBar label={`Has ${years} filing`} value={u.with_filings}
             total={u.total} />
           <CoverageBar label="Application status known" value={u.with_status}
             total={u.total} />
           <CoverageBar label="Phone" value={u.with_phone} total={u.total} />
           <CoverageBar label="Revenue" value={u.with_revenue}
             total={u.total} />
-          <CoverageBar label="Faith score" value={u.scored} total={u.total} />
+          <CoverageBar label="Confirmed Christian giving"
+            value={u.scored} total={u.total} />
           <CoverageBar label="States-given-to" value={u.with_states}
             total={u.total} />
           <CoverageBar label="Website" value={u.with_website}
@@ -64,16 +83,7 @@ export default function DataQuality() {
             <CardTitle>Pipeline reconciliation</CardTitle>
             <table className="w-full text-sm">
               <tbody>
-                {[
-                  ['Foundation filings parsed', num(p.foundation_filings)],
-                  ['Grants parsed', num(p.grants)],
-                  ['Grant dollars', money(p.grant_dollars)],
-                  ['Distinct recipients', num(p.recipients)],
-                  ['Recipients tagged (seed/rule/LLM)',
-                    num(p.recipients_tagged)],
-                  ['Pending LLM ($5k+ threshold)',
-                    num(p.recipients_pending_llm_5k)],
-                ].map(([label, v]) => (
+                {pipelineRows.map(([label, v]) => (
                   <tr key={label as string} className="border-b border-line/60">
                     <td className="py-2 text-muted">{label}</td>
                     <td className="text-right tabular font-medium">{v}</td>
@@ -108,10 +118,10 @@ export default function DataQuality() {
               <li><strong>Private foundations only</strong> (Form 990-PF).
                 Donor-advised-fund sponsors like the National Christian
                 Foundation file Form 990 and are out of scope by design.</li>
-              <li>Rule-based Christian classification is loose — Catholic health
-                infrastructure gets tagged, so some large secular funders appear
-                on volume lists. An LLM classification pass will refine this.</li>
-              <li>Data current as of 2023–2025 filings.</li>
+              <li>Recipient classifications are analytical evidence, not a legal
+                or theological determination. Ambiguous identities remain
+                unclassified until stronger evidence is available.</li>
+              <li>The current customer release covers tax years {years}.</li>
             </ul>
           </Card>
         </div>

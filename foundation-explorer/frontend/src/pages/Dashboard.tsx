@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import { ArrowRight } from 'lucide-react'
 import { apiGet } from '../lib/api'
-import { money, num, titleCase } from '../lib/format'
+import { money, num, taxWindow, titleCase } from '../lib/format'
 import {
   Card, CardTitle, KPI, Skeleton, VerdictBadge,
 } from '../components/ui/primitives'
@@ -27,6 +27,7 @@ export default function Dashboard() {
     queryKey: ['statechristian'],
     queryFn: () => apiGet<any[]>('/api/analytics/state-christian'),
   })
+  const years = taxWindow(stats?.tax_year_start, stats?.tax_year_end)
 
   return (
     <div>
@@ -34,8 +35,8 @@ export default function Dashboard() {
         Dashboard
       </h1>
       <p className="text-muted mb-6">
-        Every private foundation in the United States, scored for Christian
-        grantmaking from IRS 990-PF filings.
+        Evidence-backed Christian grantmaking from IRS Form 990-PF filings,
+        tax years {years}.
       </p>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
@@ -43,10 +44,10 @@ export default function Dashboard() {
           value={stats ? num(stats.total) : '…'}
           sub={stats ? `${num(stats.with_filings)} with filings` : ''} />
         <KPI label="Qualifying distributions"
-          value={stats ? money(stats.total_grants_dollars) : '…'}
-          sub="grant dollars tracked" />
+          value={stats ? money(stats.qualifying_distributions) : '…'}
+          sub="latest available filing per foundation" />
         <KPI label="Foundations giving to Christian causes"
-          value={stats ? num(stats.scored) : '…'} />
+          value={stats ? num(stats.confirmed_christian_foundations) : '…'} />
         <KPI label="Best-prospect universe"
           value={stats ? num(stats.best_prospects) : '…'}
           sub={stats ? `${money(stats.best_prospect_dollars)} addressable` : ''} />
@@ -61,7 +62,7 @@ export default function Dashboard() {
           <p className="text-white/80 mt-2 max-w-2xl text-sm leading-relaxed">
             {stats ? num(stats.best_prospects) : '—'} foundations that accept
             applications (or take a first contact) and have given more than
-            $100k to Christian causes over the last three years —
+            $100k to confirmed Christian recipients during {years} —
             {' '}{stats ? money(stats.best_prospect_dollars) : '—'} in
             addressable Christian giving.
           </p>
@@ -86,7 +87,7 @@ export default function Dashboard() {
               <th className="py-2">Funder</th>
               <th>Verdict</th>
               <th className="text-right">Christian orgs</th>
-              <th className="text-right">Christian $ (3yr)</th>
+              <th className="text-right">Christian $ ({years})</th>
             </tr>
           </thead>
           <tbody>
@@ -111,7 +112,7 @@ export default function Dashboard() {
 
       {/* Leaderboard by Christian dollars */}
       <div className="mb-6">
-        <Leaderboard title="Top 10 by Christian dollars given (3-year)"
+        <Leaderboard title={`Top 10 by confirmed Christian dollars (${years})`}
           rows={lb?.volume} metric="christian_dollars_3yr"
           fmt={money} onClick={(e) => nav(`/foundations?ein=${e}`)} />
       </div>

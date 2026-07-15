@@ -7,9 +7,16 @@ results.csv
 unmatched.csv
 opportunityscore.csv
 originalwithopportunity.csv
-foundation_database.csv
+foundation_database*.csv
 inviteonly.csv
 inviteonlyvalues.csv
+
+# Local databases and SQLite sidecars (including files created outside data/)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 
 # Python
 __pycache__/

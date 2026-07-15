@@ -206,12 +206,22 @@ export async function demoGet(path: string): Promise<any> {
   }
 
   if (parts[0] === 'recipients') {
+    if (parts[1] === 'stats') {
+      const rows = (await load('recipients')) as any[]
+      const bySource: Record<string, number> = {}
+      rows.forEach((row) => {
+        bySource[row.source] = (bySource[row.source] || 0) + 1
+      })
+      return { by_source: bySource,
+        pipeline_version: rows.some((row) => row.classification) ? 2 : 1 }
+    }
     if (parts.length === 1) {
       let rows = (await load('recipients')) as any[]
       const q = (p.get('q') || '').toLowerCase()
       if (q) rows = rows.filter((r) => r.display_name.toLowerCase().includes(q))
       if (p.get('tag')) rows = rows.filter((r) =>
-        r.tags.some((t: any) => t.name === p.get('tag')))
+        r.classification === p.get('tag')
+        || r.tags.some((t: any) => t.name === p.get('tag')))
       if (p.get('source')) rows = rows.filter((r) => r.source === p.get('source'))
       const page = Number(p.get('page') || 1)
       return { total: rows.length, page,

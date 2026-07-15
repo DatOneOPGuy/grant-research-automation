@@ -1,29 +1,32 @@
 """Analytics + data-quality endpoints."""
 
+from db import data_window, get_conn, rows_to_dicts
 from fastapi import APIRouter
+from quality_queries import pipeline_quality
 
-from db import get_conn, rows_to_dicts
-
-router = APIRouter(prefix='/api/analytics', tags=['analytics'])
+router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
 # Known major Christian PRIVATE foundations at verified EINs.
 VERIFY_EINS = [
-    ('626041468', 'Maclellan'),
-    ('621322826', 'Templeton'),
-    ('237456468', 'Murdock'),
-    ('350868122', 'Lilly'),
-    ('916020515', 'Stewardship'),
+    ("626041468", "Maclellan"),
+    ("621322826", "Templeton"),
+    ("237456468", "Murdock"),
+    ("350868122", "Lilly"),
+    ("916020515", "Stewardship"),
 ]
 
 
-@router.get('/score-distribution')
+@router.get("/score-distribution")
 def score_distribution():
     """Classification-coverage distribution (composite retired from UI)."""
     conn = get_conn()
     try:
         rows = conn.execute("""
-            SELECT CAST(classification_coverage / 10 AS INT) * 10 AS bucket,
+            SELECT CAST((CASE WHEN classification_coverage <= 1
+                       THEN classification_coverage * 100
+                       ELSE classification_coverage END) / 10 AS INT) * 10
+                       AS bucket,
                    COUNT(*) AS n
             FROM universe WHERE christian_dollars_3yr > 0
             GROUP BY bucket ORDER BY bucket
@@ -33,7 +36,7 @@ def score_distribution():
     return rows_to_dicts(rows)
 
 
-@router.get('/verification')
+@router.get("/verification")
 def verification():
     conn = get_conn()
     try:
@@ -43,34 +46,38 @@ def verification():
                 "SELECT foundation_name, verdict, christian_recipient_count, "
                 "christian_dollars_3yr, application_status, "
                 "christian_preview FROM universe WHERE ein = ?",
-                (ein,)).fetchone()
+                (ein,),
+            ).fetchone()
             if r:
                 d = dict(r)
-                d['label'] = label
+                d["label"] = label
                 out.append(d)
     finally:
         conn.close()
     return out
 
 
-@router.get('/leaderboards')
+@router.get("/leaderboards")
 def leaderboards(limit: int = 10):
     conn = get_conn()
     try:
-        volume = rows_to_dicts(conn.execute(
-            "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
-            "verdict, christian_recipient_count, christian_preview, "
-            "application_status FROM universe "
-            "WHERE christian_dollars_3yr > 0 "
-            "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
-            "ORDER BY christian_dollars_3yr DESC LIMIT ?",
-            (limit,)).fetchall())
+        volume = rows_to_dicts(
+            conn.execute(
+                "SELECT ein, foundation_name, city, state, christian_dollars_3yr, "
+                "verdict, christian_recipient_count, christian_preview, "
+                "application_status FROM universe "
+                "WHERE christian_dollars_3yr > 0 "
+                "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
+                "ORDER BY christian_dollars_3yr DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        )
     finally:
         conn.close()
-    return {'volume': volume}
+    return {"volume": volume}
 
 
-@router.get('/state-christian')
+@router.get("/state-christian")
 def state_christian():
     conn = get_conn()
     try:
@@ -86,7 +93,7 @@ def state_christian():
     return rows_to_dicts(rows)
 
 
-@router.get('/size-distribution')
+@router.get("/size-distribution")
 def size_distribution():
     conn = get_conn()
     try:
@@ -104,21 +111,21 @@ def size_distribution():
         """).fetchall()
     finally:
         conn.close()
-    order = ['<$10k', '$10k-100k', '$100k-1M', '$1M-10M',
-             '$10M-100M', '$100M+']
-    data = {r['bucket']: r['n'] for r in rows}
-    return [{'bucket': b, 'n': data.get(b, 0)} for b in order]
+    order = ["<$10k", "$10k-100k", "$100k-1M", "$1M-10M", "$10M-100M", "$100M+"]
+    data = {r["bucket"]: r["n"] for r in rows}
+    return [{"bucket": b, "n": data.get(b, 0)} for b in order]
 
 
-@router.get('/state-breakdown')
+@router.get("/state-breakdown")
 def state_breakdown():
     conn = get_conn()
     try:
         rows = conn.execute("""
             SELECT state, COUNT(*) AS foundations,
                    SUM(distributions) AS distributions,
-                   AVG(faith_alignment_score) AS avg_score,
-                   SUM(CASE WHEN faith_alignment_score >= 40
+                   AVG(classification_coverage) AS avg_coverage,
+                   SUM(CASE WHEN verdict IS NOT NULL
+                       AND verdict != 'No confirmed Christian giving'
                        THEN 1 ELSE 0 END) AS faith_funders
             FROM universe WHERE state != '' AND state IS NOT NULL
             GROUP BY state ORDER BY foundations DESC
@@ -128,7 +135,7 @@ def state_breakdown():
     return rows_to_dicts(rows)
 
 
-@router.get('/top-funders')
+@router.get("/top-funders")
 def top_funders(limit: int = 100):
     conn = get_conn()
     try:
@@ -138,28 +145,33 @@ def top_funders(limit: int = 100):
             "total_giving_3yr, application_status "
             "FROM universe WHERE christian_dollars_3yr > 0 "
             "AND (is_testamentary_trust = 0 OR is_testamentary_trust IS NULL) "
-            "ORDER BY christian_dollars_3yr DESC LIMIT ?", (min(limit, 500),),
+            "ORDER BY christian_dollars_3yr DESC LIMIT ?",
+            (min(limit, 500),),
         ).fetchall()
     finally:
         conn.close()
     return rows_to_dicts(rows)
 
 
-@router.get('/yearly-trends')
+@router.get("/yearly-trends")
 def yearly_trends():
     conn = get_conn()
     try:
-        rows = conn.execute("""
+        year_start, year_end = data_window(conn)
+        rows = conn.execute(
+            """
             SELECT tax_year, COUNT(*) AS grants, SUM(amount) AS dollars
-            FROM pipeline.grants WHERE tax_year >= 2021
+            FROM pipeline.grants WHERE tax_year BETWEEN ? AND ?
             GROUP BY tax_year ORDER BY tax_year
-        """).fetchall()
+        """,
+            (year_start, year_end),
+        ).fetchall()
     finally:
         conn.close()
     return rows_to_dicts(rows)
 
 
-@router.get('/data-quality')
+@router.get("/data-quality")
 def data_quality():
     conn = get_conn()
     try:
@@ -182,7 +194,8 @@ def data_quality():
                 SUM(CASE WHEN application_status != ''
                     AND application_status IS NOT NULL THEN 1 ELSE 0 END)
                     AS with_status,
-                SUM(CASE WHEN faith_alignment_score IS NOT NULL
+                SUM(CASE WHEN verdict IS NOT NULL
+                    AND verdict != 'No confirmed Christian giving'
                     THEN 1 ELSE 0 END) AS scored,
                 SUM(CASE WHEN states_given_to != ''
                     AND states_given_to IS NOT NULL THEN 1 ELSE 0 END)
@@ -191,26 +204,15 @@ def data_quality():
                 SUM(is_small_fund) AS small_funds
             FROM universe
         """).fetchone()
-        pipeline = conn.execute("""
-            SELECT (SELECT COUNT(*) FROM pipeline.foundations),
-                   (SELECT COUNT(*) FROM pipeline.grants),
-                   (SELECT SUM(amount) FROM pipeline.grants),
-                   (SELECT COUNT(*) FROM pipeline.recipients),
-                   (SELECT COUNT(*) FROM pipeline.recipients
-                    WHERE source = 'pending' AND max_grant >= 5000),
-                   (SELECT COUNT(*) FROM pipeline.recipients
-                    WHERE source IN ('rule', 'seed', 'llm'))
-        """).fetchone()
+        year_start, year_end = data_window(conn)
+        pipeline = pipeline_quality(conn, year_start, year_end)
     finally:
         conn.close()
     return {
-        'universe': dict(u),
-        'pipeline': {
-            'foundation_filings': pipeline[0],
-            'grants': pipeline[1],
-            'grant_dollars': pipeline[2],
-            'recipients': pipeline[3],
-            'recipients_pending_llm_5k': pipeline[4],
-            'recipients_tagged': pipeline[5],
+        "universe": dict(u),
+        "pipeline": {
+            **pipeline,
+            "tax_year_start": year_start,
+            "tax_year_end": year_end,
         },
     }

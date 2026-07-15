@@ -1,0 +1,44 @@
+[project]
+name = "grant-research-automation"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# Legacy report, scorer, downloader, and local-LLM modules remain frozen while
+# the provenance-first v2 path is validated. They are not production v2 code.
+extend-exclude = [
+    "src/backfill_profile.py",
+    "src/download_universe.py",
+    "src/download_xmls.py",
+    "src/downloader.py",
+    "src/export.py",
+    "src/faith_score.py",
+    "src/fix4_ntee.py",
+    "src/local_recipient_classification.py",
+    "src/matcher.py",
+    "src/recipient_batching.py",
+    "src/recipient_taxonomy.py",
+    "src/review_classifier_output.py",
+    "src/run_experiment.py",
+    "src/scorer.py",
+    "src/validate_classifier.py",
+    "src/verify_profile.py",
+    "foundation-explorer/backend/make_sample_page.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI intentionally declares dependency/query metadata in signatures.
+"foundation-explorer/backend/models.py" = ["B008"]
+"foundation-explorer/backend/routes/*.py" = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"

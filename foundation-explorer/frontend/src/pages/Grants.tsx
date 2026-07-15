@@ -71,7 +71,7 @@ export default function Grants() {
             className="border border-line rounded px-3 py-1.5 w-64"
             value={search} onChange={(e) => setSearch(e.target.value)}
           />
-          {[2021, 2022, 2023, 2024].map((y) => (
+          {[2023, 2024].map((y) => (
             <label key={y} className="flex items-center gap-1">
               <input type="checkbox" className="accent-primary"
                 checked={filters.years.includes(y)}

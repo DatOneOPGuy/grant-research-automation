@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../lib/api'
-import { useSavedFoundations } from '../../lib/savedStore'
+import { useSavedFoundations } from '../../lib/savedContext'
 import { num } from '../../lib/format'
 
 const NAV = [

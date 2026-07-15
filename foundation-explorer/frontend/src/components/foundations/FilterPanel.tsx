@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { FoundationFilterState } from '../../lib/api'
 import { US_STATES } from '../../lib/format'
+import { TAX_WINDOW_LABEL } from '../../lib/format'
 
 const TRADITIONS = ['Evangelical/Protestant', 'Catholic', 'Orthodox']
 const ORG_COUNTS: [string, number | undefined][] = [
@@ -96,7 +97,9 @@ export default function FilterPanel({ filters, onChange }: Props) {
         <div className="text-xs text-muted mb-1"># Christian orgs funded</div>
         <Pills options={ORG_COUNTS} value={filters.min_orgs}
           onPick={(v) => set({ min_orgs: v })} />
-        <div className="text-xs text-muted mb-1 mt-3">Min Christian $ (3yr)</div>
+        <div className="text-xs text-muted mb-1 mt-3">
+          Min Christian $ ({TAX_WINDOW_LABEL})
+        </div>
         <Pills options={CHRISTIAN_MINS} value={filters.christian_min}
           onPick={(v) => set({ christian_min: v })} />
         <div className="text-xs text-muted mb-1 mt-3">Tradition focus</div>

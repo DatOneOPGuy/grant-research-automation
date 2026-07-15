@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Bookmark, ExternalLink, X } from 'lucide-react'
 import { apiGet } from '../../lib/api'
-import { useSavedFoundations } from '../../lib/savedStore'
-import { money, moneyFull, num, titleCase } from '../../lib/format'
+import { useSavedFoundations } from '../../lib/savedContext'
+import { money, moneyFull, num, taxWindow, titleCase } from '../../lib/format'
 import { Badge, Skeleton, StatusPill, VerdictBadge } from '../ui/primitives'
 
 type Props = { ein: string; onClose: () => void }
@@ -96,7 +96,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ChristianEvidence({ ein }: { ein: string }) {
+function ChristianEvidence({ ein, years }: { ein: string; years: string }) {
   const [showAll, setShowAll] = useState(false)
   const { data } = useQuery({
     queryKey: ['evidence', ein],
@@ -105,7 +105,7 @@ function ChristianEvidence({ ein }: { ein: string }) {
   if (!data) return <Skeleton className="h-24" />
   if (!data.count) {
     return <div className="text-sm text-muted">
-      No confirmed Christian recipients in 2023–2025 filings.
+      No confirmed Christian recipients in {years} filings.
     </div>
   }
   const rows = showAll ? data.recipients : data.recipients.slice(0, 15)
@@ -145,6 +145,7 @@ function ChristianEvidence({ ein }: { ein: string }) {
 }
 
 function Overview({ d }: { d: any }) {
+  const years = taxWindow(d.tax_year_start, d.tax_year_end)
   const staleChristian = d.most_recent_christian_year
     && d.latest_tax_year
     && d.most_recent_christian_year < d.latest_tax_year
@@ -155,18 +156,18 @@ function Overview({ d }: { d: any }) {
         <StatusPill status={d.application_status} />
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Christian $ (3yr)"
+        <Stat label={`Confirmed Christian $ (${years})`}
           value={money(d.christian_dollars_3yr)} />
         <Stat label="Christian orgs funded"
           value={d.christian_recipient_count ?? '—'} />
-        <Stat label="Total giving (3yr)"
+        <Stat label={`Reported grant dollars (${years})`}
           value={money(d.total_giving_3yr)} />
       </div>
 
       {/* Evidence — the Christian organizations funded */}
       <div className="border border-line rounded-lg p-4">
         <div className="font-display font-medium text-primary mb-1">
-          Christian organizations this foundation has funded (2023–2025)
+          Christian organizations this foundation has funded ({years})
         </div>
         {staleChristian && (
           <div className="text-xs text-scoremid mb-2">
@@ -175,11 +176,11 @@ function Overview({ d }: { d: any }) {
             decreased recently.
           </div>
         )}
-        <ChristianEvidence ein={d.ein} />
+        <ChristianEvidence ein={d.ein} years={years} />
       </div>
 
       <div className="text-xs text-muted italic border-l-2 border-line pl-3">
-        Based on grants reported in IRS 990-PF filings, 2023–2025. We recommend
+        Based on grants reported in IRS 990-PF filings, {years}. We recommend
         confirming current priorities and application requirements directly with
         the foundation before applying.
       </div>

@@ -3,10 +3,9 @@
 import csv
 import io
 
+from db import get_conn
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-
-from db import get_conn
 from models import FoundationFilters, foundation_filters_dep
 from queries import foundation_filters, order_clause
 

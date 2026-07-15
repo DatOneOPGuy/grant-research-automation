@@ -1,53 +1,57 @@
 # Terms of Service
 
-Foundation Explorer is a business-to-business (B2B) intelligence platform
-engineered to provide evidence-backed donor prospecting shortlists for
-faith-aligned non-profit organizations.
+Foundation Explorer provides B2B research tools for professional fundraising
+teams. Use of the service is subject to these terms and any signed commercial
+agreement between the customer and Foundation Explorer.
 
-## 1. Core Data Sourcing
+## Research Tool; Independent Verification Required
 
-Our underlying dataset is compiled entirely from public-domain records
-mandated by the United States Federal Government.
+Foundation records are compiled from public IRS sources. Recipient identities,
+classification evidence, application status, and prospect verdicts are derived
+research outputs and may be incomplete, delayed, or incorrect. They are not
+legal, tax, theological, or fundraising advice and do not guarantee that a
+foundation will accept, review, or fund a request. Customers must confirm current
+priorities and application requirements directly before outreach.
 
-- The foundation universe is established natively using the official
-  Internal Revenue Service (IRS) Exempt Organization Business Master File
-  (EO BMF).
-- Filing and transactional data are programmatically extracted from
-  machine-readable Form 990-PF tax returns hosted in the public IRS Tax
-  Exempt and Government Entities (TEOS) XML archives.
+## Permitted Use
 
-## 2. Proprietary Synthesis and Analytics
+Customers may use the service for their internal prospect research and lawful
+fundraising activity. Customers may not bypass access controls, interfere with
+the service, misrepresent derived analysis as an official IRS determination, or
+resell, republish, or redistribute the compiled database except as allowed by a
+written agreement.
 
-While the underlying raw tax facts reside in the public domain, the specific
-coordination, classification algorithms, faith-alignment scoring models, and
-user-interface presentation are the exclusive proprietary property of
-Foundation Explorer.
+## Sources and Third-Party Links
 
-- Our alignment metrics are derived through a combination of deterministic
-  rule-based engines and localized algorithmic analysis.
-- All prospecting scores, tags, and metrics are analytical estimations
-  designed to assist fundraising teams and should be independently verified
-  by your organization prior to donor outreach.
+The foundation universe comes from the IRS EO BMF, and filing facts come from
+official IRS TEOS XML archives. Foundation Explorer does not use or scrape the
+ProPublica Nonprofit Explorer backend. Any ProPublica link is an ordinary
+outbound convenience link. Following it leaves the service and subjects the
+user to the third party's own terms and privacy practices.
 
-## 3. Third-Party Platform Boundaries
+## Intellectual Property
 
-Foundation Explorer operates completely independently of third-party
-non-profit aggregators.
+IRS source facts remain public records. Foundation Explorer retains all rights
+in its original software, source coordination, database selection and
+arrangement, identity-resolution methods, classification evidence, derived
+analytics, release manifests, documentation, and interface. No ownership in a
+customer's preexisting materials transfers merely because they use the service.
 
-- We do not interface with, pull data from, or scrape ProPublica's
-  Nonprofit Explorer or any similar platform.
-- For user convenience and verification, our dashboard provides outbound
-  hyperlinks directly to public organization profiles on ProPublica. These
-  links are standard navigational shortcuts to assist users in viewing
-  original PDF source filings and do not constitute an ingestion pipeline.
+## Availability and Changes
 
-## 4. Privacy Boundary
+The service and demo are provided on an as-available basis. Data coverage and
+methods may change as new IRS returns arrive, source errors are corrected, and
+release gates improve. Material methodology changes should be documented in the
+applicable release manifest.
 
-Foundation Explorer handles advanced processing locally.
+## Responsibility
 
-- Our classification loops run entirely inside our secure, self-hosted
-  infrastructure using open-source, localized language models.
-- Search queries, donor shortlists, and platform interactions are not
-  transmitted to external commercial AI vendors for processing or model
-  training.
+Customers are responsible for lawful outreach, compliance with grantmaker
+instructions, and decisions made using the service. To the maximum extent
+permitted by an applicable signed agreement and law, Foundation Explorer is not
+responsible for funding decisions, missed deadlines, or losses caused by a
+customer's failure to independently verify a prospect.
 
+This document should be reviewed with qualified counsel together with the final
+commercial agreement, governing-law clause, liability cap, support contact, and
+effective date before paid production launch.

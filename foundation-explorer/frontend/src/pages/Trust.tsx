@@ -5,29 +5,29 @@ const SECTIONS = [
     title: 'Data Provenance',
     body: [
       'Foundation Explorer is a business-to-business intelligence platform built from public IRS records.',
-      'The foundation universe is derived from the IRS Business Master File.',
-      '990-PF filing data is extracted directly from official IRS TEOS XML archives.',
+      'The foundation universe is downloaded directly from all four official IRS EO BMF regions.',
+      'Form 990-PF facts are parsed directly from official IRS TEOS XML archives; the ingestion pipeline does not scrape websites.',
     ],
   },
   {
     title: 'Proprietary Analysis',
     body: [
-      'Our classification logic, evidence rollups, and prospecting scores are generated locally inside our own infrastructure.',
-      'The compiled database and derived analytics are original outputs of our internal methodology.',
+      'Recipient identity, classification evidence, and foundation rollups are generated inside company-controlled infrastructure.',
+      'Every published release records source hashes, parser and policy versions, observed tax years, and reconciliation gates.',
     ],
   },
   {
     title: 'Third-Party Boundaries',
     body: [
       'We do not use ProPublica as a backend data source or API.',
-      'Outbound links to public ProPublica organization pages are provided only as a convenience reference for users.',
+      'Outbound links to public ProPublica organization pages are convenience links only. Clicking one leaves Foundation Explorer and contacts that third party directly.',
     ],
   },
   {
     title: 'Privacy Boundary',
     body: [
-      'We do not send user payloads or source records to commercial third-party LLM APIs for processing or model training.',
-      'The platform is designed to operate within a controlled, company-managed environment.',
+      'Classification jobs do not send source records or customer searches to commercial third-party LLM APIs.',
+      'The demo stores saved EINs and filter state in browser storage. Its hosting provider processes ordinary requests needed to deliver the site.',
     ],
   },
 ]

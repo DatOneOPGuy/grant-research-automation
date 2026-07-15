@@ -4,11 +4,21 @@ import { apiGet } from '../lib/api'
 import { moneyFull, num } from '../lib/format'
 import { Badge, Card } from '../components/ui/primitives'
 
-const TAGS = ['Christian Ministry', 'Church', 'Bible Translation',
+const LEGACY_TAGS = ['Christian Ministry', 'Church', 'Bible Translation',
   'Evangelism', 'Church Planting', 'Pregnancy Center', 'Christian School',
   'International Missions', 'Disaster Relief', 'Jewish Ministry',
   'Faith-Based Education', 'Rescue Mission', 'Youth Ministry',
   'Medical Missions']
+const CLASSIFICATIONS = [
+  ['evangelical_protestant', 'Evangelical / Protestant'],
+  ['catholic', 'Catholic'],
+  ['orthodox_christian', 'Orthodox Christian'],
+  ['christian_unspecified', 'Christian (unspecified)'],
+  ['secular', 'Secular'],
+  ['jewish', 'Jewish'],
+  ['muslim', 'Muslim'],
+  ['other_religion', 'Other religion'],
+]
 
 export default function Recipients() {
   const [q, setQ] = useState('')
@@ -37,6 +47,10 @@ export default function Recipients() {
     queryFn: () => apiGet<any>(`/api/recipients?${qs}`),
     placeholderData: keepPreviousData,
   })
+  const { data: stats } = useQuery({
+    queryKey: ['recipient-stats'],
+    queryFn: () => apiGet<any>('/api/recipients/stats'),
+  })
   const { data: funders } = useQuery({
     queryKey: ['funders', expanded],
     queryFn: () => apiGet<any>(`/api/recipients/${expanded}/funders`),
@@ -60,17 +74,29 @@ export default function Recipients() {
             value={q} onChange={(e) => setQ(e.target.value)} />
           <select className="border border-line rounded px-2 py-1.5"
             value={tag} onChange={(e) => { setTag(e.target.value); setPage(1) }}>
-            <option value="">Any tag</option>
-            {TAGS.map((t) => <option key={t}>{t}</option>)}
+            <option value="">Any classification</option>
+            {stats?.pipeline_version === 2
+              ? CLASSIFICATIONS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))
+              : LEGACY_TAGS.map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
           </select>
           <select className="border border-line rounded px-2 py-1.5"
             value={source}
             onChange={(e) => { setSource(e.target.value); setPage(1) }}>
             <option value="">Any source</option>
-            <option value="seed">Seed</option>
-            <option value="rule">Rule-tagged</option>
-            <option value="llm">LLM-classified</option>
-            <option value="pending">Pending</option>
+            {stats?.pipeline_version === 2 ? <>
+              <option value="ntee">IRS NTEE</option>
+              <option value="rule">Deterministic rule</option>
+              <option value="human">Human review</option>
+              <option value="unclassified">Unclassified</option>
+            </> : <>
+              <option value="seed">Seed</option>
+              <option value="rule">Rule-tagged</option>
+              <option value="pending">Unclassified</option>
+            </>}
           </select>
         </div>
       </Card>

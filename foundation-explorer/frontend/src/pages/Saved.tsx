@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { Bookmark, ExternalLink, Trash2 } from 'lucide-react'
 import { apiGet, DEMO } from '../lib/api'
-import { useSavedFoundations } from '../lib/savedStore'
-import { money, num, titleCase } from '../lib/format'
+import { useSavedFoundations } from '../lib/savedContext'
+import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
 import { StatusPill, VerdictBadge } from '../components/ui/primitives'
 import DetailPanel from '../components/foundations/DetailPanel'
 
@@ -85,7 +85,7 @@ export default function Saved() {
               <th className="px-3 py-3">Foundation</th>
               <th className="px-3">Location</th>
               <th className="px-3">Christian giving</th>
-              <th className="px-3">Christian $ (3yr)</th>
+              <th className="px-3">Christian $ ({TAX_WINDOW_LABEL})</th>
               <th className="px-3">Typical grant</th>
               <th className="px-3">Application</th>
               <th className="px-3"></th>

@@ -1,10 +1,10 @@
 """Grants explorer endpoints over the 5M-row pipeline grants table."""
 
+from db import get_conn, rows_to_dicts
 from fastapi import APIRouter, Query
 
-from db import get_conn, rows_to_dicts
-
 router = APIRouter(prefix='/api/grants', tags=['grants'])
+DATA_YEARS = (2023, 2024)
 
 
 def _filters(q, years, recipient_state, foundation_state, amount_min,
@@ -13,10 +13,11 @@ def _filters(q, years, recipient_state, foundation_state, amount_min,
     if q:
         where.append('(g.grantee_name LIKE ? OR g.purpose LIKE ?)')
         args += [f'%{q}%', f'%{q}%']
-    if years:
-        marks = ','.join('?' * len(years))
+    selected_years = years or list(DATA_YEARS)
+    if selected_years:
+        marks = ','.join('?' * len(selected_years))
         where.append(f'g.tax_year IN ({marks})')
-        args += years
+        args += selected_years
     if recipient_state:
         where.append('g.state = ?')
         args.append(recipient_state)

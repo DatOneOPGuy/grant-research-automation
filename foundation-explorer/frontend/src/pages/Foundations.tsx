@@ -8,18 +8,17 @@ import {
   activeFilterChips, apiGet, DEMO, defaultFilters, filterParams,
   type FoundationFilterState, type FoundationRow, type Paged,
 } from '../lib/api'
-import {
-  loadPersistedFilters, persistFilters, useSavedFoundations,
-} from '../lib/savedStore'
-import { money, num, titleCase } from '../lib/format'
+import { useSavedFoundations } from '../lib/savedContext'
+import { loadPersistedFilters, persistFilters } from '../lib/savedStore'
+import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
 import { Skeleton, StatusPill, VerdictBadge } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
 import DetailPanel from '../components/foundations/DetailPanel'
 
 const SORTS: [string, string][] = [
-  ['christian_dollars_3yr', 'Christian $ (3yr)'],
+  ['christian_dollars_3yr', `Christian $ (${TAX_WINDOW_LABEL})`],
   ['christian_recipient_count', 'Christian orgs funded'],
-  ['total_giving_3yr', 'Total giving (3yr)'],
+  ['total_giving_3yr', `Reported grants (${TAX_WINDOW_LABEL})`],
   ['assets', 'Total assets'],
   ['typical_grant_size', 'Typical grant size'],
   ['foundation_name', 'Name'],
@@ -37,7 +36,7 @@ const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
   { key: 'foundation_name', label: 'Foundation', sortable: true },
   { key: 'state', label: 'Location', sortable: true },
   { key: 'verdict', label: 'Christian giving', sortable: false },
-  { key: 'christian_dollars_3yr', label: 'Christian $ (3yr)', sortable: true },
+  { key: 'christian_dollars_3yr', label: `Christian $ (${TAX_WINDOW_LABEL})`, sortable: true },
   { key: 'typical_grant_size', label: 'Typical grant', sortable: true },
   { key: 'application_status', label: 'Application', sortable: true },
 ]

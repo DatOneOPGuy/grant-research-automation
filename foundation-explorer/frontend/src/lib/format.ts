@@ -17,31 +17,12 @@ export function num(n: number | null | undefined): string {
   return Math.round(n).toLocaleString()
 }
 
-export function scoreColor(score: number | null | undefined): string {
-  if (score === null || score === undefined) return 'bg-gray-100 text-scorelow'
-  if (score >= 60) return 'bg-green-50 text-scorehigh'
-  if (score >= 40) return 'bg-amber-50 text-scoremid'
-  return 'bg-gray-100 text-scorelow'
-}
+export const TAX_WINDOW_LABEL = '2023–2024'
 
-// Honest Christian-percentage label: single value when well-classified,
-// otherwise a floor–ceiling range. Returns short + long forms.
-export function christianPct(row: {
-  christian_pct_floor: number | null
-  christian_pct_ceiling: number | null
-  classification_coverage: number | null
-}): { short: string; long: string; well: boolean } {
-  const fl = row.christian_pct_floor
-  const ce = row.christian_pct_ceiling
-  const cov = row.classification_coverage ?? 0
-  if (fl == null || ce == null) return { short: '—', long: '—', well: false }
-  const well = cov >= 85
-  return well
-    ? { short: `${fl}%`, long: `${fl}% Christian`, well }
-    : {
-      short: `${fl}–${ce}%`,
-      long: `${fl}–${ce}% Christian (${cov}% classified)`, well,
-    }
+export function taxWindow(start?: number | null, end?: number | null): string {
+  if (!start && !end) return TAX_WINDOW_LABEL
+  if (!start || start === end) return String(end || start)
+  return `${start}–${end}`
 }
 
 // Title-case all-caps foundation names for display (keep raw data intact).
