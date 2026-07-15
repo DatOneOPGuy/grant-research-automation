@@ -1,13 +1,13 @@
 """Parse IRS 990-PF XML files into SQLite database."""
 
-import sqlite3
 import logging
+import sqlite3
 from pathlib import Path
 
 from lxml import etree
 
 from src.config import DB_PATH, RAW_DIR
-from src.profile_fields import extract_profile_fields, PROFILE_COLUMNS
+from src.profile_fields import PROFILE_COLUMNS, extract_profile_fields
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,7 +59,8 @@ def create_tables(conn: sqlite3.Connection):
             is_foreign INTEGER DEFAULT 0,
             amount INTEGER,
             purpose TEXT,
-            tax_year INTEGER
+            tax_year INTEGER,
+            schedule_type TEXT DEFAULT 'unclassified'
         );
 
         CREATE TABLE IF NOT EXISTS charitable_activities (
@@ -88,7 +89,7 @@ def create_tables(conn: sqlite3.Connection):
 
 
 def migrate_schema(conn: sqlite3.Connection):
-    """Add Phase 2 columns to a pre-existing foundations table."""
+    """Add parser columns without mislabeling legacy grant schedules."""
     existing = {
         row[1] for row in conn.execute("PRAGMA table_info(foundations)")
     }
@@ -99,6 +100,14 @@ def migrate_schema(conn: sqlite3.Connection):
         col_type = 'INTEGER' if col in int_cols else "TEXT DEFAULT ''"
         conn.execute(
             f"ALTER TABLE foundations ADD COLUMN {col} {col_type}"
+        )
+    grant_columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(grants)")
+    }
+    if 'schedule_type' not in grant_columns:
+        conn.execute(
+            "ALTER TABLE grants ADD COLUMN schedule_type "
+            "TEXT DEFAULT 'unclassified'"
         )
 
 
@@ -197,14 +206,14 @@ def parse_grants(root, ns, ein, tax_year):
     """Extract Part XV grantee list from 990-PF."""
     grants = []
 
-    # Try multiple grant element paths
+    # Preserve whether each row was paid or approved for future payment.
     grant_paths = [
-        './/irs:GrantOrContributionPdDurYrGrp',
-        './/irs:GrantOrContriPaidDuringYear',
-        './/irs:GrantOrContriApprvForFutGrp',
+        ('.//irs:GrantOrContributionPdDurYrGrp', 'paid'),
+        ('.//irs:GrantOrContriPaidDuringYear', 'paid'),
+        ('.//irs:GrantOrContriApprvForFutGrp', 'future_approved'),
     ]
 
-    for path in grant_paths:
+    for path, schedule_type in grant_paths:
         elements = root.findall(path, ns)
         for elem in elements:
             name = (
@@ -266,6 +275,7 @@ def parse_grants(root, ns, ein, tax_year):
                     'amount': amount,
                     'purpose': purpose,
                     'tax_year': tax_year,
+                    'schedule_type': schedule_type,
                 })
 
     return grants
@@ -278,7 +288,6 @@ def parse_charitable_activities(root, ns, ein, tax_year):
     activity_paths = [
         './/irs:DescriptionOfActivity',
         './/irs:ActivityOrProgramDescription',
-        './/irs:Desc',
     ]
 
     for path in activity_paths:
@@ -331,6 +340,12 @@ def parse_xml_file(filepath: str):
     ns = detect_namespace(root)
     if not ns:
         log.warning("No namespace found in %s", filepath)
+        return None
+
+    return_type = _find_text(root, './/irs:ReturnTypeCd', ns)
+    if return_type != '990PF':
+        log.debug("Skipping non-990-PF return %s in %s",
+                  return_type, filepath)
         return None
 
     header = parse_foundation_header(root, ns)
@@ -386,11 +401,12 @@ def insert_parsed_data(conn, data):
         conn.execute(
             """INSERT INTO grants
                (ein, grantee_name, city, state, country,
-                is_foreign, amount, purpose, tax_year)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                is_foreign, amount, purpose, tax_year, schedule_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (g['ein'], g['grantee_name'], g['city'],
              g['state'], g['country'], g['is_foreign'],
-             g['amount'], g['purpose'], g['tax_year']),
+             g['amount'], g['purpose'], g['tax_year'],
+             g.get('schedule_type', 'unclassified')),
         )
 
     for a in data['activities']:

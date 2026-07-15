@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import random
 import sqlite3
 from collections import Counter
 from pathlib import Path
@@ -38,21 +39,27 @@ def open_readonly(db_path: Path) -> sqlite3.Connection:
 
 
 def sample_ground_truth(conn: sqlite3.Connection, limit: int, seed: int) -> list[dict]:
-    """Sample only precise rule/NTEE classifications; unknown labels are excluded."""
+    """Sample only precise rule/NTEE classifications; unknown labels are excluded.
+
+    Sampling is deterministic under ``seed``: candidate rows are fetched in a
+    stable order (by name_norm) and shuffled by a seeded PRNG, so the same seed
+    always yields the same sample. This lets prompt iterations be compared on an
+    identical hold-out instead of a fresh SQLite RANDOM() draw each run.
+    """
     query = """
         SELECT name_norm, display_name, recipient_city, recipient_state,
                sample_purpose_text, faith_classification
         FROM recipients
         WHERE classification_method IN ('rule', 'ntee')
           AND faith_classification IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ORDER BY RANDOM() LIMIT ?
+        ORDER BY name_norm
     """
     supported = sorted(TAXONOMY - {"unknown"})
-    rows = conn.execute(query, (*supported, limit)).fetchall()
-    columns = [item[0] for item in conn.execute(query, (*supported, 0)).description]
-    # SQLite RANDOM is sufficient for this validation; seed is reported for auditability.
-    _ = seed
-    return [dict(zip(columns, row)) for row in rows]
+    cursor = conn.execute(query, tuple(supported))
+    columns = [item[0] for item in cursor.description]
+    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+    random.Random(seed).shuffle(rows)
+    return rows[:limit]
 
 
 def metrics(truth: list[str], predicted: list[str]) -> dict[str, dict[str, float]]:
