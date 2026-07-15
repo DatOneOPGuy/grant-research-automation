@@ -23,7 +23,17 @@ UNATTRIBUTABLE = re.compile(
     r"list available|available upon request|per attached|attached list|"
     r"hipp?aa?|individual patient|patient programs?|eligible patients?|"
     r"needy patients?|various individuals?|anonymous|sundry|"
-    r"scholarship recipients?|grant recipients?|donation of inventor)\b")
+    r"scholarship recipients?|grant recipients?|donation of inventor)\b"
+    # Second-pass additions (integrity check B): statutory references,
+    # bare numbers, single characters, and list-pointer phrasing. Kept
+    # narrow after the first draft wrongly flagged real orgs (NAACP filed
+    # with spaces, Hawaiian 'Na ...' names, Na'amat USA).
+    r"|section \d{3,4}|\b49(45|48)[ab]?\b"
+    r"|^\d+$|^[a-z]$"
+    r"|^(multiple|sundry|assorted) (grantee|donee|recipient)s?"
+    r"|\b(donees?|grantees?) (listed|attached|available)\b"
+    r"|^per (list|schedule|statement)\b"
+    r"|^(na|n a) (section|see|-)")
 
 GOVERNMENT = re.compile(
     r"^(city|town|county|state|village|borough|township|commonwealth|"

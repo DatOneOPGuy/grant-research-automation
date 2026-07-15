@@ -145,13 +145,118 @@ def append_rules(conn: sqlite3.Connection, run_id: str, identity_run: str) -> in
     return count
 
 
+def append_church_code(conn: sqlite3.Connection, run_id: str, identity_run: str) -> tuple[int, int]:
+    """BMF foundation code 10 = 170(b)(1)(A)(i) house of worship.
+
+    The code alone is NOT a Christian signal — synagogues and mosques carry
+    it too — so it only becomes classification evidence when the entity's
+    name yields a tradition. Code-10 entities with name-neutral names are
+    counted and returned as pending (prime GEN / recipient-990 targets).
+    """
+    emitted = pending = 0
+    for entity_id, ein, name in conn.execute(
+        """
+        SELECT e.entity_id, e.bmf_ein, b.organization_name
+        FROM recipient_entities e JOIN bmf.bmf_organizations b ON b.ein=e.bmf_ein
+        WHERE e.run_id=? AND b.foundation_code='10'
+        """,
+        (identity_run,),
+    ):
+        label = rule_label(name)
+        if label is None or label == "secular":
+            pending += 1
+            continue
+        append_evidence(
+            conn,
+            run_id,
+            identity_run,
+            Evidence(
+                entity_id,
+                label,
+                0.97,
+                "church_code_name",
+                reason="IRS foundation code 10 (house of worship) + name tradition",
+                source_rule_id="bmf-foundation-code-10",
+                source_record={"ein": ein, "name": name, "foundation_code": "10"},
+            ),
+        )
+        emitted += 1
+    return emitted, pending
+
+
+def gen_traditions(conn: sqlite3.Connection) -> dict[str, tuple[str, str]]:
+    """Map group exemption numbers to a tradition via the parent org's name.
+
+    Only GENs whose parent orgs (affiliation 6/8) agree on exactly one
+    non-secular tradition are used; ambiguous parents are dropped.
+    """
+    candidates: dict[str, set[str]] = {}
+    parents: dict[str, str] = {}
+    for gen, name in conn.execute(
+        """
+        SELECT group_exemption_number, organization_name
+        FROM bmf.bmf_organizations
+        WHERE affiliation_code IN ('6','8')
+          AND group_exemption_number NOT IN ('', '0000')
+        """
+    ):
+        label = rule_label(name)
+        if label and label != "secular":
+            candidates.setdefault(gen, set()).add(label)
+            parents[gen] = name
+    return {
+        gen: (labels.pop(), parents[gen])
+        for gen, labels in candidates.items()
+        if len(labels) == 1
+    }
+
+
+def append_group_exemption(conn: sqlite3.Connection, run_id: str, identity_run: str) -> int:
+    mapping = gen_traditions(conn)
+    count = 0
+    for entity_id, ein, name, gen in conn.execute(
+        """
+        SELECT e.entity_id, e.bmf_ein, b.organization_name,
+               b.group_exemption_number
+        FROM recipient_entities e JOIN bmf.bmf_organizations b ON b.ein=e.bmf_ein
+        WHERE e.run_id=? AND b.affiliation_code='9'
+          AND b.group_exemption_number NOT IN ('', '0000')
+        """,
+        (identity_run,),
+    ):
+        if gen not in mapping:
+            continue
+        label, parent = mapping[gen]
+        append_evidence(
+            conn,
+            run_id,
+            identity_run,
+            Evidence(
+                entity_id,
+                label,
+                0.95,
+                "group_exemption",
+                reason=f"subordinate under group ruling GEN {gen} ({parent})",
+                source_rule_id=f"gen-{gen}",
+                source_record={"ein": ein, "name": name, "gen": gen,
+                               "parent_name": parent},
+            ),
+        )
+        count += 1
+    return count
+
+
 def run(db_path: Path, bmf_path: Path, identity_run: str) -> str:
     conn = sqlite3.connect(f"file:{db_path.resolve()}?mode=rw", uri=True)
     create_classification_schema(conn)
     attach_bmf(conn, bmf_path)
     ntee_run = create_run(conn, identity_run, "ntee", engine_name="irs-eo-bmf")
+    church_run = create_run(conn, identity_run, "church_code_name", engine_name="irs-eo-bmf")
+    gen_run = create_run(conn, identity_run, "group_exemption", engine_name="irs-eo-bmf")
     rule_run = create_run(conn, identity_run, "rule", engine_name="recipient-name-rules-v2")
     ntee_count = append_ntee(conn, ntee_run, identity_run)
+    church_count, church_pending = append_church_code(conn, church_run, identity_run)
+    gen_count = append_group_exemption(conn, gen_run, identity_run)
     rule_count = append_rules(conn, rule_run, identity_run)
     conn.commit()
     release = build_release(conn, identity_run)
@@ -159,7 +264,10 @@ def run(db_path: Path, bmf_path: Path, identity_run: str) -> str:
         "SELECT COUNT(*) FROM classification_resolution_issues WHERE release_id=?", (release,)
     ).fetchone()[0]
     conn.close()
-    print(f"NTEE evidence: {ntee_count:,}; rule evidence: {rule_count:,}; issues: {issues:,}")
+    print(f"NTEE evidence: {ntee_count:,}; church-code evidence: {church_count:,} "
+          f"(+{church_pending:,} houses of worship pending tradition); "
+          f"GEN evidence: {gen_count:,}; rule evidence: {rule_count:,}; "
+          f"issues: {issues:,}")
     return release
 
 

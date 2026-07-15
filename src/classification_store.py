@@ -34,6 +34,8 @@ CLASSIFICATIONS = frozenset(
 METHOD_PRIORITY = {
     "human": 100,
     "ntee": 80,
+    "church_code_name": 80,   # BMF foundation code 10 + tradition signal
+    "group_exemption": 75,    # denominational group ruling inheritance
     "rule": 70,
     "llm": 50,
     "legacy_faith_classification": 30,
@@ -42,6 +44,8 @@ METHOD_PRIORITY = {
 METHOD_CONFIDENCE_FLOOR = {
     "human": 0.0,
     "ntee": 0.8,
+    "church_code_name": 0.9,
+    "group_exemption": 0.9,
     "rule": 0.8,
     "llm": 0.7,
     "legacy_faith_classification": 0.7,
@@ -142,16 +146,27 @@ def eligible_evidence(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
     ]
 
 
+GENERIC_LABELS = frozenset({"christian_unspecified", "nonchristian_unspecified"})
+
+
 def choose_evidence(rows: list[sqlite3.Row]) -> tuple[sqlite3.Row | None, str | None]:
     eligible = eligible_evidence(rows)
     if not eligible:
         return None, "no_eligible_evidence"
     priority = max(METHOD_PRIORITY[row["evidence_method"]] for row in eligible)
     top = [row for row in eligible if METHOD_PRIORITY[row["evidence_method"]] == priority]
-    labels = {row["classification"] for row in top}
-    if len(labels) != 1:
+    # A generic label (christian_unspecified) alongside a specific sibling
+    # (catholic, evangelical_protestant) that agrees on is_christian is a
+    # refinement, not a contradiction — prefer the specific label. Only a
+    # genuine is_christian disagreement, or two different specific
+    # traditions at equal priority, is an unresolved issue.
+    if len({row["is_christian"] for row in top}) != 1:
         return None, "conflicting_top_priority_evidence"
-    return max(top, key=lambda row: (row["confidence"], row["created_at_utc"])), None
+    specific = [row for row in top if row["classification"] not in GENERIC_LABELS]
+    pool = specific or top
+    if len({row["classification"] for row in pool}) != 1:
+        return None, "conflicting_top_priority_evidence"
+    return max(pool, key=lambda row: (row["confidence"], row["created_at_utc"])), None
 
 
 def resolve_entity(

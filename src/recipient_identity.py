@@ -284,6 +284,20 @@ def build_variant_candidates(conn: sqlite3.Connection, run_id: str) -> None:
          "m.name_norm LIKE '% inc'"),
         ("the_removed", "substr(m.name_norm, 5)", "m.name_norm LIKE 'the %'"),
         ("the_added", "'the ' || m.name_norm", "1"),
+        # Word-form family (integrity check A): filers abbreviate what the
+        # BMF spells out and vice versa — 'INDIANA ASSOCIATION OF UNITED
+        # WAYS' vs BMF '... INCORPORATED'.
+        ("incorporated_added", "m.name_norm || ' incorporated'", "1"),
+        ("inc_to_incorporated",
+         "substr(m.name_norm, 1, length(m.name_norm)-4) || ' incorporated'",
+         "m.name_norm LIKE '% inc'"),
+        ("incorporated_to_inc",
+         "substr(m.name_norm, 1, length(m.name_norm)-13) || ' inc'",
+         "m.name_norm LIKE '% incorporated'"),
+        ("corporation_added", "m.name_norm || ' corporation'", "1"),
+        ("corp_to_corporation",
+         "substr(m.name_norm, 1, length(m.name_norm)-5) || ' corporation'",
+         "m.name_norm LIKE '% corp'"),
     ]
     statements = []
     for label, expr, guard in variants:
