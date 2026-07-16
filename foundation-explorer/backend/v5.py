@@ -102,9 +102,11 @@ def foundations(
         where.append(f"f.state IN ({','.join('?' for _ in codes)})")
         params += codes
     if gives_to_state:
-        where.append("EXISTS (SELECT 1 FROM recipient_states rs "
-                     "WHERE rs.ein=f.ein AND rs.state=?)")
-        params.append(gives_to_state.strip().upper())
+        codes = [s.strip().upper() for s in gives_to_state.split(",") if s.strip()]
+        placeholders = ",".join("?" for _ in codes)
+        where.append(f"EXISTS (SELECT 1 FROM recipient_states rs "
+                     f"WHERE rs.ein=f.ein AND rs.state IN ({placeholders}))")
+        params += codes
     if application_status:
         statuses = [s.strip() for s in application_status.split(",")]
         where.append(

@@ -132,6 +132,83 @@ export const APPLICATION_STATUSES = [
 ]
 export const COVERAGE_BANDS = ['High', 'Moderate', 'Low']
 
+// ---- geographic regions ----------------------------------------------------
+// Census divisions plus a domain-specific "Bible Belt" grouping that maps to
+// how faith-based fundraisers actually think about territory. Each expands to
+// state codes for the `state` / `gives_to_state` filters.
+export const US_REGIONS: [string, string[]][] = [
+  ['Northeast', ['CT', 'ME', 'MA', 'NH', 'RI', 'VT', 'NJ', 'NY', 'PA']],
+  ['Southeast', ['AL', 'AR', 'FL', 'GA', 'KY', 'LA', 'MS', 'NC', 'SC',
+    'TN', 'VA', 'WV']],
+  ['Midwest', ['IL', 'IN', 'IA', 'KS', 'MI', 'MN', 'MO', 'NE', 'ND',
+    'OH', 'SD', 'WI']],
+  ['Southwest', ['AZ', 'NM', 'OK', 'TX']],
+  ['West', ['AK', 'CA', 'CO', 'HI', 'ID', 'MT', 'NV', 'OR', 'UT', 'WA', 'WY']],
+  ['Bible Belt', ['AL', 'AR', 'GA', 'KY', 'LA', 'MS', 'MO', 'NC', 'OK',
+    'SC', 'TN', 'TX', 'VA', 'WV']],
+]
+
+// ---- presets ---------------------------------------------------------------
+// Each preset is a full filter state (applied over defaults) — a curated
+// starting point a fundraiser can then refine. Ordered by how often they'd
+// reach for it.
+export type Preset = { id: string; label: string; hint: string
+  filters: Partial<V5Filters> }
+export const PRESETS: Preset[] = [
+  {
+    id: 'reachable-christian',
+    label: 'Reachable Christian funders',
+    hint: 'Give to Christian orgs, accept applications or contact, non-micro',
+    filters: {
+      tradition: [ANY_CHRISTIAN], min_tradition_dollars: '50000',
+      application_status: ['Accepting Applications', 'Contact First'],
+      has_contact: true, exclude_micro: true, exclude_testamentary: true,
+      sort: 'christian',
+    },
+  },
+  {
+    id: 'high-confidence-christian',
+    label: 'High-confidence Christian',
+    hint: 'Only NTEE / church-code / GEN / human-confirmed Christian giving',
+    filters: {
+      tradition: [ANY_CHRISTIAN], tier: 'authoritative',
+      min_tradition_recipients: '3', coverage_band: ['High', 'Moderate'],
+      sort: 'christian',
+    },
+  },
+  {
+    id: 'accepting',
+    label: 'Accepting applications',
+    hint: 'Foundations with affirmative application evidence, non-micro',
+    filters: {
+      application_status: ['Accepting Applications'], exclude_micro: true,
+    },
+  },
+  {
+    id: 'catholic',
+    label: 'Catholic funders',
+    hint: 'Give to Catholic-classified recipients',
+    filters: { tradition: ['catholic'], min_tradition_dollars: '50000',
+      sort: 'christian' },
+  },
+  {
+    id: 'evangelical',
+    label: 'Evangelical funders',
+    hint: 'Give to Evangelical / Protestant recipients',
+    filters: { tradition: ['evangelical_protestant'],
+      min_tradition_dollars: '50000', sort: 'christian' },
+  },
+  {
+    id: 'major',
+    label: 'Major funders ($1M+)',
+    hint: 'Large grantmakers, excluding trusts and pass-through DAFs',
+    filters: {
+      min_paid: '1000000', exclude_testamentary: true, daf: 'exclude',
+      sort: 'paid',
+    },
+  },
+]
+
 // ---- filter state ----------------------------------------------------------
 // Numeric fields are kept as strings ('' = unset) so text inputs and URL
 // round-tripping stay trivial; they are parsed when building query params.
@@ -148,7 +225,7 @@ export type V5Filters = {
   active_year: string // '' | '2023' | '2024'
   recipient_search: string
   state: string[]
-  gives_to_state: string
+  gives_to_state: string[]
   application_status: string[]
   has_website: boolean
   has_email: boolean
@@ -178,7 +255,7 @@ export const defaultV5Filters: V5Filters = {
   active_year: '',
   recipient_search: '',
   state: [],
-  gives_to_state: '',
+  gives_to_state: [],
   application_status: [],
   has_website: false,
   has_email: false,
@@ -195,8 +272,8 @@ export const defaultV5Filters: V5Filters = {
   order: 'desc',
 }
 
-const LIST_KEYS = ['tradition', 'state', 'application_status',
-  'coverage_band'] as const
+const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
+  'application_status', 'coverage_band'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',
   'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
   'min_assets', 'max_assets', 'min_revenue', 'min_coverage'] as const
@@ -215,7 +292,6 @@ export function v5FilterParams(f: V5Filters): URLSearchParams {
   BOOL_KEYS.forEach((k) => { if (f[k]) p.set(k, 'true') })
   if (f.active_year) p.set('active_year', f.active_year)
   if (f.recipient_search.trim()) p.set('recipient_search', f.recipient_search.trim())
-  if (f.gives_to_state) p.set('gives_to_state', f.gives_to_state)
   if (f.daf !== 'include') p.set('daf', f.daf)
   if (f.sort !== defaultV5Filters.sort) p.set('sort', f.sort)
   if (f.order !== defaultV5Filters.order) p.set('order', f.order)
@@ -234,7 +310,6 @@ export function v5FiltersFromParams(sp: URLSearchParams): V5Filters {
   BOOL_KEYS.forEach((k) => { if (sp.get(k) === 'true') f[k] = true })
   f.active_year = sp.get('active_year') || ''
   f.recipient_search = sp.get('recipient_search') || ''
-  f.gives_to_state = sp.get('gives_to_state') || ''
   const daf = sp.get('daf')
   if (daf === 'exclude' || daf === 'only') f.daf = daf
   f.sort = sp.get('sort') || defaultV5Filters.sort

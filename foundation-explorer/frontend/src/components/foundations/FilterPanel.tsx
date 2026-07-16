@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronDown, ChevronRight, Info } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info, Sparkles } from 'lucide-react'
 import {
   ANY_CHRISTIAN, APPLICATION_STATUSES, CHRISTIAN_TRADITIONS, COVERAGE_BANDS,
-  OTHER_TRADITIONS, type V5Filters,
+  defaultV5Filters, OTHER_TRADITIONS, PRESETS, US_REGIONS, type V5Filters,
 } from '../../lib/apiV5'
 import { US_STATES } from '../../lib/format'
 
@@ -67,14 +67,38 @@ function Range({ label, lo, hi, onLo, onHi }: {
   )
 }
 
-function StateMultiSelect({ values, onToggle }: {
-  values: string[]; onToggle: (s: string) => void
+// State picker with one-click region groupings. `onSet` replaces the whole
+// list so region toggles can add/remove many states at once.
+function StateMultiSelect({ values, onSet }: {
+  values: string[]; onSet: (next: string[]) => void
 }) {
+  const toggleState = (s: string) =>
+    onSet(values.includes(s) ? values.filter((x) => x !== s) : [...values, s])
+  const toggleRegion = (states: string[]) => {
+    const allOn = states.every((s) => values.includes(s))
+    onSet(allOn
+      ? values.filter((s) => !states.includes(s))
+      : [...new Set([...values, ...states])])
+  }
   return (
     <>
+      <div className="flex flex-wrap gap-1 mb-1.5">
+        {US_REGIONS.map(([name, states]) => {
+          const allOn = states.every((s) => values.includes(s))
+          return (
+            <button key={name} onClick={() => toggleRegion(states)}
+              title={states.join(', ')}
+              className={`text-[11px] rounded-full px-2 py-0.5 border transition-colors ${
+                allOn
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-canvas text-muted border-line hover:border-primary/60'}`}>
+              {name}
+            </button>)
+        })}
+      </div>
       <select className="w-full border border-line rounded px-2 py-1 text-sm mb-1 bg-surface"
         value=""
-        onChange={(e) => e.target.value && onToggle(e.target.value)}>
+        onChange={(e) => e.target.value && toggleState(e.target.value)}>
         <option value="">Add state…</option>
         {US_STATES.filter((s) => !values.includes(s)).map((s) => (
           <option key={s} value={s}>{s}</option>))}
@@ -82,10 +106,12 @@ function StateMultiSelect({ values, onToggle }: {
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-1">
           {values.map((s) => (
-            <button key={s} onClick={() => onToggle(s)}
+            <button key={s} onClick={() => toggleState(s)}
               className="text-xs bg-primary text-white rounded-full px-2 py-0.5">
               {s} ×
             </button>))}
+          <button onClick={() => onSet([])}
+            className="text-xs text-muted underline px-1">clear</button>
         </div>
       )}
     </>
@@ -116,8 +142,39 @@ export default function FilterPanel({ filters, onChange }: Props) {
       ? cur.filter((x) => x !== t) : [...cur, t] })
   }
 
+  // A preset is "active" when the current filters equal that preset applied
+  // over defaults (ignoring sort/order, which the user may re-sort freely).
+  const presetActive = (pf: Partial<V5Filters>) => {
+    const target = { ...defaultV5Filters, ...pf }
+    return (Object.keys(defaultV5Filters) as (keyof V5Filters)[])
+      .filter((k) => k !== 'sort' && k !== 'order')
+      .every((k) => JSON.stringify(filters[k]) === JSON.stringify(target[k]))
+  }
+  const applyPreset = (pf: Partial<V5Filters>) =>
+    onChange({ ...defaultV5Filters, ...pf })
+
   return (
     <div className="w-60 shrink-0">
+      <div className="mb-4">
+        <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted mb-2">
+          <Sparkles size={13} /> Presets
+        </div>
+        <div className="flex flex-col gap-1">
+          {PRESETS.map((p) => {
+            const active = presetActive(p.filters)
+            return (
+              <button key={p.id} onClick={() => applyPreset(p.filters)}
+                title={p.hint}
+                className={`text-left text-sm rounded-md px-2.5 py-1.5 border transition-colors ${
+                  active
+                    ? 'bg-primary/10 border-primary text-primary font-medium'
+                    : 'bg-surface border-line hover:border-primary/50'}`}>
+                {p.label}
+              </button>)
+          })}
+        </div>
+      </div>
+
       <Section title="Recipient Faith">
         <Check label={<span className="font-medium">Any Christian</span>}
           checked={filters.tradition.includes(ANY_CHRISTIAN)}
@@ -190,16 +247,12 @@ export default function FilterPanel({ filters, onChange }: Props) {
       <Section title="Geography" defaultOpen={false}>
         <div className="text-xs text-muted mb-1">Foundation located in</div>
         <StateMultiSelect values={filters.state}
-          onToggle={(s) => toggleIn('state', s)} />
-        <div className="text-xs text-muted mb-1 mt-2">
+          onSet={(next) => set({ state: next })} />
+        <div className="text-xs text-muted mb-1 mt-3">
           Gives to organizations in
         </div>
-        <select className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
-          value={filters.gives_to_state}
-          onChange={(e) => set({ gives_to_state: e.target.value })}>
-          <option value="">Any state</option>
-          {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <StateMultiSelect values={filters.gives_to_state}
+          onSet={(next) => set({ gives_to_state: next })} />
       </Section>
 
       <Section title="Reachability" defaultOpen={false}>
