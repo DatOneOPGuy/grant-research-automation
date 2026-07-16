@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import {
-  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Loader2,
-} from 'lucide-react'
-import {
-  defaultV5Filters, fetchFoundationsV5, type FoundationRowV5,
+  defaultV5Filters, fetchFoundationsV5,
   v5FilterParams, v5FiltersFromParams, type V5Filters,
 } from '../lib/apiV5'
 import { money, num, titleCase } from '../lib/format'
@@ -17,7 +15,6 @@ import { BucketBar } from '../components/foundations/BucketBar'
 import { CoverageChip } from '../components/foundations/V5Chips'
 
 const PAGE_SIZE = 25
-const EXPORT_LIMIT = 500
 
 // Table columns; sortKey maps to the API's sort vocabulary.
 const COLUMNS: { key: string; label: string; sortKey?: string }[] = [
@@ -29,29 +26,6 @@ const COLUMNS: { key: string; label: string; sortKey?: string }[] = [
   { key: 'status', label: 'Application' },
   { key: 'median', label: 'Median grant', sortKey: 'median' },
 ]
-
-const CSV_FIELDS: (keyof FoundationRowV5)[] = [
-  'ein', 'name', 'city', 'state', 'paid_2324', 'grant_count_2324',
-  'recipient_count', 'median_grant', 'christian_dollars',
-  'nonchristian_dollars', 'unclassified_dollars', 'daf_dollars',
-  'coverage_pct', 'coverage_band', 'application_status', 'website',
-  'assets', 'revenue', 'is_testamentary', 'is_micro',
-]
-
-function exportCsv(rows: FoundationRowV5[]) {
-  const esc = (v: unknown) => {
-    const s = v == null ? '' : String(v)
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const lines = [CSV_FIELDS.join(',')]
-  rows.forEach((r) => lines.push(CSV_FIELDS.map((k) => esc(r[k])).join(',')))
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = 'foundations-v5.csv'
-  a.click()
-  URL.revokeObjectURL(a.href)
-}
 
 const PAGE_LABEL = (page: number, count: number, total: number) => {
   if (!total) return '0 results'
@@ -100,15 +74,6 @@ export default function Foundations() {
     order: f.sort === sortKey && f.order === 'desc' ? 'asc' : 'desc',
   }))
 
-  const [exporting, setExporting] = useState(false)
-  const handleExport = async () => {
-    setExporting(true)
-    try {
-      const res = await fetchFoundationsV5(queryString, EXPORT_LIMIT)
-      exportCsv(res.rows)
-    } finally { setExporting(false) }
-  }
-
   const total = data?.total ?? 0
   const pageCount = Math.ceil(total / PAGE_SIZE)
 
@@ -129,13 +94,6 @@ export default function Foundations() {
             )}
           </div>
         </div>
-        <button onClick={handleExport} disabled={!data || exporting}
-          className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90 disabled:opacity-40">
-          {exporting
-            ? <Loader2 size={15} className="animate-spin" />
-            : <Download size={15} />}
-          Export CSV{total > EXPORT_LIMIT ? ` (top ${EXPORT_LIMIT})` : ''}
-        </button>
       </div>
 
       {isError && (
