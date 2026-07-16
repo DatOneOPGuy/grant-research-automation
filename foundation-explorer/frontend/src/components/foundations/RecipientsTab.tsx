@@ -35,7 +35,7 @@ export default function RecipientsTab({ recipients }: {
             <tr className="border-b border-line/60">
               <td className="py-2 pr-3 font-medium">
                 {titleCase(r.name)}
-                {r.is_daf && <span className="ml-1.5"><DafChip /></span>}
+                {Boolean(r.is_daf) && <span className="ml-1.5"><DafChip /></span>}
               </td>
               <td className="pr-2">
                 <TraditionChip tradition={r.tradition} method={r.method}
@@ -47,7 +47,7 @@ export default function RecipientsTab({ recipients }: {
               </td>
               <td className="text-right tabular text-muted pr-2">{r.grants}</td>
               <td className="text-right">
-                {r.has_mission && (
+                {Boolean(r.has_mission) && (
                   <button
                     onClick={() => setOpen(open === r.entity_id ? null : r.entity_id)}
                     title="Show this organization's own mission statement"
