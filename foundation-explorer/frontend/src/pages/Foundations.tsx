@@ -1,181 +1,140 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp, Download, Loader2, X } from 'lucide-react'
 import {
-  ArrowDown, ArrowUp, Bookmark, Download, ExternalLink, X,
-} from 'lucide-react'
-import {
-  activeFilterChips, apiGet, DEMO, defaultFilters, filterParams,
-  type FoundationFilterState, type FoundationRow, type Paged,
-} from '../lib/api'
-import { useSavedFoundations } from '../lib/savedContext'
-import { loadPersistedFilters, persistFilters } from '../lib/savedStore'
-import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
-import { Skeleton, StatusPill, VerdictBadge } from '../components/ui/primitives'
+  defaultV5Filters, fetchFoundationsV5, type FoundationRowV5,
+  v5FilterParams, v5FiltersFromParams, type V5Filters,
+} from '../lib/apiV5'
+import { money, num, titleCase } from '../lib/format'
+import { Skeleton, StatusPill } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
 import DetailPanel from '../components/foundations/DetailPanel'
+import { BucketBar } from '../components/foundations/BucketBar'
+import { CoverageChip } from '../components/foundations/V5Chips'
 
-const SORTS: [string, string][] = [
-  ['christian_dollars_3yr', `Christian $ (${TAX_WINDOW_LABEL})`],
-  ['christian_recipient_count', 'Christian orgs funded'],
-  ['total_giving_3yr', `Reported grants (${TAX_WINDOW_LABEL})`],
-  ['assets', 'Total assets'],
-  ['typical_grant_size', 'Typical grant size'],
-  ['foundation_name', 'Name'],
-  ['state', 'State'],
+const FETCH_LIMIT = 500
+
+// Table columns; sortKey maps to the API's sort vocabulary.
+const COLUMNS: { key: string; label: string; sortKey?: string }[] = [
+  { key: 'name', label: 'Foundation', sortKey: 'name' },
+  { key: 'state', label: 'Location' },
+  { key: 'paid', label: 'Paid 2023–24', sortKey: 'paid' },
+  { key: 'mix', label: 'Faith mix ($)', sortKey: 'christian' },
+  { key: 'coverage', label: 'Coverage', sortKey: 'coverage' },
+  { key: 'status', label: 'Application' },
+  { key: 'median', label: 'Median grant', sortKey: 'median' },
 ]
 
-const PRESETS: { key: string; label: string }[] = [
-  { key: 'best-prospects', label: 'Best Prospects' },
-  { key: 'top-christian-dollars', label: 'Top Christian $ Givers' },
-  { key: 'accepting', label: 'Accepting Applications' },
+const CSV_FIELDS: (keyof FoundationRowV5)[] = [
+  'ein', 'name', 'city', 'state', 'paid_2324', 'grant_count_2324',
+  'recipient_count', 'median_grant', 'christian_dollars',
+  'nonchristian_dollars', 'unclassified_dollars', 'daf_dollars',
+  'coverage_pct', 'coverage_band', 'application_status', 'website',
+  'assets', 'revenue', 'is_testamentary', 'is_micro',
 ]
 
-const COLUMNS: { key: string; label: string; sortable?: boolean }[] = [
-  { key: 'save', label: '' },
-  { key: 'foundation_name', label: 'Foundation', sortable: true },
-  { key: 'state', label: 'Location', sortable: true },
-  { key: 'verdict', label: 'Christian giving', sortable: false },
-  { key: 'christian_dollars_3yr', label: `Christian $ (${TAX_WINDOW_LABEL})`, sortable: true },
-  { key: 'typical_grant_size', label: 'Typical grant', sortable: true },
-  { key: 'application_status', label: 'Application', sortable: true },
-]
+function exportCsv(rows: FoundationRowV5[]) {
+  const esc = (v: unknown) => {
+    const s = v == null ? '' : String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = [CSV_FIELDS.join(',')]
+  rows.forEach((r) => lines.push(CSV_FIELDS.map((k) => esc(r[k])).join(',')))
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'foundations-v5.csv'
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
 
-export default function Foundations({ presetLock }: { presetLock?: string }) {
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return v
+}
+
+export default function Foundations() {
   const [urlParams, setUrlParams] = useSearchParams()
-  const { isSaved, toggle } = useSavedFoundations()
-  const [filters, setFilters] = useState<FoundationFilterState>(() => ({
-    ...defaultFilters,
-    ...(presetLock ? {} : loadPersistedFilters<FoundationFilterState>() || {}),
-    preset: presetLock || urlParams.get('preset') || '',
-    page: 1,
-  }))
-  const [search, setSearch] = useState(filters.q)
+  const [filters, setFilters] = useState<V5Filters>(
+    () => v5FiltersFromParams(urlParams))
   const [selected, setSelected] = useState<string | null>(
     urlParams.get('ein'))
 
-  // persist filter state across navigation (session-scoped)
-  useEffect(() => { if (!presetLock) persistFilters(filters) }, [filters,
-    presetLock])
-
-  const { data: stats } = useQuery({
-    queryKey: ['stats'], queryFn: () => apiGet<any>('/api/foundations/stats'),
-    staleTime: Infinity,
-  })
-  const chips = activeFilterChips(filters)
-  const set = (patch: Partial<FoundationFilterState>) =>
-    setFilters((f) => ({ ...f, ...patch, page: 1 }))
-  const clearAll = () => setFilters((f) => ({
-    ...defaultFilters, preset: f.preset, page: 1,
-  }))
-
-  // deep-link: ?ein= opens the detail panel
+  // Debounce filter changes (~300ms), then sync the shareable URL and query.
+  const debounced = useDebounced(filters, 300)
+  const queryString = useMemo(
+    () => v5FilterParams(debounced).toString(), [debounced])
   useEffect(() => {
-    const e = urlParams.get('ein')
-    if (e) setSelected(e)
-  }, [urlParams])
+    const p = v5FilterParams(debounced)
+    if (selected) p.set('ein', selected)
+    setUrlParams(p, { replace: true })
+  }, [debounced, selected, setUrlParams])
 
-  useEffect(() => {
-    const t = setTimeout(
-      () => setFilters((f) => ({ ...f, q: search, page: 1 })), 300)
-    return () => clearTimeout(t)
-  }, [search])
-
-  const params = useMemo(() => filterParams(filters).toString(), [filters])
-  const { data, isFetching } = useQuery({
-    queryKey: ['foundations', params],
-    queryFn: () => apiGet<Paged<FoundationRow>>(`/api/foundations?${params}`),
+  const { data, isFetching, isError } = useQuery({
+    queryKey: ['v5foundations', queryString],
+    queryFn: () => fetchFoundationsV5(queryString, FETCH_LIMIT),
     placeholderData: keepPreviousData,
   })
 
-  const sortBy = (col: string) => setFilters((f) => ({
-    ...f, sort: col,
-    direction: f.sort === col && f.direction === 'desc' ? 'asc' : 'desc',
-    page: 1,
+  const sortBy = (sortKey: string) => setFilters((f) => ({
+    ...f, sort: sortKey,
+    order: f.sort === sortKey && f.order === 'desc' ? 'asc' : 'desc',
   }))
 
-  const applyPreset = (key: string) => setFilters((f) => ({
-    ...f, preset: f.preset === key ? '' : key, sort: '', page: 1,
-  }))
-
-  const pages = data ? Math.max(1, Math.ceil(data.total / filters.page_size)) : 1
+  const activeCount = useMemo(() => {
+    const p = v5FilterParams(filters)
+    p.delete('sort'); p.delete('order')
+    return [...p.keys()].length
+  }, [filters])
 
   return (
     <div>
       <div className="flex items-end justify-between mb-5">
         <div>
           <h1 className="font-display text-3xl font-semibold text-primary">
-            {presetLock === 'best-prospects' ? 'Best Prospects' : 'Foundations'}
+            Foundations
           </h1>
-          <div className="text-sm text-muted mt-1">
+          <div className="text-sm text-muted mt-1 flex items-center gap-2">
             {data
-              ? <>Showing {num(data.total)}
-                {stats && <> of {num(stats.total)}</>} foundations</>
+              ? <>{num(data.total)} foundations match
+                {data.total > FETCH_LIMIT
+                  && <> · showing top {FETCH_LIMIT} by sort</>}</>
               : 'Loading…'}
+            {isFetching && (
+              <Loader2 size={14} className="animate-spin text-muted" />
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <select className="border border-line rounded-md px-2 py-2 text-sm bg-surface"
-            value={filters.sort || 'christian_dollars_3yr'}
-            onChange={(e) => setFilters((f) => ({
-              ...f, sort: e.target.value, page: 1 }))}>
-            {SORTS.map(([v, label]) => (
-              <option key={v} value={v}>Sort: {label}</option>))}
-          </select>
-          {!DEMO && (
-            <a href={`/api/export/foundations.csv?${params}`}
-              className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90">
-              <Download size={15} /> Export
-            </a>
-          )}
-        </div>
+        <button onClick={() => data && exportCsv(data.rows)} disabled={!data}
+          className="flex items-center gap-2 bg-primary text-white text-sm rounded-md px-4 py-2 hover:bg-primary/90 disabled:opacity-40">
+          <Download size={15} /> Export CSV
+        </button>
       </div>
 
-      {/* Preset views */}
-      {!presetLock && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="text-xs text-muted self-center mr-1">
-            Preset views:
-          </span>
-          {PRESETS.map((p) => (
-            <button key={p.key} onClick={() => applyPreset(p.key)}
-              className={`text-sm rounded-full px-3 py-1 border transition-colors ${
-                filters.preset === p.key
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-surface text-muted border-line hover:border-primary'}`}>
-              {p.label}
-            </button>
-          ))}
+      {isError && (
+        <div className="mb-4 rounded-md border border-scoremid/40 bg-amber-50 px-4 py-2.5 text-sm text-scoremid">
+          Could not reach the v5 API at localhost:8000 — start the backend and
+          this page will recover automatically.
         </div>
       )}
 
       <div className="flex gap-6">
-        <FilterPanel filters={filters} onChange={(f) => {
-          setFilters(f)
-          if (f.preset) urlParams.set('preset', f.preset)
-          else urlParams.delete('preset')
-        }} />
+        <FilterPanel filters={filters} onChange={setFilters} />
 
         <div className="flex-1 min-w-0">
-          <input
-            placeholder="Search foundation name, EIN, or city…"
-            className="w-full border border-line rounded-md px-4 py-2.5 text-sm mb-3 bg-surface"
-            value={search} onChange={(e) => setSearch(e.target.value)} />
-
-          {chips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 mb-4">
-              <span className="text-xs text-muted mr-1">
-                {chips.length} filter{chips.length > 1 ? 's' : ''} active:
-              </span>
-              {chips.map((c) => (
-                <button key={c.key} onClick={() => set(c.clear)}
-                  className="flex items-center gap-1 text-xs bg-canvas border border-line rounded-full px-2 py-0.5 hover:border-primary">
-                  {c.label} <X size={11} />
-                </button>
-              ))}
-              <button onClick={clearAll}
-                className="text-xs text-primary underline ml-1">
-                Clear all
+          {activeCount > 0 && (
+            <div className="flex items-center gap-2 mb-3 text-xs text-muted">
+              <span>{activeCount} filter{activeCount > 1 ? 's' : ''} active</span>
+              <button
+                onClick={() => setFilters((f) => ({
+                  ...defaultV5Filters, sort: f.sort, order: f.order }))}
+                className="flex items-center gap-1 text-primary underline">
+                Clear all <X size={11} />
               </button>
             </div>
           )}
@@ -186,12 +145,13 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                 <tr className="text-left text-xs text-muted border-b border-line bg-canvas/50">
                   {COLUMNS.map((c) => (
                     <th key={c.key} className="px-3 py-3 font-medium">
-                      {c.sortable ? (
-                        <button onClick={() => sortBy(c.key)}
+                      {c.sortKey ? (
+                        <button onClick={() => sortBy(c.sortKey!)}
                           className="flex items-center gap-1 hover:text-ink">
                           {c.label}
-                          {filters.sort === c.key && (filters.direction === 'desc'
-                            ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}
+                          {filters.sort === c.sortKey && (
+                            filters.order === 'desc'
+                              ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}
                         </button>
                       ) : c.label}
                     </th>
@@ -199,7 +159,7 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                 </tr>
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
-                {!data && Array.from({ length: 10 }).map((_, i) => (
+                {!data && !isError && Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i}><td colSpan={7} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
@@ -212,87 +172,45 @@ export default function Foundations({ presetLock }: { presetLock?: string }) {
                 {data?.rows.map((r) => (
                   <tr key={r.ein} onClick={() => setSelected(r.ein)}
                     className="border-b border-line/60 hover:bg-canvas/70 cursor-pointer">
-                    <td className="pl-3">
-                      <button onClick={(e) => { e.stopPropagation(); toggle(r.ein) }}
-                        title={isSaved(r.ein) ? 'Saved' : 'Save'}
-                        className="p-1 text-muted hover:text-accent">
-                        <Bookmark size={15}
-                          className={isSaved(r.ein)
-                            ? 'fill-accent text-accent' : ''} />
-                      </button>
-                    </td>
                     <td className="px-3 py-2.5 max-w-56">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-primary truncate">
-                          {titleCase(r.foundation_name)}
-                        </span>
-                        <a href={r.propublica_url} target="_blank" rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          title="View on ProPublica"
-                          className="text-muted hover:text-primary shrink-0">
-                          <ExternalLink size={13} />
-                        </a>
-                      </div>
+                      <span className="font-medium text-primary truncate block">
+                        {titleCase(r.name)}
+                      </span>
                     </td>
                     <td className="px-3 text-muted whitespace-nowrap">
-                      {titleCase(r.city)}, {r.state}
-                    </td>
-                    <td className="px-3 py-2">
-                      <VerdictBadge verdict={r.verdict} />
-                      {r.christian_preview && (
-                        <div className="text-xs text-muted mt-1 max-w-48 truncate"
-                          title={titleCase(r.christian_preview)}>
-                          {titleCase(r.christian_preview)}
-                        </div>
-                      )}
+                      {r.city ? `${titleCase(r.city)}, ` : ''}{r.state}
                     </td>
                     <td className="px-3 tabular font-medium whitespace-nowrap">
-                      {money(r.christian_dollars_3yr)}
+                      {money(r.paid_2324)}
+                    </td>
+                    <td className="px-3 min-w-32">
+                      <BucketBar b={{
+                        christian: r.christian_dollars,
+                        nonchristian: r.nonchristian_dollars,
+                        unclassified: r.unclassified_dollars,
+                        daf: r.daf_dollars,
+                      }} />
+                    </td>
+                    <td className="px-3 whitespace-nowrap">
+                      <CoverageChip band={r.coverage_band}
+                        pct={r.coverage_pct} />
+                    </td>
+                    <td className="px-3 whitespace-nowrap">
+                      <StatusPill status={r.application_status} />
                     </td>
                     <td className="px-3 tabular text-muted whitespace-nowrap">
-                      {money(r.typical_grant_size)}
-                    </td>
-                    <td className="px-3 whitespace-nowrap text-left">
-                      <StatusPill status={r.application_status} />
+                      {money(r.median_grant)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-
-            <div className="flex items-center justify-between px-4 py-3 border-t border-line text-sm">
-              <div className="text-muted tabular">
-                {data && <>Page {filters.page} of {num(pages)}</>}
-              </div>
-              <div className="flex items-center gap-2">
-                <select className="border border-line rounded px-2 py-1"
-                  value={filters.page_size}
-                  onChange={(e) => setFilters((f) => ({
-                    ...f, page_size: Number(e.target.value), page: 1 }))}>
-                  {[25, 50, 100, 250].map((n) => (
-                    <option key={n} value={n}>{n} / page</option>))}
-                </select>
-                <button disabled={filters.page <= 1}
-                  onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-                  className="border border-line rounded px-3 py-1 disabled:opacity-40">
-                  Prev
-                </button>
-                <button disabled={filters.page >= pages}
-                  onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-                  className="border border-line rounded px-3 py-1 disabled:opacity-40">
-                  Next
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
       {selected && (
-        <DetailPanel ein={selected} onClose={() => {
-          setSelected(null)
-          urlParams.delete('ein'); setUrlParams(urlParams, { replace: true })
-        }} />
+        <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   )

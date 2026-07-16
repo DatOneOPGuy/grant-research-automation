@@ -4,7 +4,7 @@ import {
   Users, BadgeInfo,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { apiGet } from '../../lib/api'
+import { fetchStatsV5 } from '../../lib/apiV5'
 import { useSavedFoundations } from '../../lib/savedContext'
 import { num } from '../../lib/format'
 
@@ -23,8 +23,8 @@ const NAV = [
 export default function Sidebar() {
   const { saved } = useSavedFoundations()
   const { data } = useQuery({
-    queryKey: ['stats'],
-    queryFn: () => apiGet<Record<string, number>>('/api/foundations/stats'),
+    queryKey: ['v5stats'],
+    queryFn: fetchStatsV5,
     staleTime: Infinity,
   })
   return (
@@ -63,7 +63,7 @@ export default function Sidebar() {
       </nav>
       <div className="px-5 py-4 text-[11px] leading-4 text-white/40 border-t border-white/10">
         {data
-          ? `${num(data.total)} foundations · ${num(data.total_grants)} grants`
+          ? `${num(data.foundations)} foundations · ${num(data.recipients)} recipients`
           : 'Loading…'}
       </div>
     </aside>
