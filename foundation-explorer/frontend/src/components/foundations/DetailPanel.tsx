@@ -46,6 +46,11 @@ export default function DetailPanel({ ein, onClose }: Props) {
                     Website <ExternalLink size={12} />
                   </a>
                 )}
+                <a href={`https://projects.propublica.org/nonprofits/organizations/${ein}`}
+                  target="_blank" rel="noreferrer"
+                  className="text-primary underline flex items-center gap-1">
+                  ProPublica <ExternalLink size={12} />
+                </a>
               </div>
             </div>
             <button onClick={onClose} className="p-1.5 rounded hover:bg-canvas">
