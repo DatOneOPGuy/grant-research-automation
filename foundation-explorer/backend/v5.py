@@ -46,7 +46,7 @@ def expand_traditions(raw: str) -> list[str]:
 @router.get("/foundations")
 def foundations(
     tradition: str | None = None,
-    tier: str = Query("any", pattern="^(any|authoritative)$"),
+    tier: str = Query("any", pattern="^(any|authoritative|mission)$"),
     min_tradition_dollars: int = 0,
     min_tradition_recipients: int = 0,
     min_paid: int | None = None, max_paid: int | None = None,
@@ -167,6 +167,7 @@ def foundation_detail(ein: str):
         recipients = conn.execute("""
             SELECT r.entity_id, r.name, r.ein AS recipient_ein,
                    r.identity_status, r.tradition, r.method, r.confidence,
+                   r.reason,
                    r.is_daf, (r.mission_text IS NOT NULL
                               AND r.mission_text != '') AS has_mission,
                    frs.dollars, frs.grants, frs.last_year

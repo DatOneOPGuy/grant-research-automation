@@ -51,6 +51,7 @@ CREATE TABLE recipient_states (
 CREATE TABLE recipients (
     entity_id TEXT PRIMARY KEY, ein TEXT, name TEXT,
     identity_status TEXT, tradition TEXT, method TEXT, confidence REAL,
+    reason TEXT,
     is_daf INTEGER DEFAULT 0, mission_text TEXT, website TEXT,
     total_received INTEGER DEFAULT 0, funder_count INTEGER DEFAULT 0
 );
@@ -107,9 +108,9 @@ def build_recipients(out: sqlite3.Connection, run_id: str, release_id: str) -> N
     log("recipients: entities + resolutions + canonical mission text…")
     out.execute("""
         INSERT INTO recipients (entity_id, ein, name, identity_status,
-                                tradition, method, confidence)
+                                tradition, method, confidence, reason)
         SELECT e.entity_id, e.bmf_ein, e.canonical_name, e.identity_status,
-               r.classification, ev.evidence_method, r.confidence
+               r.classification, ev.evidence_method, r.confidence, ev.reason
         FROM p.recipient_entities e
         LEFT JOIN p.classification_resolutions r
           ON r.release_id=? AND r.entity_id=e.entity_id
@@ -276,6 +277,7 @@ def build_tradition_stats(out: sqlite3.Connection) -> None:
     for tier, method_filter in (
         ("authoritative",
          "r.method IN ('human','ntee','church_code_name','group_exemption')"),
+        ("mission", "r.method='llm'"),
         ("any", "r.tradition IS NOT NULL"),
     ):
         out.execute(f"""
