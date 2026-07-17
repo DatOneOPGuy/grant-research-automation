@@ -47,7 +47,7 @@ export default function RecipientsTab({ recipients }: {
               </td>
               <td className="pr-2">
                 <TraditionChip tradition={r.tradition} method={r.method}
-                  confidence={r.confidence} />
+                  confidence={r.confidence} reason={r.reason} />
               </td>
               <td className="pr-2"><IdentityChip status={r.identity_status} /></td>
               <td className="text-right tabular pr-3 whitespace-nowrap">

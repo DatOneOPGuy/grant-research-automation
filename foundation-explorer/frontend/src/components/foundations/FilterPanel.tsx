@@ -194,12 +194,20 @@ export default function FilterPanel({ filters, onChange }: Props) {
           ))}
         </div>
         <div className="mt-2 pt-2 border-t border-line/60">
-          <Check
-            label={<span title="Counts only NTEE codes, church codes, group exemptions, and human review — excludes name-rule guesses">
-              High-confidence evidence only (NTEE/church-code/GEN/human)
-            </span>}
-            checked={filters.tier === 'authoritative'}
-            onChange={(v) => set({ tier: v ? 'authoritative' : 'any' })} />
+          <div className="text-xs text-muted mb-1">Evidence tier</div>
+          {([
+            ['any', 'All evidence'],
+            ['authoritative', 'High-confidence only (NTEE / church-code / GEN / human)'],
+            ['mission', 'Mission-text classified (from the org’s own 990)'],
+          ] as const).map(([v, label]) => (
+            <label key={v}
+              className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+              <input type="radio" name="tier" className="accent-primary"
+                checked={filters.tier === v}
+                onChange={() => set({ tier: v })} />
+              {label}
+            </label>
+          ))}
         </div>
         <div className="text-xs text-muted mb-1 mt-2">
           Min $ to selected tradition

@@ -55,6 +55,7 @@ export type FoundationRecipientV5 = {
   tradition: string | null
   method: string | null
   confidence: number | null
+  reason: string | null
   is_daf: boolean
   has_mission: boolean
   dollars: number
@@ -214,7 +215,7 @@ export const PRESETS: Preset[] = [
 // round-tripping stay trivial; they are parsed when building query params.
 export type V5Filters = {
   tradition: string[]
-  tier: 'any' | 'authoritative'
+  tier: 'any' | 'authoritative' | 'mission'
   min_tradition_dollars: string
   min_tradition_recipients: string
   min_paid: string
@@ -305,7 +306,8 @@ export function v5FiltersFromParams(sp: URLSearchParams): V5Filters {
     const v = sp.get(k)
     if (v) f[k] = v.split(',').filter(Boolean)
   })
-  if (sp.get('tier') === 'authoritative') f.tier = 'authoritative'
+  const tier = sp.get('tier')
+  if (tier === 'authoritative' || tier === 'mission') f.tier = tier
   NUM_KEYS.forEach((k) => { const v = sp.get(k); if (v) f[k] = v })
   BOOL_KEYS.forEach((k) => { if (sp.get(k) === 'true') f[k] = true })
   f.active_year = sp.get('active_year') || ''

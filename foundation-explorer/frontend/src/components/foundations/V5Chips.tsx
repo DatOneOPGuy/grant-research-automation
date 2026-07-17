@@ -24,15 +24,17 @@ export function CoverageChip({ band, pct }: {
 const CHRISTIAN_SET = new Set(['evangelical_protestant', 'catholic',
   'orthodox_christian', 'christian_unspecified', 'any_christian'])
 
-export function TraditionChip({ tradition, method, confidence }: {
+export function TraditionChip({ tradition, method, confidence, reason }: {
   tradition: string | null
   method?: string | null
   confidence?: number | null
+  reason?: string | null
 }) {
   const label = traditionLabel(tradition)
   const parts: string[] = []
   if (method) parts.push(`method: ${method}`)
   if (confidence != null) parts.push(`confidence: ${confidence}`)
+  if (reason) parts.push(`why: ${reason}`)
   const title = parts.join(' · ') || undefined
   let cls = 'bg-gray-100 text-scorelow'
   if (tradition && CHRISTIAN_SET.has(tradition)) cls = 'bg-green-50 text-scorehigh'
