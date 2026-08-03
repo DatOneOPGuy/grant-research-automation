@@ -1,0 +1,12 @@
+[16:01:17] predictions: 37,133 | missing/bad batches: 0 []
+[16:01:17] identity identity-20260715T164705Z | classification run classify-20260803T200117-2b10509e
+[16:01:17]   wrote 5,000 evidence rows (7,941/s)
+[16:01:18]   wrote 10,000 evidence rows (9,719/s)
+[16:01:18]   wrote 15,000 evidence rows (11,169/s)
+[16:01:18]   wrote 20,000 evidence rows (12,400/s)
+[16:01:19]   wrote 25,000 evidence rows (13,415/s)
+[16:01:19]   wrote 30,000 evidence rows (14,358/s)
+[16:01:19]   wrote 35,000 evidence rows (14,902/s)
+[16:01:19] evidence written: 35,599 | skipped unknown: 1,534 | bad label: 0 | below-floor (recorded, non-resolving): 754
+[16:01:19] building classification release…
+[16:01:26] release classification-20260803T200119-c05b6a4f: 337,103 entities resolved, 919 issues
