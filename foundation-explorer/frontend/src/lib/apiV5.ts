@@ -280,10 +280,13 @@ export const defaultV5Filters: V5Filters = {
   daf: 'include',
   coverage_band: [],
   min_coverage: '',
-  // Prospecting default: a foundation with a token Christian grant sorts to
-  // 100% and would otherwise crowd out real funders, so the default view asks
-  // for meaningful Christian dollars and ranks by share of classified giving.
-  min_christian: '50000',
+  // No default Christian-dollar floor. A $50k floor was tried and hid 27,759
+  // foundations that genuinely fund Christian work under that amount -- real
+  // prospects, since a $10k grant matters to a small nonprofit. It also bought
+  // nothing: sorting is % Christian desc with christian_dollars desc as the
+  // tie-break, so large funders already lead each percentage band and the top
+  // of the list is identical with or without the floor.
+  min_christian: '',
   min_pct_christian: '',
   include_inactive: false,
   sort: 'pct_christian',
