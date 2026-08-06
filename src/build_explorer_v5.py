@@ -286,11 +286,21 @@ def build_foundations(out: sqlite3.Connection) -> None:
           COUNT(DISTINCT g.entity_id) AS recips,
           MAX(CASE WHEN g.tax_year=2023 THEN 1 ELSE 0 END) AS a23,
           MAX(CASE WHEN g.tax_year=2024 THEN 1 ELSE 0 END) AS a24,
-          SUM(CASE WHEN r.is_daf=1 THEN g.amount ELSE 0 END) AS daf,
-          SUM(CASE WHEN r.is_daf=0 AND r.tradition IN
+          -- The three classified buckets count classifiable recipients only.
+          -- 17,114 `individual` and 170 `unattributable` recipients carry a
+          -- stray tradition from a name rule -- $24.8M of it Christian, which
+          -- is a person named by the filing, not a Christian organization.
+          -- Counting those would both inflate the headline Christian figure
+          -- and double-count against nonclassifiable_dollars, leaving the
+          -- buckets overlapping instead of partitioning paid_2324.
+          SUM(CASE WHEN r.identity_status NOT IN {statuses}
+                   AND r.is_daf=1 THEN g.amount ELSE 0 END) AS daf,
+          SUM(CASE WHEN r.identity_status NOT IN {statuses}
+                   AND r.is_daf=0 AND r.tradition IN
                 ('evangelical_protestant','catholic','orthodox_christian',
                  'christian_unspecified') THEN g.amount ELSE 0 END) AS chr,
-          SUM(CASE WHEN r.is_daf=0 AND r.tradition IN
+          SUM(CASE WHEN r.identity_status NOT IN {statuses}
+                   AND r.is_daf=0 AND r.tradition IN
                 ('jewish','muslim','mormon_lds','christian_science',
                  'other_religion','secular','nonchristian_unspecified')
               THEN g.amount ELSE 0 END) AS nonchr,
