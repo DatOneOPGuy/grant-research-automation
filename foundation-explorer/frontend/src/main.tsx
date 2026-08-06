@@ -7,7 +7,12 @@ import { SavedProvider } from './lib/SavedProvider'
 import Dashboard from './pages/Dashboard'
 import Foundations from './pages/Foundations'
 import BestProspects from './pages/BestProspects'
-import NotRewired from './pages/NotRewired'
+import Saved from './pages/Saved'
+import Grants from './pages/Grants'
+import Recipients from './pages/Recipients'
+import Analytics from './pages/Analytics'
+import DataQuality from './pages/DataQuality'
+import Trust from './pages/Trust'
 import './styles/index.css'
 
 const queryClient = new QueryClient({
@@ -16,8 +21,8 @@ const queryClient = new QueryClient({
   },
 })
 
-// Dashboard + Foundations run against the v5 API. The remaining pages were
-// wired to the retired v1 API and render a placeholder until migrated.
+// Every page now runs against the v5 API. Nothing reads the retired v1
+// endpoints, so the honest-coverage semantics hold across the whole app.
 const router = createBrowserRouter([
   {
     path: '/',
@@ -26,12 +31,12 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'best-prospects', element: <BestProspects /> },
       { path: 'foundations', element: <Foundations /> },
-      { path: 'saved', element: <NotRewired name="Saved" /> },
-      { path: 'grants', element: <NotRewired name="Grants" /> },
-      { path: 'recipients', element: <NotRewired name="Recipients" /> },
-      { path: 'analytics', element: <NotRewired name="Analytics" /> },
-      { path: 'data-quality', element: <NotRewired name="Data Quality" /> },
-      { path: 'trust', element: <NotRewired name="Trust & Data" /> },
+      { path: 'saved', element: <Saved /> },
+      { path: 'grants', element: <Grants /> },
+      { path: 'recipients', element: <Recipients /> },
+      { path: 'analytics', element: <Analytics /> },
+      { path: 'data-quality', element: <DataQuality /> },
+      { path: 'trust', element: <Trust /> },
     ],
   },
 ])

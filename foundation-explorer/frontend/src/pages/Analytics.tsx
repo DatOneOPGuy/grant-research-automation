@@ -1,145 +1,152 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
-  Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
-import { apiGet } from '../lib/api'
+  fetchStateBreakdownV5, fetchTopFundersV5, fetchYearlyTrendsV5,
+} from '../lib/apiV5'
 import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
 import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
 
 export default function Analytics() {
   const { data: states } = useQuery({
-    queryKey: ['statebreakdown'],
-    queryFn: () => apiGet<any[]>('/api/analytics/state-breakdown'),
+    queryKey: ['v5states'], queryFn: fetchStateBreakdownV5,
   })
   const { data: top } = useQuery({
-    queryKey: ['top100'],
-    queryFn: () => apiGet<any[]>('/api/analytics/top-funders?limit=100'),
+    queryKey: ['v5topFunders'], queryFn: () => fetchTopFundersV5(100),
   })
   const { data: trends } = useQuery({
-    queryKey: ['trends'],
-    queryFn: () => apiGet<any[]>('/api/analytics/yearly-trends'),
+    queryKey: ['v5trends'], queryFn: fetchYearlyTrendsV5,
   })
+
+  const maxPaid = states?.[0]?.paid ?? 1
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-semibold text-primary mb-6">
+      <h1 className="font-display text-3xl font-semibold text-primary mb-1">
         Analytics
       </h1>
+      <p className="text-sm text-muted mb-4">
+        Paid grants, tax years {TAX_WINDOW_LABEL}.
+      </p>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardTitle>Foundations by state (top 15)</CardTitle>
-          {states ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={states.slice(0, 15)}>
-                <XAxis dataKey="state" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => num(Number(v))} />
-                <Bar dataKey="foundations" fill="#1a3a2e"
-                  radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <Skeleton className="h-60" />}
-        </Card>
-        <Card>
-          <CardTitle>Confirmed Christian funders by state (top 15)</CardTitle>
-          {states ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={[...states]
-                .sort((a, b) => b.faith_funders - a.faith_funders)
-                .slice(0, 15)}>
-                <XAxis dataKey="state" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => num(Number(v))} />
-                <Bar dataKey="faith_funders" fill="#c9a961"
-                  radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <Skeleton className="h-60" />}
-        </Card>
-      </div>
-
-      <Card className="mb-6">
-        <CardTitle>Grant dollars by tax year</CardTitle>
-        {trends ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={trends}>
-              <XAxis dataKey="tax_year" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }}
-                tickFormatter={(v) => money(v)} />
-              <Tooltip formatter={(v) => money(Number(v))} />
-              <Bar dataKey="dollars" fill="#2d5a3d" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : <Skeleton className="h-48" />}
+      <Card className="mb-4">
+        <CardTitle>Yearly totals</CardTitle>
+        {!trends && <Skeleton className="h-24 mt-2" />}
+        {trends && (
+          <table className="w-full text-sm mt-2">
+            <thead>
+              <tr className="text-left text-xs text-muted border-b border-line">
+                <th className="py-2">Tax year</th>
+                <th className="text-right">Foundations</th>
+                <th className="text-right">Grants</th>
+                <th className="text-right">Paid</th>
+                <th className="text-right">Christian</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trends.map((t) => (
+                <tr key={t.tax_year} className="border-b border-line/60">
+                  <td className="py-2 font-medium">{t.tax_year}</td>
+                  <td className="text-right tabular">{num(t.foundations)}</td>
+                  <td className="text-right tabular">{num(t.grants)}</td>
+                  <td className="text-right tabular">{money(t.paid)}</td>
+                  <td className="text-right tabular">{money(t.christian)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
-      <Card className="mb-6">
-        <CardTitle>How we decide "Funds Christian organizations"</CardTitle>
-        <p className="text-sm text-muted mb-3">
-          We classify every grant recipient, then judge each foundation by the
-          Christian organizations it actually funds — and show you those orgs
-          as evidence. No percentages; a plain verdict you can verify.
-        </p>
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div className="border border-line rounded p-3">
-            <div className="font-medium text-scorehigh">
-              ✓ Funds Christian organizations
-            </div>
-            <div className="text-muted">≥ $100k to Christian causes AND ≥ 3
-              distinct Christian recipients during {TAX_WINDOW_LABEL}</div>
+      <Card className="mb-4">
+        <CardTitle>Giving by foundation state</CardTitle>
+        {!states && <Skeleton className="h-64 mt-2" />}
+        {states && (
+          <div className="overflow-x-auto max-h-96 overflow-y-auto mt-2">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-surface">
+                <tr className="text-left text-xs text-muted border-b border-line">
+                  <th className="py-2">State</th>
+                  <th className="text-right">Foundations</th>
+                  <th className="text-right">Paid</th>
+                  <th className="text-right">Christian</th>
+                  <th className="w-40" />
+                </tr>
+              </thead>
+              <tbody>
+                {states.map((s) => (
+                  <tr key={s.state} className="border-b border-line/60">
+                    <td className="py-1.5 font-medium">{s.state}</td>
+                    <td className="text-right tabular">{num(s.foundations)}</td>
+                    <td className="text-right tabular">{money(s.paid)}</td>
+                    <td className="text-right tabular pr-3">
+                      {money(s.christian)}
+                    </td>
+                    <td>
+                      <div className="h-2 bg-canvas rounded overflow-hidden">
+                        <div className="h-full bg-primary"
+                          style={{ width: `${(s.paid / maxPaid) * 100}%` }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="border border-line rounded p-3">
-            <div className="font-medium text-scoremid">Some Christian giving</div>
-            <div className="text-muted">Confirmed Christian giving, but below
-              the strong-yes threshold</div>
-          </div>
-          <div className="border border-line rounded p-3">
-            <div className="font-medium text-scorelow">No confirmed</div>
-            <div className="text-muted">No identified Christian recipients —
-              hidden from default view</div>
-          </div>
-        </div>
+        )}
       </Card>
 
       <Card>
-        <CardTitle>Top 100 Christian funders (by Christian $ given)</CardTitle>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-muted border-b border-line">
-              <th className="py-2 pr-3">#</th>
-              <th className="pr-3">Foundation</th>
-              <th className="pr-3">Location</th>
-              <th className="text-right pr-3">
-                Christian $ ({TAX_WINDOW_LABEL})
-              </th>
-              <th className="text-right pr-3">Christian orgs</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {top?.map((f, i) => (
-              <tr key={f.ein} className="border-b border-line/60">
-                <td className="py-1.5 pr-3 tabular text-muted">{i + 1}</td>
-                <td className="pr-3 font-medium max-w-72 truncate">
-                  {titleCase(f.foundation_name)}
-                </td>
-                <td className="pr-3 text-muted">
-                  {f.city}, {f.state}
-                </td>
-                <td className="text-right tabular pr-3 font-medium">
-                  {money(f.christian_dollars_3yr)}
-                </td>
-                <td className="text-right tabular pr-3 text-muted">
-                  {f.christian_recipient_count}
-                </td>
-                <td className="text-xs text-muted">
-                  {f.application_status || '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <CardTitle>Top 100 Christian funders</CardTitle>
+        <p className="text-xs text-muted mt-1 mb-2">
+          Ranked by classified Christian dollars. Coverage shows how much of
+          each foundation’s identifiable giving we have classified.
+        </p>
+        {!top && <Skeleton className="h-64" />}
+        {top && (
+          <div className="overflow-x-auto max-h-[32rem] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-surface">
+                <tr className="text-left text-xs text-muted border-b border-line">
+                  <th className="py-2">#</th>
+                  <th>Foundation</th>
+                  <th>Location</th>
+                  <th className="text-right">Christian</th>
+                  <th className="text-right">Paid</th>
+                  <th className="text-right">Coverage</th>
+                  <th>Applications</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top.map((f, i) => (
+                  <tr key={f.ein} className="border-b border-line/60">
+                    <td className="py-1.5 text-muted tabular">{i + 1}</td>
+                    <td className="pr-3 font-medium">
+                      <Link to={`/foundations?ein=${f.ein}`}
+                        className="hover:underline">
+                        {titleCase(f.foundation_name)}
+                      </Link>
+                    </td>
+                    <td className="pr-3 text-muted whitespace-nowrap">
+                      {f.city && `${titleCase(f.city)}, `}{f.state}
+                    </td>
+                    <td className="text-right tabular pr-3">
+                      {money(f.christian_dollars)}
+                    </td>
+                    <td className="text-right tabular pr-3">
+                      {money(f.paid_2324)}
+                    </td>
+                    <td className="text-right tabular pr-3">
+                      {Math.round(f.coverage_pct)}%
+                    </td>
+                    <td className="text-muted text-xs">
+                      {f.application_status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   )

@@ -1,30 +1,27 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { apiGet } from '../lib/api'
-import { moneyFull, num } from '../lib/format'
-import { Badge, Card } from '../components/ui/primitives'
+import {
+  ANY_CHRISTIAN, CHRISTIAN_TRADITIONS, OTHER_TRADITIONS,
+  fetchRecipientV5, fetchRecipientsStatsV5, fetchRecipientsV5,
+  traditionLabel, type RecipientRowV5,
+} from '../lib/apiV5'
+import { money, moneyFull, num, titleCase } from '../lib/format'
+import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
+import { IdentityChip, TraditionChip } from '../components/foundations/V5Chips'
 
-const LEGACY_TAGS = ['Christian Ministry', 'Church', 'Bible Translation',
-  'Evangelism', 'Church Planting', 'Pregnancy Center', 'Christian School',
-  'International Missions', 'Disaster Relief', 'Jewish Ministry',
-  'Faith-Based Education', 'Rescue Mission', 'Youth Ministry',
-  'Medical Missions']
-const CLASSIFICATIONS = [
-  ['evangelical_protestant', 'Evangelical / Protestant'],
-  ['catholic', 'Catholic'],
-  ['orthodox_christian', 'Orthodox Christian'],
-  ['christian_unspecified', 'Christian (unspecified)'],
-  ['secular', 'Secular'],
-  ['jewish', 'Jewish'],
-  ['muslim', 'Muslim'],
-  ['other_religion', 'Other religion'],
+const PAGE_SIZE = 50
+
+const IDENTITY_STATUSES = [
+  'matched_bmf', 'unresolved', 'individual', 'foreign', 'collision',
+  'government', 'unattributable',
 ]
 
 export default function Recipients() {
   const [q, setQ] = useState('')
   const [debounced, setDebounced] = useState('')
-  const [tag, setTag] = useState('')
-  const [source, setSource] = useState('')
+  const [tradition, setTradition] = useState('')
+  const [identity, setIdentity] = useState('')
+  const [minReceived, setMinReceived] = useState('')
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
 
@@ -36,149 +33,214 @@ export default function Recipients() {
   const qs = useMemo(() => {
     const p = new URLSearchParams()
     if (debounced) p.set('q', debounced)
-    if (tag) p.set('tag', tag)
-    if (source) p.set('source', source)
+    if (tradition) p.set('tradition', tradition)
+    if (identity) p.set('identity_status', identity)
+    if (minReceived) p.set('min_received', minReceived)
     p.set('page', String(page))
+    p.set('page_size', String(PAGE_SIZE))
     return p.toString()
-  }, [debounced, tag, source, page])
+  }, [debounced, tradition, identity, minReceived, page])
 
   const { data, isFetching } = useQuery({
-    queryKey: ['recipients', qs],
-    queryFn: () => apiGet<any>(`/api/recipients?${qs}`),
+    queryKey: ['v5recipients', qs],
+    queryFn: () => fetchRecipientsV5(qs),
     placeholderData: keepPreviousData,
   })
   const { data: stats } = useQuery({
-    queryKey: ['recipient-stats'],
-    queryFn: () => apiGet<any>('/api/recipients/stats'),
+    queryKey: ['v5recipientsStats'],
+    queryFn: fetchRecipientsStatsV5,
   })
   const { data: funders } = useQuery({
-    queryKey: ['funders', expanded],
-    queryFn: () => apiGet<any>(`/api/recipients/${expanded}/funders`),
+    queryKey: ['v5recipientFunders', expanded],
+    queryFn: () => fetchRecipientV5(expanded as string),
     enabled: !!expanded,
   })
+
+  const pages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
 
   return (
     <div>
       <h1 className="font-display text-3xl font-semibold text-primary mb-1">
         Recipients
       </h1>
-      <div className="text-sm text-muted mb-6">
-        {data ? `${num(data.total)} recipients in the knowledge base`
-          : 'Loading…'}
-      </div>
+      <p className="text-sm text-muted mb-4">
+        Who the money went to, tax years 2023–2024. Every classification shows
+        its method and the evidence behind it.
+      </p>
+
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          {stats.by_tradition.slice(0, 4).map((t) => (
+            <Card key={t.tradition}>
+              <div className="text-xs text-muted">
+                {traditionLabel(t.tradition)}
+              </div>
+              <div className="text-lg font-semibold text-primary tabular">
+                {money(t.dollars)}
+              </div>
+              <div className="text-xs text-muted">
+                {num(t.recipients)} recipients
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card className="mb-4">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <input placeholder="Search recipient name…"
-            className="border border-line rounded px-3 py-1.5 w-64"
-            value={q} onChange={(e) => setQ(e.target.value)} />
-          <select className="border border-line rounded px-2 py-1.5"
-            value={tag} onChange={(e) => { setTag(e.target.value); setPage(1) }}>
-            <option value="">Any classification</option>
-            {stats?.pipeline_version === 2
-              ? CLASSIFICATIONS.map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))
-              : LEGACY_TAGS.map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-          </select>
-          <select className="border border-line rounded px-2 py-1.5"
-            value={source}
-            onChange={(e) => { setSource(e.target.value); setPage(1) }}>
-            <option value="">Any source</option>
-            {stats?.pipeline_version === 2 ? <>
-              <option value="ntee">IRS NTEE</option>
-              <option value="rule">Deterministic rule</option>
-              <option value="human">Human review</option>
-              <option value="unclassified">Unclassified</option>
-            </> : <>
-              <option value="seed">Seed</option>
-              <option value="rule">Rule-tagged</option>
-              <option value="pending">Unclassified</option>
-            </>}
-          </select>
+        <div className="flex flex-wrap gap-3 items-end">
+          <label className="flex flex-col text-xs text-muted">
+            Search name
+            <input value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder="e.g. seminary"
+              className="mt-1 border border-line rounded px-2 py-1.5 text-sm
+                w-64" />
+          </label>
+          <label className="flex flex-col text-xs text-muted">
+            Tradition
+            <select value={tradition}
+              onChange={(e) => { setTradition(e.target.value); setPage(1) }}
+              className="mt-1 border border-line rounded px-2 py-1.5 text-sm">
+              <option value="">Any</option>
+              <option value={ANY_CHRISTIAN}>Any Christian</option>
+              {[...CHRISTIAN_TRADITIONS, ...OTHER_TRADITIONS]
+                .map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col text-xs text-muted">
+            Identity status
+            <select value={identity}
+              onChange={(e) => { setIdentity(e.target.value); setPage(1) }}
+              className="mt-1 border border-line rounded px-2 py-1.5 text-sm">
+              <option value="">Any</option>
+              {IDENTITY_STATUSES.map((s) =>
+                <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col text-xs text-muted">
+            Min received
+            <input value={minReceived} inputMode="numeric"
+              onChange={(e) => { setMinReceived(e.target.value); setPage(1) }}
+              placeholder="e.g. 100000"
+              className="mt-1 border border-line rounded px-2 py-1.5 text-sm
+                w-32" />
+          </label>
+          <button onClick={() => {
+            setQ(''); setTradition(''); setIdentity(''); setMinReceived('')
+            setPage(1)
+          }} className="text-sm text-primary hover:underline pb-1.5">
+            Reset
+          </button>
         </div>
       </Card>
 
+      <div className="text-sm text-muted mb-2">
+        {data ? `${num(data.total)} recipients` : <Skeleton className="h-4 w-40" />}
+        {isFetching && <span className="ml-2 opacity-60">updating…</span>}
+      </div>
+
       <Card>
-        <table className={`w-full text-sm ${isFetching ? 'opacity-60' : ''}`}>
-          <thead>
-            <tr className="text-left text-xs text-muted border-b border-line">
-              <th className="py-2 pr-3">Recipient</th>
-              <th className="text-right pr-3">Largest grant</th>
-              <th className="pr-3">Tags</th>
-              <th>Source</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.rows.map((r: any) => (
-              <Fragment key={r.name_norm}>
-                <tr
-                  onClick={() => setExpanded(
-                    expanded === r.name_norm ? null : r.name_norm,
-                  )}
-                  className="border-b border-line/60 hover:bg-canvas/70 cursor-pointer">
-                  <td className="py-2 pr-3 font-medium">{r.display_name}</td>
-                  <td className="text-right tabular pr-3">
-                    {moneyFull(r.max_grant)}
-                  </td>
-                  <td className="pr-3">
-                    <div className="flex flex-wrap gap-1">
-                      {r.tags.slice(0, 4).map((t: any) => (
-                        <Badge key={t.name}
-                          className="bg-green-50 text-scorehigh">
-                          {t.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="text-muted text-xs">{r.source}</td>
-                </tr>
-                {expanded === r.name_norm && (
-                  <tr className="bg-canvas/50">
-                    <td colSpan={4} className="px-4 py-3">
-                      <div className="text-xs text-muted mb-2">
-                        Foundations that funded this recipient:
-                      </div>
-                      {funders?.funders?.length ? (
-                        <table className="w-full text-xs">
-                          <tbody>
-                            {funders.funders.slice(0, 15).map((f: any) => (
-                              <tr key={f.ein}>
-                                <td className="py-0.5 pr-3">
-                                  {f.foundation_name || f.ein}
-                                </td>
-                                <td className="tabular pr-3">
-                                  {f.n} grant(s)
-                                </td>
-                                <td className="tabular pr-3">
-                                  {moneyFull(f.dollars)}
-                                </td>
-                                <td className="text-muted">{f.years}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : <div className="text-xs text-muted">Loading…</div>}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted border-b border-line">
+                <th className="py-2">Recipient</th>
+                <th>Classification</th>
+                <th>Method</th>
+                <th className="text-right">Received</th>
+                <th className="text-right">Funders</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!data && <tr><td colSpan={5} className="py-6">
+                <Skeleton className="h-40" /></td></tr>}
+              {data?.rows.map((r: RecipientRowV5) => (
+                <Fragment key={r.entity_id}>
+                  <tr onClick={() => setExpanded(
+                        expanded === r.entity_id ? null : r.entity_id)}
+                    className="border-b border-line/60 cursor-pointer
+                      hover:bg-canvas align-top">
+                    <td className="py-2 pr-3 font-medium">
+                      {titleCase(r.name)}
+                      {r.identity_status !== 'matched_bmf' && (
+                        <span className="ml-1.5">
+                          <IdentityChip status={r.identity_status} /></span>
+                      )}
+                    </td>
+                    <td className="pr-3">
+                      {r.tradition
+                        ? <TraditionChip tradition={r.tradition} />
+                        : <span className="text-muted text-xs">
+                            Unclassified</span>}
+                    </td>
+                    <td className="pr-3 text-muted text-xs">
+                      {r.method || '—'}
+                      {r.confidence != null &&
+                        ` · ${Math.round(r.confidence * 100)}%`}
+                    </td>
+                    <td className="text-right tabular pr-3 whitespace-nowrap">
+                      {moneyFull(r.total_received)}
+                    </td>
+                    <td className="text-right tabular pr-3">
+                      {num(r.funder_count)}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-        <div className="flex justify-end gap-2 pt-3 text-sm">
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)}
-            className="border border-line rounded px-3 py-1 disabled:opacity-40">
-            Prev
-          </button>
-          <span className="py-1 text-muted tabular">Page {page}</span>
-          <button onClick={() => setPage(page + 1)}
-            className="border border-line rounded px-3 py-1">
-            Next
-          </button>
+                  {expanded === r.entity_id && (
+                    <tr className="border-b border-line/60 bg-canvas/50">
+                      <td colSpan={5} className="py-3 px-3">
+                        {r.reason && (
+                          <div className="text-xs text-muted mb-2">
+                            <span className="font-medium text-ink">
+                              Evidence:</span> {r.reason}
+                          </div>
+                        )}
+                        <CardTitle>Funders</CardTitle>
+                        {!funders && <Skeleton className="h-16 mt-2" />}
+                        {funders && (
+                          <table className="w-full text-xs mt-2">
+                            <tbody>
+                              {funders.funders.slice(0, 15).map((f) => (
+                                <tr key={f.ein}>
+                                  <td className="py-1 pr-3">
+                                    {titleCase(f.name)}
+                                  </td>
+                                  <td className="text-right tabular pr-3">
+                                    {moneyFull(f.dollars)}
+                                  </td>
+                                  <td className="text-muted pr-3">
+                                    {f.grants} grants · last {f.last_year}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+              {data?.rows.length === 0 && (
+                <tr><td colSpan={5} className="py-6 text-center text-muted">
+                  No recipients match these filters.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
+        {pages > 1 && (
+          <div className="flex items-center gap-3 mt-3 text-sm">
+            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}
+              className="px-2 py-1 border border-line rounded
+                disabled:opacity-40">Previous</button>
+            <span className="text-muted">
+              Page {num(page)} of {num(pages)}
+            </span>
+            <button disabled={page >= pages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-2 py-1 border border-line rounded
+                disabled:opacity-40">Next</button>
+          </div>
+        )}
       </Card>
     </div>
   )

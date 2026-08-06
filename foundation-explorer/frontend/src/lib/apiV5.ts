@@ -355,3 +355,92 @@ export function fetchFoundationGrantsV5(
 export function fetchRecipientV5(entityId: string): Promise<RecipientDetailV5> {
   return getV5(`/api/v5/recipients/${entityId}`)
 }
+
+// --- pages beyond the foundations explorer ----------------------------------
+
+export type GrantsExplorerRow = {
+  grantee_name: string
+  city: string | null
+  state: string | null
+  amount: number
+  tax_year: number
+  purpose: string | null
+  entity_id: string | null
+  ein: string
+  foundation_name: string
+  tradition: string | null
+  identity_status: string | null
+}
+
+export function fetchGrantsV5(qs: string): Promise<{
+  total: number; total_dollars: number; rows: GrantsExplorerRow[]
+}> {
+  return getV5(`/api/v5/grants?${qs}`)
+}
+
+export type RecipientRowV5 = {
+  entity_id: string
+  name: string
+  ein: string | null
+  identity_status: string
+  tradition: string | null
+  method: string | null
+  confidence: number | null
+  reason: string | null
+  is_daf: boolean
+  total_received: number
+  funder_count: number
+  has_mission: boolean
+}
+
+export function fetchRecipientsV5(qs: string): Promise<{
+  total: number; rows: RecipientRowV5[]
+}> {
+  return getV5(`/api/v5/recipients?${qs}`)
+}
+
+export function fetchRecipientsStatsV5(): Promise<{
+  by_tradition: { tradition: string; recipients: number; dollars: number }[]
+  by_method: { method: string; recipients: number }[]
+  by_identity: { identity_status: string; recipients: number; dollars: number }[]
+}> {
+  return getV5('/api/v5/recipients-stats')
+}
+
+export function fetchStateBreakdownV5(): Promise<{
+  state: string; foundations: number; paid: number; christian: number
+}[]> {
+  return getV5('/api/v5/analytics/state-breakdown')
+}
+
+export type TopFunderV5 = {
+  ein: string; foundation_name: string; city: string | null
+  state: string | null; paid_2324: number; christian_dollars: number
+  coverage_pct: number; coverage_band: string
+  application_status: string | null; recipient_count: number
+}
+
+export function fetchTopFundersV5(limit = 100, by = 'christian'):
+  Promise<TopFunderV5[]> {
+  return getV5(`/api/v5/analytics/top-funders?limit=${limit}&by=${by}`)
+}
+
+export function fetchYearlyTrendsV5(): Promise<{
+  tax_year: number; grants: number; paid: number
+  foundations: number; christian: number
+}[]> {
+  return getV5('/api/v5/analytics/yearly-trends')
+}
+
+export type DataQualityV5 = {
+  totals: Record<string, number>
+  coverage_bands: { coverage_band: string; foundations: number; paid: number }[]
+  unattributable_reasons: { reason: string; foundations: number; dollars: number }[]
+  identity: { identity_status: string; recipients: number; dollars: number }[]
+  methods: { method: string; recipients: number }[]
+  window: string
+}
+
+export function fetchDataQualityV5(): Promise<DataQualityV5> {
+  return getV5('/api/v5/analytics/data-quality')
+}

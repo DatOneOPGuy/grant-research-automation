@@ -1,131 +1,195 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiGet } from '../lib/api'
-import { money, num } from '../lib/format'
-import { taxWindow } from '../lib/format'
+import { fetchDataQualityV5 } from '../lib/apiV5'
+import { money, num, TAX_WINDOW_LABEL } from '../lib/format'
 import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
 
-function CoverageBar({ label, value, total }: {
-  label: string; value: number; total: number
-}) {
-  const pct = total ? (value / total) * 100 : 0
+const REASON_LABELS: Record<string, string> = {
+  hipaa: 'Individual patients (HIPAA-protected)',
+  foreign_4948: 'Foreign private foundation (IRC §4948(b))',
+  pdf_attachment: 'Recipient list filed as a PDF attachment',
+  not_itemized: 'Recipients not itemized in the filing',
+  '(none)': 'Other',
+}
+
+function Bar({ value, total }: { value: number; total: number }) {
+  const pct = total > 0 ? (value / total) * 100 : 0
   return (
-    <div className="mb-3">
-      <div className="flex justify-between text-sm mb-1">
-        <span>{label}</span>
-        <span className="tabular text-muted">
-          {num(value)} ({pct.toFixed(1)}%)
-        </span>
-      </div>
-      <div className="h-2 bg-line/50 rounded-full overflow-hidden">
-        <div className="h-full bg-primary rounded-full"
-          style={{ width: `${pct}%` }} />
-      </div>
+    <div className="h-2 bg-canvas rounded overflow-hidden w-full">
+      <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
     </div>
   )
 }
 
 export default function DataQuality() {
   const { data } = useQuery({
-    queryKey: ['dq'],
-    queryFn: () => apiGet<any>('/api/analytics/data-quality'),
+    queryKey: ['v5quality'], queryFn: fetchDataQualityV5,
   })
 
-  if (!data) return <Skeleton className="h-96" />
-  const u = data.universe
-  const p = data.pipeline
-  const years = taxWindow(p.tax_year_start, p.tax_year_end)
-  const pipelineRows = [
-    ['Foundation filings parsed', num(p.foundation_filings)],
-    [`Positive paid grant rows in ${years}`, num(p.grants)],
-    ['Positive paid grant dollars', money(p.grant_dollars)],
-    ['Distinct recipient entities', num(p.recipients)],
-    ['Recipients with classification evidence', num(p.recipients_tagged)],
-    ['Unclassified recipients above $5k',
-      num(p.recipients_unclassified_5k ?? p.recipients_pending_llm_5k)],
-  ]
-  if (p.pipeline_version === 2) {
-    pipelineRows.push(
-      ['Identity collisions retained for review', num(p.identity_collisions)],
-      ['Future commitments kept out of paid totals', num(p.future_commitments)],
-      ['Zero/negative/invalid paid rows retained', num(p.paid_adjustments)],
-    )
+  if (!data) {
+    return <div><h1 className="font-display text-3xl font-semibold
+      text-primary mb-4">Data Quality</h1><Skeleton className="h-96" /></div>
   }
+
+  const t = data.totals
+  const contactFields: [string, number][] = [
+    ['Phone', t.with_phone], ['Website', t.with_website],
+    ['Contact person', t.with_contact_person], ['Email', t.with_email],
+  ]
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-semibold text-primary mb-6">
+      <h1 className="font-display text-3xl font-semibold text-primary mb-1">
         Data Quality
       </h1>
+      <p className="text-sm text-muted mb-4">
+        What we know, what we don’t, and why. Paid grants, tax years{' '}
+        {TAX_WINDOW_LABEL}.
+      </p>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <Card className="mb-4">
+        <CardTitle>Where the dollars stand</CardTitle>
+        <p className="text-xs text-muted mt-1 mb-3">
+          Coverage is measured against {money(t.classifiable)} of giving to
+          identifiable organizations — not against the {money(t.paid)} total,
+          because {money(t.nonclassifiable)} was never attributed to an
+          organization by the filing itself.
+        </p>
+        <table className="w-full text-sm">
+          <tbody>
+            {([
+              ['Classified Christian', t.christian],
+              ['Classified non-Christian', t.nonchristian],
+              ['DAF / pass-through', t.daf],
+              ['Classifiable, not yet classified', t.unclassified],
+              ['Not attributable per the filing', t.nonclassifiable],
+            ] as [string, number][]).map(([label, v]) => (
+              <tr key={label} className="border-b border-line/60">
+                <td className="py-2 pr-3">{label}</td>
+                <td className="text-right tabular pr-3 whitespace-nowrap">
+                  {money(v)}
+                </td>
+                <td className="text-right tabular pr-3 text-muted w-16">
+                  {((v / t.paid) * 100).toFixed(1)}%
+                </td>
+                <td className="w-40"><Bar value={v} total={t.paid} /></td>
+              </tr>
+            ))}
+            <tr className="font-medium">
+              <td className="py-2">Total paid</td>
+              <td className="text-right tabular pr-3">{money(t.paid)}</td>
+              <td /><td />
+            </tr>
+          </tbody>
+        </table>
+      </Card>
+
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
         <Card>
-          <CardTitle>Field coverage (of {num(u.total)} foundations)</CardTitle>
-          <CoverageBar label={`Has ${years} filing`} value={u.with_filings}
-            total={u.total} />
-          <CoverageBar label="Application status known" value={u.with_status}
-            total={u.total} />
-          <CoverageBar label="Phone" value={u.with_phone} total={u.total} />
-          <CoverageBar label="Revenue" value={u.with_revenue}
-            total={u.total} />
-          <CoverageBar label="Confirmed Christian giving"
-            value={u.scored} total={u.total} />
-          <CoverageBar label="States-given-to" value={u.with_states}
-            total={u.total} />
-          <CoverageBar label="Website" value={u.with_website}
-            total={u.total} />
-          <CoverageBar label="Contact person" value={u.with_contact}
-            total={u.total} />
-          <CoverageBar label="Contact email" value={u.with_email}
-            total={u.total} />
+          <CardTitle>Coverage bands</CardTitle>
+          <table className="w-full text-sm mt-2">
+            <tbody>
+              {data.coverage_bands.map((b) => (
+                <tr key={b.coverage_band} className="border-b border-line/60">
+                  <td className="py-2">{b.coverage_band}</td>
+                  <td className="text-right tabular pr-3">
+                    {num(b.foundations)}
+                  </td>
+                  <td className="text-right tabular text-muted">
+                    {money(b.paid)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-muted mt-2">
+            “Not Classifiable” means the filing named no recipients we could
+            attribute — it is not a gap in our work.
+          </p>
         </Card>
-        <div className="space-y-4">
-          <Card>
-            <CardTitle>Pipeline reconciliation</CardTitle>
-            <table className="w-full text-sm">
-              <tbody>
-                {pipelineRows.map(([label, v]) => (
-                  <tr key={label as string} className="border-b border-line/60">
-                    <td className="py-2 text-muted">{label}</td>
-                    <td className="text-right tabular font-medium">{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-          <Card>
-            <CardTitle>Flagged foundations</CardTitle>
-            <table className="w-full text-sm">
-              <tbody>
-                <tr className="border-b border-line/60">
-                  <td className="py-2 text-muted">Testamentary / memorial trusts</td>
-                  <td className="text-right tabular font-medium">
-                    {num(u.testamentary_trusts)}</td>
+
+        <Card>
+          <CardTitle>Why dollars are unattributable</CardTitle>
+          <table className="w-full text-sm mt-2">
+            <tbody>
+              {data.unattributable_reasons.map((r) => (
+                <tr key={r.reason} className="border-b border-line/60">
+                  <td className="py-2 pr-2">
+                    {REASON_LABELS[r.reason] || r.reason}
+                  </td>
+                  <td className="text-right tabular pr-3 whitespace-nowrap">
+                    {num(r.foundations)}
+                  </td>
+                  <td className="text-right tabular text-muted
+                    whitespace-nowrap">{money(r.dollars)}</td>
                 </tr>
-                <tr>
-                  <td className="py-2 text-muted">Micro-funds (&lt;$10k/yr)</td>
-                  <td className="text-right tabular font-medium">
-                    {num(u.small_funds)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <p className="text-xs text-muted mt-2">
-              Excluded from prospect views by default.
-            </p>
-          </Card>
-          <Card>
-            <CardTitle>Scope &amp; caveats</CardTitle>
-            <ul className="text-sm text-muted leading-relaxed list-disc pl-4 space-y-1">
-              <li><strong>Private foundations only</strong> (Form 990-PF).
-                Donor-advised-fund sponsors like the National Christian
-                Foundation file Form 990 and are out of scope by design.</li>
-              <li>Recipient classifications are analytical evidence, not a legal
-                or theological determination. Ambiguous identities remain
-                unclassified until stronger evidence is available.</li>
-              <li>The current customer release covers tax years {years}.</li>
-            </ul>
-          </Card>
-        </div>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       </div>
+
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+        <Card>
+          <CardTitle>Recipient identity resolution</CardTitle>
+          <table className="w-full text-sm mt-2">
+            <tbody>
+              {data.identity.map((r) => (
+                <tr key={r.identity_status} className="border-b border-line/60">
+                  <td className="py-2 capitalize">
+                    {r.identity_status.replace('_', ' ')}
+                  </td>
+                  <td className="text-right tabular pr-3">
+                    {num(r.recipients)}
+                  </td>
+                  <td className="text-right tabular text-muted">
+                    {money(r.dollars)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+
+        <Card>
+          <CardTitle>Classification evidence by method</CardTitle>
+          <p className="text-xs text-muted mt-1 mb-2">
+            Deterministic methods outrank mission-text inference, so a
+            model-derived label never overrides IRS-derived evidence.
+          </p>
+          <table className="w-full text-sm">
+            <tbody>
+              {data.methods.map((m) => (
+                <tr key={m.method} className="border-b border-line/60">
+                  <td className="py-2">{m.method}</td>
+                  <td className="text-right tabular">{num(m.recipients)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      </div>
+
+      <Card>
+        <CardTitle>Contact-field coverage</CardTitle>
+        <p className="text-xs text-muted mt-1 mb-2">
+          Across all {num(t.foundations)} foundations. Email is inherently thin
+          — most 990-PF filings do not include one.
+        </p>
+        <table className="w-full text-sm">
+          <tbody>
+            {contactFields.map(([label, v]) => (
+              <tr key={label} className="border-b border-line/60">
+                <td className="py-2">{label}</td>
+                <td className="text-right tabular pr-3">{num(v)}</td>
+                <td className="text-right tabular pr-3 text-muted w-16">
+                  {((v / t.foundations) * 100).toFixed(0)}%
+                </td>
+                <td className="w-40"><Bar value={v} total={t.foundations} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   )
 }
