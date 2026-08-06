@@ -202,9 +202,18 @@ def build_recipients(out: sqlite3.Connection, run_id: str, release_id: str) -> N
     # one up from a recipient-name rule firing on a personal name. The
     # evidence ledger is immutable and append-only, so the stray rows stay on
     # the record; the read model simply declines to present them as verdicts.
+    # Materialize + index locally rather than probing the attached table: its
+    # primary key is (identity_run_id, entity_id), so a correlated lookup by
+    # entity_id alone cannot use it and degrades to a scan per row. That turned
+    # a 4-minute rebuild into a 20-minute one before this was fixed.
+    out.execute("""
+        CREATE TEMP TABLE disp AS
+        SELECT entity_id, disposition FROM p.recipient_dispositions
+    """)
+    out.execute("CREATE INDEX temp.idx_disp ON disp(entity_id)")
     out.execute("""
         UPDATE recipients SET disposition=(
-            SELECT d.disposition FROM p.recipient_dispositions d
+            SELECT d.disposition FROM disp d
             WHERE d.entity_id=recipients.entity_id)
         WHERE identity_status IN ('unresolved','collision')
     """)
