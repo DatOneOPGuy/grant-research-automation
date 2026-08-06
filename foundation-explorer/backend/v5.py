@@ -113,7 +113,15 @@ def foundations(
             f"f.application_status IN ({','.join('?' for _ in statuses)})")
         params += statuses
     if has_website:
-        where.append("COALESCE(f.website,'') NOT IN ('','N/A','NONE')")
+        # Case-sensitive NOT IN previously let 'NA', 'n/a', 'None', 'none' and
+        # 'NOT APPLICABLE' count as real websites, so foundations with no site
+        # were surfaced as contactable. Mirror the frontend's websiteUrl():
+        # reject placeholders case-insensitively and require a dotted host.
+        where.append(
+            "lower(trim(COALESCE(f.website,''))) NOT IN "
+            "('','-','--','n/a','na','n.a.','none','not applicable','no',"
+            "'not available','tbd','pending','null') "
+            "AND instr(f.website, '.') > 0")
     if has_email:
         where.append("COALESCE(f.contact_email,'') != ''")
     if has_contact:

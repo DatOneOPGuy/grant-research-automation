@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Globe } from 'lucide-react'
 import { ANY_CHRISTIAN, fetchFoundationsV5 } from '../lib/apiV5'
-import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
+import {
+  money, num, propublicaUrl, TAX_WINDOW_LABEL, titleCase, websiteUrl,
+} from '../lib/format'
 import { Card, Skeleton, StatusPill } from '../components/ui/primitives'
 import DetailPanel from '../components/foundations/DetailPanel'
 
@@ -95,15 +97,19 @@ export default function BestProspects() {
                         <StatusPill status={f.application_status} />
                       </td>
                       <td>
-                        {f.website && (
-                          <a href={f.website.startsWith('http')
-                            ? f.website : `https://${f.website}`}
-                            target="_blank" rel="noreferrer"
-                            title="Foundation website"
-                            className="text-primary inline-flex p-1">
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-0.5">
+                          {websiteUrl(f.website) && (
+                            <a href={websiteUrl(f.website) as string}
+                              target="_blank" rel="noreferrer"
+                              title="Foundation website"
+                              className="text-muted hover:text-ink inline-flex
+                                p-1"><Globe size={14} /></a>
+                          )}
+                          <a href={propublicaUrl(f.ein)} target="_blank"
+                            rel="noreferrer" title="View on ProPublica"
+                            className="text-muted hover:text-ink inline-flex
+                              p-1"><ExternalLink size={14} /></a>
+                        </div>
                       </td>
                     </tr>
                   ))}

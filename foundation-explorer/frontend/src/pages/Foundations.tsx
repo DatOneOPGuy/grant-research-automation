@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import {
+  ArrowDown, ArrowUp, Bookmark, ChevronLeft, ChevronRight, ExternalLink,
+  Globe, Loader2,
+} from 'lucide-react'
 import {
   defaultV5Filters, fetchFoundationsV5,
   v5FilterParams, v5FiltersFromParams, type V5Filters,
 } from '../lib/apiV5'
-import { money, num, titleCase } from '../lib/format'
+import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
+import { useSavedFoundations } from '../lib/savedContext'
 import { Skeleton, StatusPill } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
 import ActiveFilters from '../components/foundations/ActiveFilters'
@@ -25,6 +29,7 @@ const COLUMNS: { key: string; label: string; sortKey?: string }[] = [
   { key: 'coverage', label: 'Coverage', sortKey: 'coverage' },
   { key: 'status', label: 'Application' },
   { key: 'median', label: 'Median grant', sortKey: 'median' },
+  { key: 'actions', label: '' },
 ]
 
 const PAGE_LABEL = (page: number, count: number, total: number) => {
@@ -132,11 +137,11 @@ export default function Foundations() {
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && !isError && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={7} className="px-3 py-2">
+                  <tr key={i}><td colSpan={8} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={8} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -173,6 +178,7 @@ export default function Foundations() {
                     <td className="px-3 tabular text-muted whitespace-nowrap">
                       {money(r.median_grant)}
                     </td>
+                    <RowActions ein={r.ein} website={r.website} />
                   </tr>
                 ))}
               </tbody>
@@ -205,5 +211,45 @@ export default function Foundations() {
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}
     </div>
+  )
+}
+
+// Row actions live inside a clickable <tr>, so every control stops
+// propagation -- otherwise saving a foundation would also open its panel.
+function RowActions({ ein, website }: { ein: string; website: string | null }) {
+  const { isSaved, toggle } = useSavedFoundations()
+  const saved = isSaved(ein)
+  const site = websiteUrl(website)
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
+  return (
+    <td className="px-3 whitespace-nowrap">
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={(e) => { stop(e); toggle(ein) }}
+          title={saved ? 'Remove from saved' : 'Save this foundation'}
+          aria-label={saved ? 'Remove from saved' : 'Save this foundation'}
+          aria-pressed={saved}
+          className={`p-1.5 rounded hover:bg-canvas ${
+            saved ? 'text-primary' : 'text-muted hover:text-ink'}`}>
+          <Bookmark size={15} fill={saved ? 'currentColor' : 'none'} />
+        </button>
+        {site ? (
+          <a href={site} target="_blank" rel="noreferrer" onClick={stop}
+            title={`Website: ${site}`} aria-label="Foundation website"
+            className="p-1.5 rounded text-muted hover:text-ink hover:bg-canvas">
+            <Globe size={15} />
+          </a>
+        ) : (
+          <span className="p-1.5 text-line" title="No website in the filing"
+            aria-hidden><Globe size={15} /></span>
+        )}
+        <a href={propublicaUrl(ein)} target="_blank" rel="noreferrer"
+          onClick={stop} title="View on ProPublica Nonprofit Explorer"
+          aria-label="View on ProPublica"
+          className="p-1.5 rounded text-muted hover:text-ink hover:bg-canvas">
+          <ExternalLink size={15} />
+        </a>
+      </div>
+    </td>
   )
 }

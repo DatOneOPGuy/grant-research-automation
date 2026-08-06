@@ -4,7 +4,9 @@ import { ExternalLink, X } from 'lucide-react'
 import {
   fetchFoundationDetailV5, fetchFoundationGrantsV5, type GrantRowV5,
 } from '../../lib/apiV5'
-import { money, moneyFull, titleCase } from '../../lib/format'
+import {
+  money, moneyFull, propublicaUrl, titleCase, websiteUrl,
+} from '../../lib/format'
 import { Skeleton, StatusPill } from '../ui/primitives'
 import { BucketBarLabeled } from './BucketBar'
 import { IdentityChip, TraditionChip } from './V5Chips'
@@ -67,15 +69,14 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 {f && <span className="tabular font-medium text-ink">
                   {money(f.paid_2324)} paid 2023–24</span>}
                 {f && <StatusPill status={f.application_status} />}
-                {f?.website && (
-                  <a href={f.website.startsWith('http')
-                    ? f.website : `https://${f.website}`}
+                {websiteUrl(f?.website) && (
+                  <a href={websiteUrl(f?.website) as string}
                     target="_blank" rel="noreferrer"
                     className="text-primary underline flex items-center gap-1">
                     Website <ExternalLink size={12} />
                   </a>
                 )}
-                <a href={`https://projects.propublica.org/nonprofits/organizations/${ein}`}
+                <a href={propublicaUrl(ein)}
                   target="_blank" rel="noreferrer"
                   className="text-primary underline flex items-center gap-1">
                   ProPublica <ExternalLink size={12} />

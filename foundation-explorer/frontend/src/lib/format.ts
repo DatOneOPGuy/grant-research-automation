@@ -47,3 +47,40 @@ export const US_STATES = [
   'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN',
   'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
 ]
+
+// IRS 990 website fields are free text and arrive in several broken shapes.
+// A previous bug shipped "https/example.org" straight into an href: it starts
+// with "http", so a naive startsWith('http') check passed it through, and the
+// browser resolved it as a relative path. Returns null when there is no usable
+// URL, so callers render nothing rather than a dead link.
+const WEB_PLACEHOLDERS = new Set([
+  '', '-', '--', 'n/a', 'na', 'n.a.', 'none', 'not applicable', 'no',
+  'not available', 'nonexistent', 'n/a.', 'tbd', 'pending', 'null',
+])
+
+export function websiteUrl(raw: string | null | undefined): string | null {
+  const value = (raw ?? '').trim()
+  if (WEB_PLACEHOLDERS.has(value.toLowerCase())) return null
+  // An email in the website field is not a website.
+  if (value.includes('@') && !value.includes('/')) return null
+  // Repair a missing colon: "https//host", "http//host", "https:/host".
+  let url = value
+    .replace(/^(https?)\/\//i, '$1://')
+    .replace(/^(https?):\/(?!\/)/i, '$1://')
+  if (!/^https?:\/\//i.test(url)) {
+    // Reject anything that still isn't host-shaped (needs a dot, no spaces).
+    if (!/^[\w.-]+\.[a-z]{2,}(\/|$|\?)/i.test(url)) return null
+    url = `https://${url}`
+  }
+  try {
+    const parsed = new URL(url)
+    if (!parsed.hostname.includes('.')) return null
+    return parsed.href
+  } catch {
+    return null
+  }
+}
+
+export function propublicaUrl(ein: string): string {
+  return `https://projects.propublica.org/nonprofits/organizations/${ein}`
+}

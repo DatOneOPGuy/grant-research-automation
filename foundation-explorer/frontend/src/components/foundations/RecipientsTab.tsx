@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BookOpen, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { fetchRecipientV5, type FoundationRecipientV5 } from '../../lib/apiV5'
-import { moneyFull, titleCase } from '../../lib/format'
+import { moneyFull, titleCase, propublicaUrl } from '../../lib/format'
 import { Skeleton } from '../ui/primitives'
 import { DafChip, IdentityChip, TraditionChip } from './V5Chips'
 
@@ -37,7 +37,7 @@ export default function RecipientsTab({ recipients }: {
                 {titleCase(r.name)}
                 {Boolean(r.is_daf) && <span className="ml-1.5"><DafChip /></span>}
                 {r.recipient_ein && (
-                  <a href={`https://projects.propublica.org/nonprofits/organizations/${r.recipient_ein}`}
+                  <a href={propublicaUrl(r.recipient_ein)}
                     target="_blank" rel="noreferrer"
                     title="View this recipient on ProPublica"
                     className="ml-1.5 inline-flex text-muted hover:text-primary align-middle">

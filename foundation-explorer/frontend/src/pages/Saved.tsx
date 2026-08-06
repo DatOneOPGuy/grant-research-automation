@@ -3,7 +3,9 @@ import { useQueries } from '@tanstack/react-query'
 import { Bookmark, Trash2 } from 'lucide-react'
 import { fetchFoundationDetailV5, type FoundationRowV5 } from '../lib/apiV5'
 import { useSavedFoundations } from '../lib/savedContext'
-import { money, num, TAX_WINDOW_LABEL, titleCase } from '../lib/format'
+import {
+  money, num, propublicaUrl, TAX_WINDOW_LABEL, titleCase,
+} from '../lib/format'
 import { Card, StatusPill } from '../components/ui/primitives'
 import DetailPanel from '../components/foundations/DetailPanel'
 
@@ -19,7 +21,7 @@ function toCsv(rows: FoundationRowV5[]): string {
     [...CSV_COLUMNS, 'propublica_url'].join(','),
     ...rows.map((r) => [
       ...CSV_COLUMNS.map((c) => esc(r[c])),
-      esc(`https://projects.propublica.org/nonprofits/organizations/${r.ein}`),
+      esc(propublicaUrl(r.ein)),
     ].join(',')),
   ].join('\n')
 }
