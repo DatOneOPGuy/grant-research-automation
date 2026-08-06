@@ -37,8 +37,12 @@ def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
 
 
-def load_results() -> tuple[dict[str, tuple[str, int, str]], list[str]]:
-    expected = len(list(BATCHES.glob("batch_*.json")))
+def load_results(batches: Path = BATCHES,
+                 results: Path = RESULTS
+                 ) -> tuple[dict[str, tuple[str, int, str]], list[str]]:
+    global RESULTS  # noqa: PLW0603 - path is read by the loop below
+    RESULTS = results
+    expected = len(list(batches.glob("batch_*.json")))
     preds: dict[str, tuple[str, int, str]] = {}
     missing: list[str] = []
     for i in range(expected):
@@ -66,8 +70,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--max-missing", type=int, default=3,
                     help="refuse to load if more than this many batches missing")
+    ap.add_argument("--batches-dir", type=Path, default=BATCHES,
+                    help="directory of batch_*.json inputs (results/ inside)")
     args = ap.parse_args()
-    preds, missing = load_results()
+    preds, missing = load_results(args.batches_dir, args.batches_dir / "results")
     log(f"predictions: {len(preds):,} | missing/bad batches: {len(missing)} "
         f"{missing[:10]}")
     if len(missing) > args.max_missing:
