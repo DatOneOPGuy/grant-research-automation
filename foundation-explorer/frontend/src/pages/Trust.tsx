@@ -26,7 +26,8 @@ const SECTIONS = [
   {
     title: 'Privacy Boundary',
     body: [
-      'Classification jobs do not send source records or customer searches to commercial third-party LLM APIs.',
+      'Build-time classification of public source records — organization names, EINs, and mission statements from public IRS filings — may use deterministic code and language models, which may include a commercial LLM API.',
+      'Customer data — your searches, saved lists, and account activity — is never submitted to any third-party LLM API for classification or training.',
       'The demo stores saved EINs and filter state in browser storage. Its hosting provider processes ordinary requests needed to deliver the site.',
     ],
   },

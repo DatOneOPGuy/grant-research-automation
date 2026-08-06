@@ -18,11 +18,12 @@ We do not build consumer profiles from private data.
 
 ## AI Processing
 
-Foundation and recipient classification jobs run in company-controlled local
-infrastructure using deterministic code and, when enabled for a documented run,
-an open-source local model. Source records, customer searches, and saved lists
-are not submitted to OpenAI, Anthropic, or another commercial LLM API for
-classification or model training.
+Classification of public source records (organization names, EINs, and mission
+statements drawn from public IRS filings) may be processed using deterministic
+code and language models, which may include a commercial LLM API, during
+documented build-time classification runs. Customer data — your searches, saved
+lists, and account activity — is never submitted to any third-party LLM API for
+classification or training.
 
 This statement does not mean no service provider processes any network data:
 the web host necessarily handles requests needed to deliver the application.
