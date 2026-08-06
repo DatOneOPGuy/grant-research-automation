@@ -194,6 +194,19 @@ def build_recipients(out: sqlite3.Connection, run_id: str, release_id: str) -> N
           website=(SELECT website FROM best_doc d WHERE d.ein=recipients.ein)
         WHERE ein IS NOT NULL
     """)
+    # A natural person or a filing placeholder cannot hold a religious
+    # tradition. 17,114 `individual` and 170 `unattributable` entities picked
+    # one up from a recipient-name rule firing on a personal name. The
+    # evidence ledger is immutable and append-only, so the stray rows stay on
+    # the record; the read model simply declines to present them as verdicts.
+    stray = out.execute(f"""
+        UPDATE recipients SET tradition=NULL, method=NULL, confidence=NULL,
+               reason=NULL
+        WHERE identity_status IN {NONCLASSIFIABLE_STATUSES}
+          AND tradition IS NOT NULL
+    """).rowcount
+    log(f"recipients: cleared {stray:,} stray traditions on "
+        f"individual/unattributable entities")
     for entity_id, name in out.execute(
             "SELECT entity_id, name FROM recipients").fetchall():
         if DAF_PATTERN.search((name or "").lower()):
