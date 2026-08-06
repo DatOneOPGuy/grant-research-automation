@@ -83,7 +83,10 @@ CREATE TABLE recipients (
     identity_status TEXT, tradition TEXT, method TEXT, confidence REAL,
     reason TEXT,
     is_daf INTEGER DEFAULT 0, mission_text TEXT, website TEXT,
-    total_received INTEGER DEFAULT 0, funder_count INTEGER DEFAULT 0
+    total_received INTEGER DEFAULT 0, funder_count INTEGER DEFAULT 0,
+    -- Internal bookkeeping from src.recipient_partition, not a user-facing
+    -- dimension: recipients are evidence about a foundation, not the product.
+    disposition TEXT
 );
 CREATE TABLE frs (
     ein TEXT, entity_id TEXT, dollars INTEGER, grants INTEGER,
@@ -199,6 +202,12 @@ def build_recipients(out: sqlite3.Connection, run_id: str, release_id: str) -> N
     # one up from a recipient-name rule firing on a personal name. The
     # evidence ledger is immutable and append-only, so the stray rows stay on
     # the record; the read model simply declines to present them as verdicts.
+    out.execute("""
+        UPDATE recipients SET disposition=(
+            SELECT d.disposition FROM p.recipient_dispositions d
+            WHERE d.entity_id=recipients.entity_id)
+        WHERE identity_status IN ('unresolved','collision')
+    """)
     stray = out.execute(f"""
         UPDATE recipients SET tradition=NULL, method=NULL, confidence=NULL,
                reason=NULL
