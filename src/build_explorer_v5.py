@@ -8,6 +8,7 @@ pipeline database is opened read-only.
 
 from __future__ import annotations
 
+import argparse
 import re
 import sqlite3
 import sys
@@ -84,7 +85,12 @@ def log(msg: str) -> None:
 
 
 def open_dbs() -> tuple[sqlite3.Connection, str, str]:
+    # Remove the sidecars alongside the db. SQLite binds -journal/-wal/-shm to
+    # the *filename*, so a leftover journal from an interrupted run would be
+    # replayed into the freshly created file and corrupt it.
     OUT_DB.unlink(missing_ok=True)
+    for suffix in ("-journal", "-wal", "-shm"):
+        OUT_DB.with_name(OUT_DB.name + suffix).unlink(missing_ok=True)
     # uri=True on the primary connection so the file: ATTACH URIs below are
     # parsed as URIs rather than literal filenames.
     out = sqlite3.connect(f"file:{OUT_DB.resolve()}", uri=True)
@@ -315,6 +321,14 @@ def median_grants(out: sqlite3.Connection) -> None:
 
 
 def main() -> None:
+    # Parse before doing anything: open_dbs() deletes OUT_DB, so an unrecognized
+    # flag (notably --help) must not fall through into a destructive rebuild.
+    argparse.ArgumentParser(
+        prog="python3 -m src.build_explorer_v5",
+        description=("Rebuild data/explorer_v5.db from scratch out of the v5 "
+                     "identity + evidence ledger. Takes no options; the "
+                     "existing read model is deleted and recreated."),
+    ).parse_args()
     started = time.monotonic()
     out, run_id, release_id = open_dbs()
     build_recipients(out, run_id, release_id)

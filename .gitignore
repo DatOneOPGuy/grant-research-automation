@@ -15,6 +15,7 @@ inviteonlyvalues.csv
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 *.sqlite
 *.sqlite3
 
@@ -33,6 +34,8 @@ venv/
 # Transient run logs and scratch output
 logs/
 scratch_*.log
+scratch/
+scratchpad_*.log
 
 # OS / editor
 .DS_Store
