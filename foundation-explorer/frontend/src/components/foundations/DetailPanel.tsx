@@ -12,6 +12,35 @@ import RecipientsTab from './RecipientsTab'
 
 type Props = { ein: string; onClose: () => void }
 
+// Three different truths that used to share one vague message. Each is the
+// real legal or filing reason the dollars could not be attributed; see
+// logs/parser_recipient_audit.md for the raw-XML evidence behind each class.
+function unattributableMessage(reason: string | null, amount: string) {
+  switch (reason) {
+    case 'hipaa':
+      return `${amount} went to individual patients through a
+        patient-assistance program. Federal privacy law (HIPAA) prohibits
+        naming them, so these dollars cannot be attributed to an organization
+        — they are excluded from the coverage figure rather than counted
+        against it.`
+    case 'foreign_4948':
+      return `${amount} was paid by a foreign private foundation, which is not
+        required to itemize grant recipients under IRC §4948(b). These dollars
+        cannot be attributed and are excluded from coverage.`
+    case 'pdf_attachment':
+      return `${amount} went to recipients this foundation listed in a PDF
+        attachment rather than in machine-readable form, so they cannot be
+        extracted from the electronic filing. The list exists — it just isn’t
+        machine-readable. These dollars are excluded from coverage rather than
+        counted against it.`
+    default:
+      return `${amount} went to recipients that are not itemized in the
+        machine-readable filing, so they cannot be attributed to an
+        organization. These dollars are excluded from the coverage figure
+        rather than counted against it.`
+  }
+}
+
 const TABS = ['Recipients', 'Grants', 'Geography'] as const
 
 export default function DetailPanel({ ein, onClose }: Props) {
@@ -67,28 +96,18 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 daf: f.daf_dollars,
               }} />
               <div className="text-xs text-muted mt-1.5">
-                {f.classifiable_dollars > 0 ? (
+                {f.classifiable_dollars > 0 && (
                   <>
                     We have classified {Math.round(f.coverage_pct)}% of this
                     foundation’s {money(f.classifiable_dollars)} in 2023–24
                     giving to identifiable organizations ({f.coverage_band}{' '}
                     coverage).
                   </>
-                ) : (
-                  <>
-                    This foundation’s filing does not name its recipients, so
-                    none of its 2023–24 giving can be classified.
-                  </>
                 )}
                 {f.nonclassifiable_dollars > 0 && (
                   <div className="mt-1">
-                    A further {money(f.nonclassifiable_dollars)} went to
-                    individuals or to recipients the filing left anonymous
-                    (e.g. patient-assistance programs, “see attached
-                    schedule”). The IRS form permits this, so those dollars
-                    cannot be attributed to any organization — they are
-                    excluded from the coverage figure rather than counted
-                    against it.
+                    {unattributableMessage(f.unattributable_reason,
+                      money(f.nonclassifiable_dollars))}
                   </div>
                 )}
               </div>

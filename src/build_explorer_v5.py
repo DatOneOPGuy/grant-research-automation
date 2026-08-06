@@ -55,6 +55,36 @@ TESTAMENTARY = re.compile(r"\b(tuw|tua|uw|testamentary|crut|crat|charitable rema
 #     make the product look finished when it is not.
 NONCLASSIFIABLE_STATUSES = ("unattributable", "individual")
 
+# Why a recipient could not be attributed, matched on the markers the filer
+# actually wrote. Verified against raw XML in logs/parser_recipient_audit.md:
+# in every case the string below is the filer's own text, not a parse failure.
+# Order matters -- HIPAA and 4948 are legal non-disclosure and must win over
+# the generic "see attached" test, which many of them also match.
+REASON_RULES = (
+    ("hipaa", re.compile(
+        r"hipaa|hippa|health insurance portability|patient|confidential|"
+        r"cannot be listed|not be disclosed", re.I)),
+    ("foreign_4948", re.compile(r"4948", re.I)),
+    ("pdf_attachment", re.compile(
+        r"see\s+attach|attached\s+(pdf|schedule|statement|list)|see\s+schedule|"
+        r"see\s+statement|see\s+below|see\s+part|attachment|\bpdf\b|\bstmt\b|"
+        r"^\W*(grants?|various|totals?|n/?a|none|other|continued|"
+        r"miscellaneous|contributions?|schedule)\W*$", re.I)),
+)
+REASON_LABELS = {
+    "hipaa": "[Individual patients — HIPAA protected]",
+    "foreign_4948": "[Foreign foundation — recipients not itemized]",
+    "pdf_attachment": "[Recipients filed as PDF attachment]",
+    "not_itemized": "[Recipients not itemized in the filing]",
+}
+
+
+def unattributable_reason(name: str | None) -> str:
+    for reason, pattern in REASON_RULES:
+        if pattern.search(name or ""):
+            return reason
+    return "not_itemized"
+
 SCHEMA = """
 CREATE TABLE foundations (
     ein TEXT PRIMARY KEY, name TEXT, city TEXT, state TEXT,
@@ -67,6 +97,9 @@ CREATE TABLE foundations (
     unclassified_dollars INTEGER DEFAULT 0, daf_dollars INTEGER DEFAULT 0,
     nonclassifiable_dollars INTEGER DEFAULT 0,
     classifiable_dollars INTEGER DEFAULT 0,
+    -- Why this foundation's dollars could not be attributed. Display only:
+    -- drives the message shown to the user, never a dollar figure or verdict.
+    unattributable_reason TEXT,
     coverage_pct REAL DEFAULT 0, coverage_band TEXT DEFAULT 'Low',
     is_testamentary INTEGER DEFAULT 0, is_micro INTEGER DEFAULT 0,
     active_2023 INTEGER DEFAULT 0, active_2024 INTEGER DEFAULT 0
@@ -84,6 +117,11 @@ CREATE TABLE recipients (
     reason TEXT,
     is_daf INTEGER DEFAULT 0, mission_text TEXT, website TEXT,
     total_received INTEGER DEFAULT 0, funder_count INTEGER DEFAULT 0,
+    -- Clean label shown instead of the raw filing string. Rendering a
+    -- recipient as "GRANTS" or "Under the Health Insurance Portability and
+    -- Account" reads as a broken product; the ledger row is untouched.
+    display_name TEXT,
+    unattributable_reason TEXT,
     -- Internal bookkeeping from src.recipient_partition, not a user-facing
     -- dimension: recipients are evidence about a foundation, not the product.
     disposition TEXT
@@ -217,6 +255,19 @@ def build_recipients(out: sqlite3.Connection, run_id: str, release_id: str) -> N
             WHERE d.entity_id=recipients.entity_id)
         WHERE identity_status IN ('unresolved','collision')
     """)
+    # Display layer for dollars the filing never attributed. Sets a clean label
+    # and the per-recipient reason; changes no dollar figure, coverage value or
+    # verdict.
+    rows = out.execute(
+        f"SELECT entity_id, name FROM recipients "  # noqa: S608
+        f"WHERE identity_status IN {NONCLASSIFIABLE_STATUSES}").fetchall()
+    labelled = [(unattributable_reason(name),
+                 REASON_LABELS[unattributable_reason(name)], entity_id)
+                for entity_id, name in rows]
+    out.executemany(
+        "UPDATE recipients SET unattributable_reason=?, display_name=? "
+        "WHERE entity_id=?", labelled)
+    log(f"recipients: labelled {len(labelled):,} unattributable recipients")
     stray = out.execute(f"""
         UPDATE recipients SET tradition=NULL, method=NULL, confidence=NULL,
                reason=NULL
@@ -380,6 +431,24 @@ def build_foundations(out: sqlite3.Connection) -> None:
     # classifiable dollars at all. Calling that 'Low' coverage would read as our
     # failure, so it gets its own band rather than being ranked against
     # foundations we genuinely under-classified.
+    # Foundation-level reason = the reason accounting for the most
+    # nonclassifiable dollars at that foundation, so the message shown matches
+    # where the money actually went.
+    out.execute("""
+        CREATE TEMP TABLE reason_rank AS
+        SELECT g.funder_ein AS ein, r.unattributable_reason AS reason,
+               SUM(g.amount) AS d
+        FROM grants g JOIN recipients r ON r.entity_id=g.entity_id
+        WHERE r.unattributable_reason IS NOT NULL
+        GROUP BY 1, 2
+    """)
+    out.execute("CREATE INDEX temp.idx_rr ON reason_rank(ein, d)")
+    out.execute("""
+        UPDATE foundations SET unattributable_reason=(
+            SELECT reason FROM reason_rank rr WHERE rr.ein=foundations.ein
+            ORDER BY rr.d DESC LIMIT 1)
+        WHERE nonclassifiable_dollars > 0
+    """)
     out.execute("""
         UPDATE foundations SET
           coverage_band = CASE

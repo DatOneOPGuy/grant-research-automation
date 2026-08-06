@@ -147,6 +147,7 @@ def foundations(
                    recipient_count, median_grant, christian_dollars,
                    nonchristian_dollars, unclassified_dollars, daf_dollars,
                    nonclassifiable_dollars, classifiable_dollars,
+                   unattributable_reason,
                    coverage_pct, coverage_band, application_status, website,
                    assets, revenue, is_testamentary, is_micro
             FROM foundations f WHERE {sql_where}
@@ -166,7 +167,8 @@ def foundation_detail(ein: str):
             "SELECT tradition, tier, dollars, recipients FROM tradition_stats "
             "WHERE ein=? ORDER BY dollars DESC", (ein,)).fetchall()
         recipients = conn.execute("""
-            SELECT r.entity_id, r.name, r.ein AS recipient_ein,
+            SELECT r.entity_id, COALESCE(r.display_name, r.name) AS name,
+                   r.ein AS recipient_ein,
                    r.identity_status, r.tradition, r.method, r.confidence,
                    r.reason,
                    r.is_daf, (r.mission_text IS NOT NULL
@@ -188,7 +190,9 @@ def foundation_detail(ein: str):
 def foundation_grants(ein: str, limit: int = Query(200, le=1000), offset: int = 0):
     with connect() as conn:
         rows = conn.execute("""
-            SELECT g.recipient_name, g.recipient_city, g.recipient_state,
+            SELECT COALESCE(r.display_name, g.recipient_name)
+                       AS recipient_name,
+                   g.recipient_city, g.recipient_state,
                    g.amount, g.tax_year, g.purpose, g.entity_id,
                    r.tradition, r.identity_status
             FROM grants g LEFT JOIN recipients r ON r.entity_id=g.entity_id

@@ -30,6 +30,7 @@ export type FoundationRowV5 = {
   daf_dollars: number
   nonclassifiable_dollars: number
   classifiable_dollars: number
+  unattributable_reason: string | null
   coverage_pct: number
   coverage_band: string
   application_status: string | null
