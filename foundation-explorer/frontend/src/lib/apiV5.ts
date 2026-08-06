@@ -28,6 +28,8 @@ export type FoundationRowV5 = {
   nonchristian_dollars: number
   unclassified_dollars: number
   daf_dollars: number
+  nonclassifiable_dollars: number
+  classifiable_dollars: number
   coverage_pct: number
   coverage_band: string
   application_status: string | null
@@ -131,7 +133,7 @@ export function traditionLabel(t: string | null | undefined): string {
 export const APPLICATION_STATUSES = [
   'Accepting Applications', 'Contact First', 'Invite Only', 'Unknown',
 ]
-export const COVERAGE_BANDS = ['High', 'Moderate', 'Low']
+export const COVERAGE_BANDS = ['High', 'Moderate', 'Low', 'Not Classifiable']
 
 // ---- geographic regions ----------------------------------------------------
 // Census divisions plus a domain-specific "Bible Belt" grouping that maps to

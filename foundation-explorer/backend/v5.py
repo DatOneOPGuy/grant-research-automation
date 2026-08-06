@@ -146,6 +146,7 @@ def foundations(
             SELECT ein, name, city, state, paid_2324, grant_count_2324,
                    recipient_count, median_grant, christian_dollars,
                    nonchristian_dollars, unclassified_dollars, daf_dollars,
+                   nonclassifiable_dollars, classifiable_dollars,
                    coverage_pct, coverage_band, application_status, website,
                    assets, revenue, is_testamentary, is_micro
             FROM foundations f WHERE {sql_where}

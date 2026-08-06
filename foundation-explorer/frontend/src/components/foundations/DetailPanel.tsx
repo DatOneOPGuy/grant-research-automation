@@ -67,9 +67,30 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 daf: f.daf_dollars,
               }} />
               <div className="text-xs text-muted mt-1.5">
-                We have classified {Math.round(f.coverage_pct)}% of this
-                foundation’s 2023–24 paid dollars
-                ({f.coverage_band} coverage).
+                {f.classifiable_dollars > 0 ? (
+                  <>
+                    We have classified {Math.round(f.coverage_pct)}% of this
+                    foundation’s {money(f.classifiable_dollars)} in 2023–24
+                    giving to identifiable organizations ({f.coverage_band}{' '}
+                    coverage).
+                  </>
+                ) : (
+                  <>
+                    This foundation’s filing does not name its recipients, so
+                    none of its 2023–24 giving can be classified.
+                  </>
+                )}
+                {f.nonclassifiable_dollars > 0 && (
+                  <div className="mt-1">
+                    A further {money(f.nonclassifiable_dollars)} went to
+                    individuals or to recipients the filing left anonymous
+                    (e.g. patient-assistance programs, “see attached
+                    schedule”). The IRS form permits this, so those dollars
+                    cannot be attributed to any organization — they are
+                    excluded from the coverage figure rather than counted
+                    against it.
+                  </div>
+                )}
               </div>
             </div>
           )}

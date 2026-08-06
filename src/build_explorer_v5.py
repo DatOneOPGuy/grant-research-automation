@@ -9,6 +9,8 @@ pipeline database is opened read-only.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import os
 import re
 import sqlite3
 import sys
@@ -28,6 +30,31 @@ DAF_PATTERN = re.compile(
     r"national philanthropic)\b")
 TESTAMENTARY = re.compile(r"\b(tuw|tua|uw|testamentary|crut|crat|charitable remainder)\b")
 
+# Identity dispositions excluded from the coverage denominator. Coverage answers
+# "of the dollars that went to identifiable organizations we could in principle
+# classify, how many did we classify" -- so it must not penalize a foundation
+# for dollars the filing itself never attributed to an organization.
+#
+#   unattributable -- the 990-PF names no recipient: "INDIVIDUAL PATIENT
+#     PROGRAMS", "Eligible Patients (See Schedule #2)", "HIPPA REGULATIONS
+#     PREVENT THE LISTING OF NAMES", "See Statement 17", "ATCH 4". $58.46B and
+#     0.0% classified, because there is nothing there to classify -- by us or
+#     by anyone.
+#   individual -- grants to natural persons (scholarships, hardship and patient
+#     aid). Real dispositions, but a religious tradition is a property of an
+#     organization; it cannot attach to a person. $3.60B, 4.1% classified.
+#
+# Deliberately NOT excluded, because each is a genuine coverage gap we could
+# close and hiding it would overstate our coverage:
+#   foreign ($10.26B, 23.3%) -- real organizations, classifiable from name and
+#     mission text. Overseas mission agencies live here, so this gap is
+#     product-relevant for a Christian-donor tool and must stay visible.
+#   government ($6.12B, 56.2%) -- identifiable public bodies, classifiable.
+#   collision ($4.28B, 65.3%) -- ambiguous identity is our unfinished work.
+#   unresolved ($48.25B, 36.5%) -- the core remaining gap; excluding it would
+#     make the product look finished when it is not.
+NONCLASSIFIABLE_STATUSES = ("unattributable", "individual")
+
 SCHEMA = """
 CREATE TABLE foundations (
     ein TEXT PRIMARY KEY, name TEXT, city TEXT, state TEXT,
@@ -38,6 +65,8 @@ CREATE TABLE foundations (
     recipient_count INTEGER DEFAULT 0, median_grant INTEGER,
     christian_dollars INTEGER DEFAULT 0, nonchristian_dollars INTEGER DEFAULT 0,
     unclassified_dollars INTEGER DEFAULT 0, daf_dollars INTEGER DEFAULT 0,
+    nonclassifiable_dollars INTEGER DEFAULT 0,
+    classifiable_dollars INTEGER DEFAULT 0,
     coverage_pct REAL DEFAULT 0, coverage_band TEXT DEFAULT 'Low',
     is_testamentary INTEGER DEFAULT 0, is_micro INTEGER DEFAULT 0,
     active_2023 INTEGER DEFAULT 0, active_2024 INTEGER DEFAULT 0
@@ -82,6 +111,31 @@ CREATE INDEX idx_r_tradition ON recipients(tradition);
 
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
+
+
+@contextlib.contextmanager
+def build_lock():
+    """Refuse to start if another rebuild holds the lock.
+
+    Two concurrent rebuilds previously overlapped: open_dbs() unlinks and
+    recreates OUT_DB, so the second run destroyed the first run's file
+    mid-write and left a hot journal behind. O_EXCL makes that unrepeatable.
+    """
+    lock = OUT_DB.with_suffix(".build.lock")
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        raise SystemExit(
+            f"another rebuild is in progress (lock held: {lock}). "
+            f"If no build is running, the previous one died -- verify no "
+            f"python process is writing {OUT_DB}, then delete the lock."
+        ) from None
+    try:
+        os.write(fd, f"pid={os.getpid()} started={time.ctime()}\n".encode())
+        os.close(fd)
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def open_dbs() -> tuple[sqlite3.Connection, str, str]:
@@ -239,10 +293,18 @@ def build_foundations(out: sqlite3.Connection) -> None:
           SUM(CASE WHEN r.is_daf=0 AND r.tradition IN
                 ('jewish','muslim','mormon_lds','christian_science',
                  'other_religion','secular','nonchristian_unspecified')
-              THEN g.amount ELSE 0 END) AS nonchr
+              THEN g.amount ELSE 0 END) AS nonchr,
+          -- dollars the filing never attributed to an organization
+          SUM(CASE WHEN r.identity_status IN {statuses}
+              THEN g.amount ELSE 0 END) AS nonclass,
+          -- classified dollars, counted only over classifiable recipients so
+          -- the ratio below can never exceed 100%
+          SUM(CASE WHEN r.identity_status NOT IN {statuses}
+                   AND (r.tradition IS NOT NULL OR r.is_daf=1)
+              THEN g.amount ELSE 0 END) AS class_num
         FROM grants g JOIN recipients r ON r.entity_id=g.entity_id
         GROUP BY 1
-    """)
+    """.format(statuses=str(NONCLASSIFIABLE_STATUSES)))
     out.execute("CREATE INDEX temp.idx_agg ON agg(ein)")
     out.execute("""
         UPDATE foundations SET
@@ -253,21 +315,38 @@ def build_foundations(out: sqlite3.Connection) -> None:
           active_2024=COALESCE((SELECT a24 FROM agg WHERE agg.ein=foundations.ein),0),
           daf_dollars=COALESCE((SELECT daf FROM agg WHERE agg.ein=foundations.ein),0),
           christian_dollars=COALESCE((SELECT chr FROM agg WHERE agg.ein=foundations.ein),0),
-          nonchristian_dollars=COALESCE((SELECT nonchr FROM agg WHERE agg.ein=foundations.ein),0)
+          nonchristian_dollars=COALESCE((SELECT nonchr FROM agg WHERE agg.ein=foundations.ein),0),
+          nonclassifiable_dollars=COALESCE(
+              (SELECT nonclass FROM agg WHERE agg.ein=foundations.ein),0)
     """)
+    # unclassified_dollars now means "classifiable, but we have not classified
+    # it" -- the honest remaining work. Dollars the filing anonymized are held
+    # separately in nonclassifiable_dollars, not counted as our failure.
     out.execute("""
         UPDATE foundations SET
-          unclassified_dollars = paid_2324 - christian_dollars
-                                 - nonchristian_dollars - daf_dollars,
-          coverage_pct = CASE WHEN paid_2324 > 0 THEN
-            ROUND(100.0 * (christian_dollars + nonchristian_dollars
-                           + daf_dollars) / paid_2324, 1) ELSE 0 END
+          classifiable_dollars = paid_2324 - nonclassifiable_dollars,
+          unclassified_dollars = paid_2324 - nonclassifiable_dollars
+                                 - COALESCE((SELECT class_num FROM agg
+                                             WHERE agg.ein=foundations.ein),0),
+          coverage_pct = CASE
+            WHEN paid_2324 - nonclassifiable_dollars > 0 THEN
+              ROUND(100.0 * COALESCE((SELECT class_num FROM agg
+                                      WHERE agg.ein=foundations.ein),0)
+                    / (paid_2324 - nonclassifiable_dollars), 1)
+            ELSE 0 END
     """)
+    # A foundation whose entire giving was anonymized by its own filing has no
+    # classifiable dollars at all. Calling that 'Low' coverage would read as our
+    # failure, so it gets its own band rather than being ranked against
+    # foundations we genuinely under-classified.
     out.execute("""
         UPDATE foundations SET
-          coverage_band = CASE WHEN coverage_pct >= 80 THEN 'High'
-                               WHEN coverage_pct >= 50 THEN 'Moderate'
-                               ELSE 'Low' END,
+          coverage_band = CASE
+            WHEN paid_2324 > 0 AND classifiable_dollars <= 0
+              THEN 'Not Classifiable'
+            WHEN coverage_pct >= 80 THEN 'High'
+            WHEN coverage_pct >= 50 THEN 'Moderate'
+            ELSE 'Low' END,
           is_micro = CASE WHEN paid_2324 < 50000 THEN 1 ELSE 0 END
     """)
     for ein, name in out.execute(
@@ -330,17 +409,18 @@ def main() -> None:
                      "existing read model is deleted and recreated."),
     ).parse_args()
     started = time.monotonic()
-    out, run_id, release_id = open_dbs()
-    build_recipients(out, run_id, release_id)
-    build_grants(out, run_id)
-    build_rollups(out)
-    build_foundations(out)
-    build_tradition_stats(out)
-    median_grants(out)
-    log("indexing…")
-    out.executescript(INDEXES)
-    out.execute("PRAGMA main.optimize")
-    out.commit()
+    with build_lock():
+        out, run_id, release_id = open_dbs()
+        build_recipients(out, run_id, release_id)
+        build_grants(out, run_id)
+        build_rollups(out)
+        build_foundations(out)
+        build_tradition_stats(out)
+        median_grants(out)
+        log("indexing…")
+        out.executescript(INDEXES)
+        out.execute("PRAGMA main.optimize")
+        out.commit()
     stats = {
         "foundations": out.execute("SELECT COUNT(*) FROM foundations").fetchone()[0],
         "with 23-24 giving": out.execute(
@@ -350,8 +430,10 @@ def main() -> None:
         "paid $": out.execute("SELECT SUM(paid_2324) FROM foundations").fetchone()[0],
         "christian $": out.execute(
             "SELECT SUM(christian_dollars) FROM foundations").fetchone()[0],
-        "unclassified $": out.execute(
+        "unclassified $ (classifiable)": out.execute(
             "SELECT SUM(unclassified_dollars) FROM foundations").fetchone()[0],
+        "nonclassifiable $ (anonymized by filing)": out.execute(
+            "SELECT SUM(nonclassifiable_dollars) FROM foundations").fetchone()[0],
         "with mission text": out.execute(
             "SELECT COUNT(*) FROM recipients WHERE mission_text!=''").fetchone()[0],
     }
