@@ -23,7 +23,12 @@ TRADITIONS = {*CHRISTIAN, "jewish", "muslim", "mormon_lds",
               "nonchristian_unspecified", "any_christian", "unclassified"}
 SORTS = {"paid": "paid_2324", "christian": "christian_dollars",
          "coverage": "coverage_pct", "assets": "assets", "name": "name",
-         "median": "median_grant", "recipients": "recipient_count"}
+         "median": "median_grant", "recipients": "recipient_count",
+         "pct_christian": "pct_christian"}
+# A NULL pct_christian means "nothing could be classified", not "0% Christian".
+# SQLite sorts NULLs first on DESC, which would put foundations we know
+# nothing about at the top of the flagship view, so they are pushed last.
+NULLS_LAST = {"pct_christian"}
 
 
 def connect() -> sqlite3.Connection:
@@ -65,10 +70,18 @@ def foundations(
     daf: str = Query("include", pattern="^(include|exclude|only)$"),
     coverage_band: str | None = None,
     min_coverage: float | None = None,
+    min_christian: int | None = None,
+    min_pct_christian: float | None = None,
+    include_inactive: bool = False,
     sort: str = "paid", order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, le=500), offset: int = 0,
 ):
     where, params = ["1=1"], []
+    # A foundation that paid nothing in the window is not a prospect: no
+    # grants, no faith mix, no coverage. 28,129 of them padded every result
+    # set until this became the default.
+    if not include_inactive:
+        where.append("f.paid_2324 > 0")
     if tradition:
         labels = expand_traditions(tradition)
         if not labels:
@@ -91,6 +104,7 @@ def foundations(
         ("f.grant_count_2324 >= ?", min_grants),
         ("f.assets >= ?", min_assets), ("f.assets <= ?", max_assets),
         ("f.revenue >= ?", min_revenue), ("f.coverage_pct >= ?", min_coverage),
+        ("f.christian_dollars >= ?", min_christian),
     ):
         if value is not None:
             where.append(clause)
@@ -144,7 +158,24 @@ def foundations(
             SELECT 1 FROM frs JOIN recipients r ON r.entity_id=frs.entity_id
             WHERE frs.ein=f.ein AND r.name LIKE ?)""")
         params.append(f"%{recipient_search}%")
+    # The rigor dial recomputes the headline number rather than only filtering
+    # rows: on the authoritative tier the percentage is the authoritative-only
+    # ratio, so "90% Christian" always means "of the evidence you asked for".
+    pct_column = ("pct_christian_auth" if tier == "authoritative"
+                  else "pct_christian")
+    # Denominator stays the full classified base on both tiers -- only the
+    # numerator tightens -- so the dial cannot inflate a foundation.
     order_column = SORTS.get(sort, "paid_2324")
+    if order_column == "pct_christian":
+        order_column = pct_column
+    direction = "ASC" if order == "asc" else "DESC"
+    order_sql = f"{order_column} {direction}"
+    if sort in NULLS_LAST:
+        order_sql = (f"({order_column} IS NULL), {order_sql}, "
+                     "christian_dollars DESC")
+    if min_pct_christian is not None:
+        where.append(f"{pct_column} >= ?")
+        params.append(min_pct_christian)
     sql_where = " AND ".join(where)
     with connect() as conn:
         total = conn.execute(
@@ -155,11 +186,14 @@ def foundations(
                    recipient_count, median_grant, christian_dollars,
                    nonchristian_dollars, unclassified_dollars, daf_dollars,
                    nonclassifiable_dollars, classifiable_dollars,
+                   classified_dollars,
+                   {pct_column} AS pct_christian,
+                   auth_christian_dollars, pct_christian_auth,
                    unattributable_reason,
                    coverage_pct, coverage_band, application_status, website,
                    assets, revenue, is_testamentary, is_micro
             FROM foundations f WHERE {sql_where}
-            ORDER BY {order_column} {'ASC' if order == 'asc' else 'DESC'}
+            ORDER BY {order_sql}
             LIMIT ? OFFSET ?""", [*params, limit, offset]).fetchall()
     return {"total": total, "rows": [dict(row) for row in rows]}
 

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   ArrowDown, ArrowUp, Bookmark, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, Loader2,
+  Globe, HelpCircle, Loader2,
 } from 'lucide-react'
 import {
   defaultV5Filters, fetchFoundationsV5,
@@ -16,17 +16,31 @@ import FilterPanel from '../components/foundations/FilterPanel'
 import ActiveFilters from '../components/foundations/ActiveFilters'
 import DetailPanel from '../components/foundations/DetailPanel'
 import { BucketBar } from '../components/foundations/BucketBar'
-import { CoverageChip } from '../components/foundations/V5Chips'
 
 const PAGE_SIZE = 25
 
 // Table columns; sortKey maps to the API's sort vocabulary.
-const COLUMNS: { key: string; label: string; sortKey?: string }[] = [
+const COLUMNS: { key: string; label: string; sortKey?: string
+  help?: string }[] = [
   { key: 'name', label: 'Foundation', sortKey: 'name' },
   { key: 'state', label: 'Location' },
+  {
+    key: 'pct', label: '% Christian', sortKey: 'pct_christian',
+    help: 'Share of this foundation\u2019s CLASSIFIED giving that went to '
+      + 'Christian organizations. Unclassified dollars are unknown, not '
+      + 'non-Christian, so they are excluded from the denominator. The '
+      + 'smaller figure below is coverage: the share of this foundation\u2019s '
+      + 'giving we could classify at all. A high percentage on low coverage '
+      + 'is a thinner claim. With high-confidence evidence only, the '
+      + 'numerator tightens to IRS-derived evidence while the denominator '
+      + 'stays the same, so the figure can only fall.',
+  },
+  {
+    key: 'christian', label: 'Christian $', sortKey: 'christian',
+    help: 'Absolute dollars to Christian organizations. A large foundation '
+      + 'can be a small percentage and still be a major Christian funder.',
+  },
   { key: 'paid', label: 'Paid 2023–24', sortKey: 'paid' },
-  { key: 'mix', label: 'Faith mix ($)', sortKey: 'christian' },
-  { key: 'coverage', label: 'Coverage', sortKey: 'coverage' },
   { key: 'status', label: 'Application' },
   { key: 'median', label: 'Median grant', sortKey: 'median' },
   { key: 'actions', label: '' },
@@ -124,8 +138,10 @@ export default function Foundations() {
                     <th key={c.key} className="px-3 py-3 font-medium">
                       {c.sortKey ? (
                         <button onClick={() => sortBy(c.sortKey!)}
+                          title={c.help}
                           className="flex items-center gap-1 hover:text-ink">
                           {c.label}
+                          {c.help && <HelpCircle size={11} className="opacity-60" />}
                           {filters.sort === c.sortKey && (
                             filters.order === 'desc'
                               ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}
@@ -137,11 +153,11 @@ export default function Foundations() {
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && !isError && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={8} className="px-3 py-2">
+                  <tr key={i}><td colSpan={9} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={9} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -157,20 +173,25 @@ export default function Foundations() {
                     <td className="px-3 text-muted whitespace-nowrap">
                       {r.city ? `${titleCase(r.city)}, ` : ''}{r.state}
                     </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <PctChristian pct={r.pct_christian}
+                        coverage={r.coverage_pct} />
+                    </td>
+                    <td className="px-3 tabular whitespace-nowrap">
+                      <div className="font-medium">
+                        {money(r.christian_dollars)}
+                      </div>
+                      <div className="mt-1 w-24">
+                        <BucketBar b={{
+                          christian: r.christian_dollars,
+                          nonchristian: r.nonchristian_dollars,
+                          unclassified: r.unclassified_dollars,
+                          daf: r.daf_dollars,
+                        }} />
+                      </div>
+                    </td>
                     <td className="px-3 tabular font-medium whitespace-nowrap">
                       {money(r.paid_2324)}
-                    </td>
-                    <td className="px-3 min-w-32">
-                      <BucketBar b={{
-                        christian: r.christian_dollars,
-                        nonchristian: r.nonchristian_dollars,
-                        unclassified: r.unclassified_dollars,
-                        daf: r.daf_dollars,
-                      }} />
-                    </td>
-                    <td className="px-3 whitespace-nowrap">
-                      <CoverageChip band={r.coverage_band}
-                        pct={r.coverage_pct} />
                     </td>
                     <td className="px-3 whitespace-nowrap">
                       <StatusPill status={r.application_status} />
@@ -251,5 +272,41 @@ function RowActions({ ein, website }: { ein: string; website: string | null }) {
         </a>
       </div>
     </td>
+  )
+}
+
+// The primary signal. Two honesty rules are enforced here:
+//   - null means nothing could be classified, so it renders as an em dash and
+//     "no classifiable giving" -- never "0% Christian", which would assert we
+//     know the giving is non-Christian when we know nothing about it.
+//   - the percentage is never shown without its coverage qualifier, because
+//     "100% Christian at 33% classified" is a much weaker claim than at 100%.
+function PctChristian({ pct, coverage }: {
+  pct: number | null; coverage: number
+}) {
+  if (pct === null) {
+    return (
+      <div title="This foundation's filing did not attribute its giving to
+        organizations we could classify, so no share can be computed.">
+        <div className="text-lg text-line leading-none">—</div>
+        <div className="text-[11px] text-muted mt-1">no classifiable giving</div>
+      </div>
+    )
+  }
+  const strong = pct >= 50
+  const thin = coverage < 50
+  return (
+    <div>
+      <div className={`text-base font-semibold leading-none tabular ${
+        strong ? 'text-primary' : 'text-ink'}`}>
+        {Math.round(pct)}%
+      </div>
+      <div className={`text-[11px] mt-1 ${thin ? 'text-scoremid' : 'text-muted'}`}
+        title={thin
+          ? 'Low coverage: we could classify under half of this foundation\u2019s giving, so this share rests on a thin base.'
+          : 'Coverage: the share of this foundation\u2019s giving we could classify.'}>
+        {Math.round(coverage)}% classified
+      </div>
+    </div>
   )
 }

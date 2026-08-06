@@ -97,6 +97,25 @@ CREATE TABLE foundations (
     unclassified_dollars INTEGER DEFAULT 0, daf_dollars INTEGER DEFAULT 0,
     nonclassifiable_dollars INTEGER DEFAULT 0,
     classifiable_dollars INTEGER DEFAULT 0,
+    -- Christian as a share of CLASSIFIED dollars, not of total giving.
+    -- Unclassified dollars are unknown, not non-Christian, so dividing by the
+    -- total would understate every foundation and punish low-coverage ones.
+    -- NULL (not 0) when nothing could be classified, so the UI can say
+    -- "no classifiable giving" rather than the false claim "0% Christian".
+    classified_dollars INTEGER DEFAULT 0,
+    pct_christian REAL,
+    -- The rigor dial. NOT "Christian share of authoritative-tier dollars":
+    -- the authoritative methods (NTEE religion codes, church code, group
+    -- exemption) only ever fire on RELIGIOUS organizations -- there is no
+    -- `secular` among them -- so that denominator is religious-only and
+    -- averages 81.4% Christian against 26.9% on the full basis, with 20,414
+    -- of 25,760 foundations pinned at exactly 100%. Labelling that "%
+    -- Christian" would overstate every foundation.
+    -- Instead: Christian dollars carrying AUTHORITATIVE evidence, over the
+    -- SAME full classified denominator. Turning rigor on can then only lower
+    -- the number, which is the honest direction for a confidence dial.
+    auth_christian_dollars INTEGER DEFAULT 0,
+    pct_christian_auth REAL,
     -- Why this foundation's dollars could not be attributed. Display only:
     -- drives the message shown to the user, never a dollar figure or verdict.
     unattributable_reason TEXT,
@@ -142,6 +161,9 @@ CREATE INDEX idx_f_state ON foundations(state);
 CREATE INDEX idx_f_paid ON foundations(paid_2324);
 CREATE INDEX idx_f_app ON foundations(application_status);
 CREATE INDEX idx_f_cov ON foundations(coverage_band);
+CREATE INDEX idx_f_pct ON foundations(pct_christian);
+CREATE INDEX idx_f_chr ON foundations(christian_dollars);
+CREATE INDEX idx_f_active ON foundations(paid_2324, pct_christian);
 CREATE INDEX idx_ts_lookup ON tradition_stats(tradition, tier, dollars);
 CREATE INDEX idx_ts_ein ON tradition_stats(ein);
 CREATE INDEX idx_rs_state ON recipient_states(state, dollars);
@@ -431,6 +453,44 @@ def build_foundations(out: sqlite3.Connection) -> None:
     # classifiable dollars at all. Calling that 'Low' coverage would read as our
     # failure, so it gets its own band rather than being ranked against
     # foundations we genuinely under-classified.
+    out.execute("""
+        UPDATE foundations SET
+          classified_dollars = christian_dollars + nonchristian_dollars,
+          pct_christian = CASE
+            WHEN christian_dollars + nonchristian_dollars > 0
+              THEN ROUND(100.0 * christian_dollars
+                         / (christian_dollars + nonchristian_dollars), 1)
+            ELSE NULL END
+    """)
+    # Authoritative-tier ratio, materialised and indexed rather than probed per
+    # row: a correlated subquery over frs here is the shape that previously
+    # turned a 4-minute rebuild into a 20-minute one.
+    out.execute(f"""
+        CREATE TEMP TABLE auth_mix AS
+        SELECT f.ein,
+          SUM(CASE WHEN r.tradition IN {CHRISTIAN}
+              THEN f.dollars ELSE 0 END) AS chr,
+          SUM(CASE WHEN r.tradition IS NOT NULL
+                   AND r.tradition NOT IN {CHRISTIAN}
+              THEN f.dollars ELSE 0 END) AS nonchr
+        FROM frs f JOIN recipients r ON r.entity_id=f.entity_id
+        WHERE r.is_daf=0 AND r.method IN {AUTHORITATIVE}
+        GROUP BY f.ein
+    """)
+    out.execute("CREATE INDEX temp.idx_auth ON auth_mix(ein)")
+    out.execute("""
+        UPDATE foundations SET
+          auth_christian_dollars = COALESCE(
+              (SELECT chr FROM auth_mix a WHERE a.ein=foundations.ein), 0)
+    """)
+    out.execute("""
+        UPDATE foundations SET
+          pct_christian_auth = CASE
+            WHEN classified_dollars > 0
+              THEN ROUND(100.0 * auth_christian_dollars
+                         / classified_dollars, 1)
+            ELSE NULL END
+    """)
     # Foundation-level reason = the reason accounting for the most
     # nonclassifiable dollars at that foundation, so the message shown matches
     # where the money actually went.

@@ -30,6 +30,11 @@ export type FoundationRowV5 = {
   daf_dollars: number
   nonclassifiable_dollars: number
   classifiable_dollars: number
+  classified_dollars: number
+  // null means "nothing could be classified" -- never render this as 0%.
+  pct_christian: number | null
+  auth_christian_dollars: number
+  pct_christian_auth: number | null
   unattributable_reason: string | null
   coverage_pct: number
   coverage_band: string
@@ -242,6 +247,9 @@ export type V5Filters = {
   daf: 'include' | 'exclude' | 'only'
   coverage_band: string[]
   min_coverage: string
+  min_christian: string
+  min_pct_christian: string
+  include_inactive: boolean
   sort: string
   order: 'asc' | 'desc'
 }
@@ -272,7 +280,13 @@ export const defaultV5Filters: V5Filters = {
   daf: 'include',
   coverage_band: [],
   min_coverage: '',
-  sort: 'paid',
+  // Prospecting default: a foundation with a token Christian grant sorts to
+  // 100% and would otherwise crowd out real funders, so the default view asks
+  // for meaningful Christian dollars and ranks by share of classified giving.
+  min_christian: '50000',
+  min_pct_christian: '',
+  include_inactive: false,
+  sort: 'pct_christian',
   order: 'desc',
 }
 
@@ -280,9 +294,10 @@ const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
   'application_status', 'coverage_band'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',
   'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
-  'min_assets', 'max_assets', 'min_revenue', 'min_coverage'] as const
+  'min_assets', 'max_assets', 'min_revenue', 'min_coverage',
+  'min_christian', 'min_pct_christian'] as const
 const BOOL_KEYS = ['has_website', 'has_email', 'has_contact',
-  'exclude_testamentary', 'exclude_micro'] as const
+  'exclude_testamentary', 'exclude_micro', 'include_inactive'] as const
 
 // Build API query params (also used verbatim for URL sharing).
 export function v5FilterParams(f: V5Filters): URLSearchParams {

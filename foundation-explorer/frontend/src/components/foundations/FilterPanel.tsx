@@ -285,7 +285,14 @@ export default function FilterPanel({ filters, onChange }: Props) {
           lo={filters.min_assets} hi={filters.max_assets}
           onLo={(v) => set({ min_assets: v })}
           onHi={(v) => set({ max_assets: v })} />
-        <div className="text-xs text-muted mb-1">Min revenue</div>
+        <div className="text-xs text-muted mb-1">Min Christian $</div>
+        <NumInput value={filters.min_christian}
+          onChange={(v) => set({ min_christian: v })} placeholder="Min $" />
+        <div className="text-xs text-muted mb-1 mt-2">Min % Christian
+          (of classified)</div>
+        <NumInput value={filters.min_pct_christian}
+          onChange={(v) => set({ min_pct_christian: v })} placeholder="0-100" />
+        <div className="text-xs text-muted mb-1 mt-2">Min revenue</div>
         <NumInput value={filters.min_revenue}
           onChange={(v) => set({ min_revenue: v })} placeholder="Min $" />
         <div className="mt-2 pt-2 border-t border-line/60">
@@ -295,6 +302,13 @@ export default function FilterPanel({ filters, onChange }: Props) {
           <Check label="Exclude micro-funds"
             checked={filters.exclude_micro}
             onChange={(v) => set({ exclude_micro: v })} />
+          <Check label="Include zero-giving foundations"
+            checked={filters.include_inactive}
+            onChange={(v) => set({ include_inactive: v })} />
+          <p className="text-[11px] text-muted mt-1 leading-snug">
+            28,129 foundations paid nothing in 2023–24. They are hidden by
+            default because there is nothing to prospect.
+          </p>
         </div>
         <div className="text-xs text-muted mb-1 mt-2">Donor-advised funds</div>
         {([['include', 'Include DAFs'], ['exclude', 'Exclude DAFs'],
