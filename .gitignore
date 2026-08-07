@@ -43,5 +43,6 @@ scratchpad_*.log
 # Local Netlify folder
 .netlify
 foundation-explorer/frontend/public/demo/
+foundation-explorer/frontend/public/demo-v5/
 foundation-explorer/frontend/public/report/
 foundation-explorer/frontend/public/sample/

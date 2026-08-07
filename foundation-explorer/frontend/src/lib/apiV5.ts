@@ -342,6 +342,7 @@ export function v5FiltersFromParams(sp: URLSearchParams): V5Filters {
 
 // ---- fetchers ---------------------------------------------------------------
 async function getV5<T>(path: string): Promise<T> {
+  if (STATIC_MODE) return staticRoute(path) as Promise<T>
   const res = await fetch(`${V5_BASE}${path}`)
   if (!res.ok) throw new Error(`v5 API ${res.status} ${res.statusText}`)
   return res.json() as Promise<T>
@@ -461,4 +462,205 @@ export type DataQualityV5 = {
 
 export function fetchDataQualityV5(): Promise<DataQualityV5> {
   return getV5('/api/v5/analytics/data-quality')
+}
+
+// --- static review build ----------------------------------------------------
+// Netlify serves files, not queries. When no live API is present the app reads
+// a pre-generated sample from /demo-v5 and applies the same filter, sort and
+// pagination semantics client-side, so the reviewer sees the real product
+// behaviour rather than a mock. Headline aggregates in that dataset are
+// computed over the FULL database; only the browsable rows are sampled.
+export const STATIC_MODE =
+  typeof window !== 'undefined' &&
+  !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
+
+let staticCache: Record<string, unknown> = {}
+
+async function staticJson<T>(path: string): Promise<T> {
+  if (staticCache[path] === undefined) {
+    const res = await fetch(`/demo-v5/${path}`)
+    if (!res.ok) throw new Error(`sample data missing: ${path}`)
+    staticCache[path] = await res.json()
+  }
+  return staticCache[path] as T
+}
+
+export type SampleMeta = {
+  generated_utc: string; sample: boolean
+  foundations_in_sample: number; foundations_total: number
+  foundations_with_giving: number
+  grants_in_sample: number; grants_total: number
+  recipients_in_sample: number; recipients_total: number
+  window: string
+}
+
+export function fetchSampleMeta(): Promise<SampleMeta> {
+  return staticJson<SampleMeta>('meta.json')
+}
+
+const CHRISTIAN_SET = new Set(CHRISTIAN_TRADITIONS.map(([v]) => v))
+
+function num(p: URLSearchParams, k: string): number | null {
+  const v = p.get(k)
+  return v === null || v === '' ? null : Number(v)
+}
+
+// Mirrors the server's foundations endpoint for the filters the UI exposes.
+async function staticFoundations(qs: string) {
+  const p = new URLSearchParams(qs)
+  let rows = (await staticJson<FoundationRowV5[]>('foundations.json')).slice()
+  if (p.get('include_inactive') !== 'true') rows = rows.filter((r) => r.paid_2324 > 0)
+
+  const tradition = p.get('tradition')
+  const tier = p.get('tier') || 'any'
+  const minTradDollars = num(p, 'min_tradition_dollars') ?? 0
+  if (tradition) {
+    const wanted = new Set(
+      tradition.split(',').flatMap((t) =>
+        t === ANY_CHRISTIAN ? [...CHRISTIAN_SET] : [t]))
+    const anyChristian = [...wanted].every((t) => CHRISTIAN_SET.has(t))
+    rows = rows.filter((r) => {
+      // The sample carries per-foundation totals, not the full tradition
+      // breakdown, so Christian filters use christian_dollars directly.
+      const dollars = anyChristian ? r.christian_dollars : r.nonchristian_dollars
+      return dollars > Math.max(minTradDollars, 0)
+    })
+  }
+  const pairs: [string, (r: FoundationRowV5, v: number) => boolean][] = [
+    ['min_paid', (r, v) => r.paid_2324 >= v],
+    ['max_paid', (r, v) => r.paid_2324 <= v],
+    ['min_median', (r, v) => (r.median_grant ?? 0) >= v],
+    ['max_median', (r, v) => (r.median_grant ?? 0) <= v],
+    ['min_grants', (r, v) => r.grant_count_2324 >= v],
+    ['min_assets', (r, v) => (r.assets ?? 0) >= v],
+    ['max_assets', (r, v) => (r.assets ?? 0) <= v],
+    ['min_revenue', (r, v) => (r.revenue ?? 0) >= v],
+    ['min_coverage', (r, v) => r.coverage_pct >= v],
+    ['min_christian', (r, v) => r.christian_dollars >= v],
+    ['min_pct_christian', (r, v) => (r.pct_christian ?? -1) >= v],
+  ]
+  for (const [key, test] of pairs) {
+    const v = num(p, key)
+    if (v !== null) rows = rows.filter((r) => test(r, v))
+  }
+  const listFilter = (key: string, get: (r: FoundationRowV5) => string | null) => {
+    const raw = p.get(key)
+    if (!raw) return
+    const set = new Set(raw.split(',').map((s) => s.trim()))
+    rows = rows.filter((r) => set.has(String(get(r))))
+  }
+  listFilter('state', (r) => (r.state || '').toUpperCase())
+  listFilter('application_status', (r) => r.application_status)
+  listFilter('coverage_band', (r) => r.coverage_band)
+  if (p.get('has_website') === 'true') rows = rows.filter((r) => !!websiteUrlSafe(r.website))
+  if (p.get('has_email') === 'true') rows = rows.filter(() => false)
+  if (p.get('exclude_testamentary') === 'true') rows = rows.filter((r) => !r.is_testamentary)
+  if (p.get('exclude_micro') === 'true') rows = rows.filter((r) => !r.is_micro)
+  if (p.get('daf') === 'exclude') rows = rows.filter((r) => r.daf_dollars === 0)
+  if (p.get('daf') === 'only') rows = rows.filter((r) => r.daf_dollars > 0)
+
+  const sortKey = p.get('sort') || 'pct_christian'
+  const desc = (p.get('order') || 'desc') === 'desc'
+  const pctField = tier === 'authoritative' ? 'pct_christian_auth' : 'pct_christian'
+  const value = (r: FoundationRowV5): number | string | null => {
+    switch (sortKey) {
+      case 'pct_christian': return r[pctField] as number | null
+      case 'christian': return r.christian_dollars
+      case 'coverage': return r.coverage_pct
+      case 'assets': return r.assets ?? 0
+      case 'median': return r.median_grant ?? 0
+      case 'recipients': return r.recipient_count
+      case 'name': return r.name
+      default: return r.paid_2324
+    }
+  }
+  rows.sort((a, b) => {
+    const av = value(a), bv = value(b)
+    // NULL means "nothing could be classified" -- always last, never treated
+    // as 0, matching the server's NULLS LAST behaviour.
+    if (av === null && bv === null) return b.christian_dollars - a.christian_dollars
+    if (av === null) return 1
+    if (bv === null) return -1
+    if (typeof av === 'string' || typeof bv === 'string') {
+      const cmp = String(av).localeCompare(String(bv))
+      return desc ? -cmp : cmp
+    }
+    if (av === bv) return b.christian_dollars - a.christian_dollars
+    return desc ? (bv as number) - (av as number) : (av as number) - (bv as number)
+  })
+  const limit = Number(p.get('limit') || 50)
+  const offset = Number(p.get('offset') || 0)
+  return { total: rows.length, rows: rows.slice(offset, offset + limit) }
+}
+
+function websiteUrlSafe(raw: string | null): boolean {
+  const v = (raw ?? '').trim().toLowerCase()
+  if (!v || ['n/a', 'na', 'none', 'not applicable', '-'].includes(v)) return false
+  return v.includes('.')
+}
+
+async function staticGrants(qs: string) {
+  const p = new URLSearchParams(qs)
+  let rows = (await staticJson<GrantsExplorerRow[]>('grants.json')).slice()
+  const q = (p.get('q') || '').toLowerCase()
+  if (q) rows = rows.filter((r) =>
+    r.grantee_name.toLowerCase().includes(q) ||
+    r.foundation_name.toLowerCase().includes(q))
+  if (p.get('recipient_state')) rows = rows.filter((r) => r.state === p.get('recipient_state'))
+  if (p.get('tax_year')) rows = rows.filter((r) => String(r.tax_year) === p.get('tax_year'))
+  const min = num(p, 'amount_min')
+  if (min !== null) rows = rows.filter((r) => r.amount >= min)
+  const tradition = p.get('tradition')
+  if (tradition === ANY_CHRISTIAN) rows = rows.filter((r) => r.tradition && CHRISTIAN_SET.has(r.tradition))
+  else if (tradition) rows = rows.filter((r) => r.tradition === tradition)
+  const size = Number(p.get('page_size') || 50)
+  const page = Number(p.get('page') || 1)
+  return {
+    total: rows.length,
+    total_dollars: rows.reduce((s, r) => s + r.amount, 0),
+    rows: rows.slice((page - 1) * size, page * size),
+  }
+}
+
+async function staticRecipients(qs: string) {
+  const p = new URLSearchParams(qs)
+  let rows = (await staticJson<RecipientRowV5[]>('recipients.json')).slice()
+  const q = (p.get('q') || '').toLowerCase()
+  if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q))
+  const tradition = p.get('tradition')
+  if (tradition === ANY_CHRISTIAN) rows = rows.filter((r) => r.tradition && CHRISTIAN_SET.has(r.tradition))
+  else if (tradition === 'unclassified') rows = rows.filter((r) => !r.tradition)
+  else if (tradition) rows = rows.filter((r) => r.tradition === tradition)
+  if (p.get('identity_status')) rows = rows.filter((r) => r.identity_status === p.get('identity_status'))
+  const min = num(p, 'min_received')
+  if (min !== null) rows = rows.filter((r) => r.total_received >= min)
+  const size = Number(p.get('page_size') || 50)
+  const page = Number(p.get('page') || 1)
+  return { total: rows.length, rows: rows.slice((page - 1) * size, page * size) }
+}
+
+type StaticDetail = FoundationDetailV5 & { grants: GrantRowV5[] }
+
+export async function staticRoute(path: string): Promise<unknown> {
+  const [route, qs = ''] = path.replace('/api/v5/', '').split('?')
+  if (route === 'stats') return staticJson('stats.json')
+  if (route === 'recipients-stats') return staticJson('recipients-stats.json')
+  if (route.startsWith('analytics/')) return staticJson(`${route}.json`)
+  if (route === 'foundations') return staticFoundations(qs)
+  if (route === 'grants') return staticGrants(qs)
+  if (route === 'recipients') return staticRecipients(qs)
+  const detail = route.match(/^foundations\/(\d+)$/)
+  if (detail) return staticJson<StaticDetail>(`foundation/${detail[1]}.json`)
+  const grants = route.match(/^foundations\/(\d+)\/grants$/)
+  if (grants) {
+    const d = await staticJson<StaticDetail>(`foundation/${grants[1]}.json`)
+    return { rows: d.grants }
+  }
+  const recipient = route.match(/^recipients\/(.+)$/)
+  if (recipient) {
+    // Recipient drill-down needs a funder join the static sample does not
+    // carry; return the shape with an empty funder list rather than erroring.
+    return { recipient: null, funders: [] }
+  }
+  throw new Error(`no sample data for ${route}`)
 }
