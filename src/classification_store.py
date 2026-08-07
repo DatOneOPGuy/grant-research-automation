@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import uuid
 from dataclasses import dataclass
@@ -148,9 +149,36 @@ def eligible_evidence(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
 
 GENERIC_LABELS = frozenset({"christian_unspecified", "nonchristian_unspecified"})
 
+_RULE_VERSION = re.compile(r"-v(\d+)$")
+
+
+def _rule_version(row: sqlite3.Row) -> int:
+    match = _RULE_VERSION.search(row["source_rule_id"] or "")
+    return int(match.group(1)) if match else 0
+
+
+def newest_rule_only(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
+    """Drop superseded name-rule evidence.
+
+    The ledger is append-only, so a corrected rule cannot delete what an
+    earlier version wrote. Instead each rule pass stamps its version into
+    source_rule_id, and only the newest version present for an entity is
+    considered. That is how a v3 pass retracts a v2 false positive: it writes
+    an `unknown` row, which shadows v2 and is then filtered as ineligible,
+    leaving the entity unclassified rather than wrongly Christian.
+    """
+    rule_rows = [row for row in rows if row["evidence_method"] == "rule"]
+    if len(rule_rows) < 2:
+        return rows
+    newest = max(_rule_version(row) for row in rule_rows)
+    superseded = {
+        id(row) for row in rule_rows if _rule_version(row) != newest
+    }
+    return [row for row in rows if id(row) not in superseded]
+
 
 def choose_evidence(rows: list[sqlite3.Row]) -> tuple[sqlite3.Row | None, str | None]:
-    eligible = eligible_evidence(rows)
+    eligible = eligible_evidence(newest_rule_only(rows))
     if not eligible:
         return None, "no_eligible_evidence"
     priority = max(METHOD_PRIORITY[row["evidence_method"]] for row in eligible)
