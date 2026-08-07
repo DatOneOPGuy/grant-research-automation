@@ -21,8 +21,33 @@ import re
 # --- helpers -------------------------------------------------------------
 
 def _rx(words):
-    """Word-boundary alternation regex for a list of phrases."""
-    parts = [re.escape(w.strip()) for w in words if w.strip()]
+    """Word-boundary alternation regex for a list of phrases.
+
+    Both boundaries matter. The pattern previously had a leading \\b only, so
+    every literal could match the PREFIX of a longer word, and .strip() then
+    deleted the trailing space authors had added to prevent exactly that --
+    'cru ' became \\b(?:cru) and matched "cruz", "cruelty", "crusade",
+    mislabelling 913 recipients including the ASPCA. Five entries relied on
+    that space guard: cru, byu, zen, pbs, npr.
+
+    The trailing space is now honoured as the guard it was: an entry written
+    with one gets a real trailing \\b. Entries without one keep the open end,
+    deliberately -- many are stems that must still match their inflections
+    ("christ scientist" must match "CHRIST SCIENTISTS", "latter day" must match
+    "LATTERDAY"). Adding \\b to every entry was tried and broke exactly those:
+    it let 20 Mormon / Christian Science / Muslim organisations escape their
+    exclusion lists and be relabelled Christian, which is a precision leak in
+    the worst direction for this product.
+    """
+    parts = []
+    for word in words:
+        text = word.strip()
+        if not text:
+            continue
+        pattern = re.escape(text)
+        if word != text and word.rstrip() == text and text[-1].isalnum():
+            pattern += r'\b'
+        parts.append(pattern)
     return re.compile(r'\b(?:' + '|'.join(parts) + r')', re.IGNORECASE)
 
 
@@ -200,6 +225,29 @@ SAINT_PLACE = re.compile(
     r'|(?:st\.?|saint)\s+(?:louis|petersburg|croix|simons?\s+island)\b'
     r'|st\.?\s+\w+s?\s+county\b'
     r'|st\s+univ(?:ersity)?\b)', re.IGNORECASE)
+# Religious terms functioning as PLACE names, mirroring SAINT_PLACE. Same
+# principle as the ST-LOUIS / Georgetown fixes: a religious word standing in
+# for a location is not a religious signal.
+#   Corpus Christi, TX -- "Texas A&M University-Corpus Christi" is a secular
+#     public university. Guarded only in a civic/education context, so the
+#     parish "CORPUS CHRISTI CHURCH" keeps its Catholic classification.
+#   Assumption / Ascension Parish, LA -- civil parishes (the Louisiana word
+#     for county), not church parishes. Guarded only in a government context,
+#     so "Church of the Assumption" is untouched.
+CATHOLIC_PLACE = re.compile(
+    r'\b(?:'
+    r'(?:texas\s*a\s*&?\s*m|tamu)\b[\w\s&.\-]*\bcorpus\s+christi'
+    r'|corpus\s+christi[\w\s&.\-]*\b(?:university|college|independent'
+    r'\s+school|isd|school\s+district|public\s+schools?|county|city\s+of'
+    r'|chamber|convention|symphony|museum|zoo|humane|public\s+library)'
+    r'|(?:university|college|isd|school\s+district)[\w\s&.\-]*\bcorpus'
+    r'\s+christi'
+    r'|(?:assumption|ascension)\s+parish\b[\w\s&.\-]*\b(?:government'
+    r'|sheriff|school\s+board|council|police\s+jury|library|assessor'
+    r'|clerk|coroner|tourist|economic)'
+    r'|(?:government|sheriff|school\s+board|police\s+jury|clerk\s+of\s+court)'
+    r'[\w\s&.\-]*\b(?:assumption|ascension)\s+parish'
+    r')', re.IGNORECASE)
 # Secular-sounding "Big Brothers Big Sisters" must never match 'sisters of'.
 BBBS = re.compile(r'\bbig\s+brothers[\s-]+big\s+sisters\b', re.IGNORECASE)
 # An explicit religious word blocks the secular institution-word override:
@@ -270,7 +318,7 @@ def tradition(name: str) -> str | None:
     # Orthodox markers beat the Catholic saint/monastery vocabulary.
     if ORTHODOX.search(n):
         return 'Orthodox'
-    if CATHOLIC.search(n) and not BBBS.search(n):
+    if CATHOLIC.search(n) and not BBBS.search(n) and not CATHOLIC_PLACE.search(n):
         return 'Catholic'
     if (SALVATION_ARMY.search(n) or MESSIANIC.search(n)
             or PROTESTANT.search(n)):
@@ -304,6 +352,9 @@ def classify(name: str) -> str | None:
             return 'nonchristian'
     # "Big Brothers Big Sisters" must not fall into Catholic 'sisters of'.
     if BBBS.search(n):
+        return 'nonchristian'
+    # A religious term used as a place name is not a religious signal.
+    if CATHOLIC_PLACE.search(n) and not RELIGIOUS_WORD.search(n):
         return 'nonchristian'
     if (CATHOLIC.search(n) or ORTHODOX.search(n)):
         return 'christian'
