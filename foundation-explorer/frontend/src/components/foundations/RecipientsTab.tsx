@@ -92,9 +92,16 @@ function Mission({ entityId }: { entityId: string }) {
     </div>
   }
   if (!data) return <Skeleton className="h-10" />
+  // Never dereference blindly: a recipient outside the sample, or one with no
+  // 990 on file, must degrade to a message rather than crash the whole route.
+  if (!data.recipient?.mission_text) {
+    return <div className="text-xs text-muted">
+      No mission text on file for this recipient.
+    </div>
+  }
   return (
     <blockquote className="border-l-2 border-accent pl-3 text-sm italic text-ink max-w-2xl">
-      “{data.recipient.mission_text || 'No mission text on file.'}”
+      “{data.recipient.mission_text}”
       <div className="text-xs text-muted not-italic mt-1">
         From the organization’s own Form 990
       </div>

@@ -13,6 +13,7 @@ import Recipients from './pages/Recipients'
 import Analytics from './pages/Analytics'
 import DataQuality from './pages/DataQuality'
 import Trust from './pages/Trust'
+import RouteError from './components/layout/RouteError'
 import './styles/index.css'
 
 const queryClient = new QueryClient({
@@ -27,16 +28,18 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
+    // One bad record must cost the reviewer a page, not the whole app.
+    errorElement: <RouteError />,
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'best-prospects', element: <BestProspects /> },
-      { path: 'foundations', element: <Foundations /> },
-      { path: 'saved', element: <Saved /> },
-      { path: 'grants', element: <Grants /> },
-      { path: 'recipients', element: <Recipients /> },
-      { path: 'analytics', element: <Analytics /> },
-      { path: 'data-quality', element: <DataQuality /> },
-      { path: 'trust', element: <Trust /> },
+      { index: true, element: <Dashboard />, errorElement: <RouteError /> },
+      { path: 'best-prospects', element: <BestProspects />, errorElement: <RouteError /> },
+      { path: 'foundations', element: <Foundations />, errorElement: <RouteError /> },
+      { path: 'saved', element: <Saved />, errorElement: <RouteError /> },
+      { path: 'grants', element: <Grants />, errorElement: <RouteError /> },
+      { path: 'recipients', element: <Recipients />, errorElement: <RouteError /> },
+      { path: 'analytics', element: <Analytics />, errorElement: <RouteError /> },
+      { path: 'data-quality', element: <DataQuality />, errorElement: <RouteError /> },
+      { path: 'trust', element: <Trust />, errorElement: <RouteError /> },
     ],
   },
 ])

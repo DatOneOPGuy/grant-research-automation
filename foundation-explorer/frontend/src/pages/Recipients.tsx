@@ -198,7 +198,7 @@ export default function Recipients() {
                         {funders && (
                           <table className="w-full text-xs mt-2">
                             <tbody>
-                              {funders.funders.slice(0, 15).map((f) => (
+                              {(funders.funders ?? []).slice(0, 15).map((f) => (
                                 <tr key={f.ein}>
                                   <td className="py-1 pr-3">
                                     {titleCase(f.name)}

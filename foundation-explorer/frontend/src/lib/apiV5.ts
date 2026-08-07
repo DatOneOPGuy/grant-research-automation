@@ -476,6 +476,13 @@ export const STATIC_MODE =
 
 let staticCache: Record<string, unknown> = {}
 
+// Deterministic 2-hex bucket. Must match shard_for() in make_demo_v5.py.
+function shardFor(entityId: string): string {
+  let total = 0
+  for (const char of entityId) total = (total * 31 + char.charCodeAt(0)) % 4096
+  return (total % 128).toString(16).padStart(2, '0')
+}
+
 async function staticJson<T>(path: string): Promise<T> {
   if (staticCache[path] === undefined) {
     const res = await fetch(`/demo-v5/${path}`)
@@ -658,9 +665,12 @@ export async function staticRoute(path: string): Promise<unknown> {
   }
   const recipient = route.match(/^recipients\/(.+)$/)
   if (recipient) {
-    // Recipient drill-down needs a funder join the static sample does not
-    // carry; return the shape with an empty funder list rather than erroring.
-    return { recipient: null, funders: [] }
+    const entityId = decodeURIComponent(recipient[1])
+    const shard = await staticJson<Record<string, RecipientDetailV5>>(
+      `recipient/${shardFor(entityId)}.json`)
+    const found = shard[entityId]
+    if (!found) throw new Error(`recipient not in sample: ${entityId}`)
+    return found
   }
   throw new Error(`no sample data for ${route}`)
 }

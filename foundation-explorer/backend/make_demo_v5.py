@@ -45,6 +45,14 @@ FOUNDATION_COLUMNS = """
 """
 
 
+def shard_for(entity_id: str) -> str:
+    """Deterministic 2-hex bucket. Must match shardFor() in apiV5.ts."""
+    total = 0
+    for char in entity_id:
+        total = (total * 31 + ord(char)) % 4096
+    return f"{total % 128:02x}"
+
+
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
 
@@ -232,6 +240,51 @@ def main() -> None:
                    AS has_mission
         FROM recipients r WHERE r.total_received > 0
         ORDER BY r.total_received DESC LIMIT ?""", (RECIPIENTS_SAMPLE,))])
+
+    # --- recipient detail: mission text is the product's core evidence ------
+    # Every recipient referenced anywhere in the sample gets a record, sharded
+    # so the browser fetches ~60 KB instead of the whole 3 MB corpus. Without
+    # this the mission drill-down has nothing to read, which is exactly the
+    # evidence a reviewer needs to judge whether a classification is credible.
+    referenced: set[str] = set()
+    for path in (OUT / "foundation").glob("*.json"):
+        for row in json.loads(path.read_text())["recipients"]:
+            referenced.add(row["entity_id"])
+    sample_recipient_ids = {
+        r["entity_id"] for r in json.loads(
+            (OUT / "recipients.json").read_text())}
+    referenced |= sample_recipient_ids
+
+    conn.execute("CREATE TEMP TABLE want(id TEXT PRIMARY KEY)")
+    conn.executemany("INSERT OR IGNORE INTO want VALUES (?)",
+                     [(i,) for i in referenced])
+    shards: dict[str, dict] = {}
+    for row in conn.execute("""
+            SELECT r.entity_id, COALESCE(r.display_name, r.name) AS name,
+                   r.ein, r.identity_status, r.tradition, r.method,
+                   r.confidence, r.reason, r.is_daf, r.mission_text,
+                   r.website, r.total_received, r.funder_count
+            FROM recipients r JOIN want w ON w.id = r.entity_id"""):
+        shards.setdefault(shard_for(row["entity_id"]), {})[
+            row["entity_id"]] = {"recipient": dict(row), "funders": []}
+    # Funders only for the browsable recipient sample -- carrying them for all
+    # 46k referenced recipients would add tens of MB for rows nobody opens.
+    for entity_id in sample_recipient_ids:
+        funders = conn.execute("""
+            SELECT frs.ein, f.name, frs.dollars, frs.grants, frs.last_year
+            FROM frs JOIN foundations f ON f.ein=frs.ein
+            WHERE frs.entity_id=? ORDER BY frs.dollars DESC LIMIT 15""",
+            (entity_id,)).fetchall()
+        bucket = shards.get(shard_for(entity_id), {})
+        if entity_id in bucket:
+            bucket[entity_id]["funders"] = [dict(r) for r in funders]
+    for name, payload in shards.items():
+        dump(f"recipient/{name}.json", payload)
+    with_mission = sum(
+        1 for b in shards.values() for v in b.values()
+        if v["recipient"].get("mission_text"))
+    log(f"recipient records: {len(referenced):,} across {len(shards)} shards "
+        f"({with_mission:,} carry mission text)")
 
     # Totals the static adapter reports, so counts stay truthful even though
     # only a sample is browsable.
