@@ -60,7 +60,11 @@ MESSIANIC = _rx([
 # --- 2. Exclusions (non-Christian) ---------------------------------------
 JEWISH = _rx([
     'yeshiva', 'hebrew academy', 'hebrew school', 'hebrew day', 'jewish',
-    'torah', 'rabbinical', 'rabbi', 'chabad', 'lubavitch', 'hasidic',
+    # 'rabbi ' is boundary-guarded so it cannot match "rabbit". 'rabbin' is
+    # left open on purpose: it covers rabbinical / rabbinic / rabbinate and
+    # the misspellings that occur in filings ("Rabbincal Seminary"), while
+    # still being unable to match "rabbit" (which has no 'n').
+    'torah', 'rabbin', 'rabbi ', 'chabad', 'lubavitch', 'hasidic',
     'chasidic', 'synagogue', 'kollel', 'hillel', 'mesorah', "b'nai",
     'bnai', 'bnos', 'temple beth', 'temple emanu', 'temple israel',
     'temple sinai', 'congregation beth', 'congregation bnai', 'beth jacob',
@@ -186,7 +190,9 @@ PROTESTANT = _rx([
     'lifeline children', 'show hope', 'world orphans', 'lifesong for orphans',
     'operation blessing', 'christian broadcasting', 'the 700 club',
     'inspiration ministries', 'daystar', 'trinity broadcasting', 'salem media',
-    'care net', 'heartbeat international', 'crisis pregnancy',
+    # Trailing space = required boundary (see _rx). Without it 'care net'
+    # matched "care network" and made ABORTION CARE NETWORK evangelical.
+    'care net ', 'heartbeat international', 'crisis pregnancy',
     'pregnancy resource', 'pregnancy center', 'kairos', 'church planting',
     'seminary', 'theological seminary', 'chaplain', 'chaplaincy',
 ])
@@ -248,11 +254,46 @@ CATHOLIC_PLACE = re.compile(
     r'|(?:government|sheriff|school\s+board|police\s+jury|clerk\s+of\s+court)'
     r'[\w\s&.\-]*\b(?:assumption|ascension)\s+parish'
     r')', re.IGNORECASE)
+# "Christiana" (Christiana, DE; Christiana Care Health System; the Christiana
+# River) is a place and personal name, not a Christian signal. Same principle
+# as SAINT_PLACE and CATHOLIC_PLACE. Deliberately narrow: it fires only on the
+# place/health-system shapes, so "Christian [X]" ministries are untouched.
+CHRISTIANA_PLACE = re.compile(
+    r'\bchristiana\b(?:\s|$)|\bchristiana\s*(?:care|health|hospital|river|'
+    r'town|borough|county)\b|\bchristianas\b', re.IGNORECASE)
+# Safety net for the RELIGIOUS_WORD escape hatch. The non-Christian exclusion
+# lists have vocabulary gaps ("Hebrew Theological College" carries no listed
+# Jewish literal; "Rabbincal Seminary" is misspelt), so a generically religious
+# word like 'seminary' or 'theological' could otherwise carry a Jewish or
+# Muslim institution into the Christian bucket. Consulted ONLY where
+# RELIGIOUS_WORD is, which preserves the property that the escape hatch can
+# prevent a secular verdict but never leak a non-Christian one.
+OTHER_FAITH_HINT = _rx([
+    'hebrew', 'rabbin', 'rabbi', 'yeshiva', 'torah', 'talmud', 'judaic',
+    'judaism', 'jewish', 'synagogue', 'chabad', 'islamic', 'muslim', 'quran',
+    'madrasa', 'hindu', 'vedic', 'buddhist', 'dharma', 'sikh', 'gurdwara',
+    'baha', 'zoroastrian', 'latter-day', 'latter day', 'mormon',
+    'christian science', 'jehovah', 'unitarian',
+])
 # Secular-sounding "Big Brothers Big Sisters" must never match 'sisters of'.
 BBBS = re.compile(r'\bbig\s+brothers[\s-]+big\s+sisters\b', re.IGNORECASE)
 # An explicit religious word blocks the secular institution-word override:
 # "Heritage Christian University" and "Revive College Church" are churches.
-RELIGIOUS_WORD = _rx(['church', 'chapel', 'christian', 'ministry', 'ministries'])
+# Words that block the secular-institution override. This list can only
+# PREVENT a secular verdict; it never assigns a religious label on its own, and
+# the non-Christian exclusions (Jewish, Muslim, Mormon, Christian Science...)
+# have already returned by the time it is consulted. So extending it can
+# recover a missed Christian organisation but cannot leak a non-Christian one.
+#
+# Without bible/gospel/seminary/theological, SECULAR 'college' outranked
+# "Bible Institute" and LATIN AMERICAN BIBLE INST COLLEGE ($5.3M) read secular.
+RELIGIOUS_WORD = _rx([
+    'church', 'chapel', 'christian', 'ministry', 'ministries',
+    'bible', 'biblical', 'gospel', 'seminary', 'theological', 'theology',
+    'diocese', 'diocesan', 'archdiocese', 'catholic', 'baptist',
+    'evangelical', 'pentecostal', 'methodist', 'presbyterian', 'lutheran',
+    'wesleyan', 'episcopal', 'mennonite', 'anglican',
+])
 # Research institutions only: a plain "St. Joseph Hospital" IS a Catholic
 # hospital; "St. Jude Children's Research Hospital" is the secular exception.
 MEDICAL_OVERRIDE = _rx([
@@ -305,13 +346,25 @@ BIG_SECULAR = _rx([
 ])
 
 
+def _neutralize_places(text: str) -> str:
+    """Blank out religious tokens that are functioning as place names.
+
+    "Christiana" (Christiana Care Health System, Christiana DE) otherwise
+    satisfies RELIGIOUS_WORD via the 'christian' prefix, which then blocks the
+    secular override and yields a Christian verdict. Neutralising the token up
+    front is surgical: no downstream rule can read it as a signal, and no other
+    organisation's name is touched.
+    """
+    return CHRISTIANA_PLACE.sub(' ', text)
+
+
 def tradition(name: str) -> str | None:
     """For a Christian recipient, return which branch matched — a subtle
     display hint. Returns 'Catholic' | 'Orthodox' | 'Evangelical/Protestant'
     | None. Only meaningful when classify() returns 'christian'."""
     if not name:
         return None
-    n = f' {name.lower().strip()} '
+    n = _neutralize_places(f' {name.lower().strip()} ')
     # An explicit Protestant denomination beats saint/Catholic vocabulary.
     if PROT_DENOMINATION.search(n):
         return 'Evangelical/Protestant'
@@ -333,7 +386,7 @@ def classify(name: str) -> str | None:
     if not name:
         return None
     raw = name.strip()
-    n = f' {raw.lower()} '
+    n = _neutralize_places(f' {raw.lower()} ')
 
     # placeholder / non-recipient text -> not an identifiable Christian org
     if PLACEHOLDER.match(raw) or len(raw) <= 2:
@@ -372,7 +425,7 @@ def classify(name: str) -> str | None:
     # secular override — blocked by an explicit religious word in the name
     # ("Heritage Christian University", "Revive College Church" are churches)
     if SECULAR.search(n):
-        if RELIGIOUS_WORD.search(n):
+        if RELIGIOUS_WORD.search(n) and not OTHER_FAITH_HINT.search(n):
             return 'christian'
         return 'nonchristian'
     return None

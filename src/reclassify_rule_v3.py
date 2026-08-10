@@ -34,7 +34,7 @@ from src.classification_store import (
 )
 
 DB = Path("data/grants_v2.db")
-RULE_ID = "recipient-name-rule-v3"
+RULE_ID = "recipient-name-rule-v3"   # default; override with --rule-version
 CHUNK = 5_000
 
 
@@ -42,20 +42,33 @@ def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
 
 
-def superseded_candidates(conn: sqlite3.Connection, identity_run: str):
-    """Entities carrying v2 rule evidence, with their current label."""
+def superseded_candidates(conn: sqlite3.Connection, identity_run: str,
+                          rule_id: str):
+    """Entities whose CURRENTLY-WINNING rule label may now be wrong.
+
+    Compares against the newest rule version already on the ledger, not against
+    v2, so successive correction passes chain correctly: a v4 pass must
+    supersede whatever v3 concluded, not re-litigate v2.
+    """
     return conn.execute(
         """
+        WITH newest AS (
+          SELECT entity_id, MAX(source_rule_id) AS top_rule
+          FROM classification_evidence
+          WHERE evidence_method = 'rule' AND source_rule_id < ?
+          GROUP BY entity_id
+        )
         SELECT e.entity_id, e.canonical_name, e.identity_status,
                MAX(ce.classification) AS old_label
         FROM recipient_entities e
-        JOIN classification_evidence ce ON ce.entity_id = e.entity_id
+        JOIN newest n ON n.entity_id = e.entity_id
+        JOIN classification_evidence ce
+          ON ce.entity_id = e.entity_id
+         AND ce.source_rule_id = n.top_rule
         WHERE e.run_id = ?
-          AND ce.evidence_method = 'rule'
-          AND ce.source_rule_id = 'recipient-name-rule-v2'
         GROUP BY e.entity_id
         """,
-        (identity_run,),
+        (rule_id, identity_run),
     ).fetchall()
 
 
@@ -64,13 +77,15 @@ def main() -> None:
                                  description=__doc__)
     ap.add_argument("--identity-run", required=True)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--rule-version", default=RULE_ID)
     args = ap.parse_args()
+    rule_id = args.rule_version
 
     started = time.monotonic()
     conn = sqlite3.connect(DB, timeout=60)
     create_classification_schema(conn)
-    rows = superseded_candidates(conn, args.identity_run)
-    log(f"entities carrying v2 rule evidence: {len(rows):,}")
+    rows = superseded_candidates(conn, args.identity_run, rule_id)
+    log(f"entities carrying prior rule evidence: {len(rows):,}")
 
     changed = []
     for entity_id, name, identity_status, old_label in rows:
@@ -91,7 +106,7 @@ def main() -> None:
         return
 
     run_id = create_run(conn, args.identity_run, "rule",
-                        engine_name="recipient-name-rule-v3",
+                        engine_name=rule_id,
                         config={"fix": "rx-boundary-guard+place-literals"})
     log(f"classification run {run_id}")
     for index, (entity_id, name, identity_status, old_label, new_label) in \
@@ -103,11 +118,11 @@ def main() -> None:
                 new_label or "unknown",
                 0.90,
                 "rule",
-                reason=("name rule v3 supersedes v2: "
+                reason=(f"name rule {rule_id} supersedes prior version: "
                         + ("no religious signal survives the boundary and "
                            "place-name guards" if new_label is None
                            else f"reclassified {old_label} -> {new_label}")),
-                source_rule_id=RULE_ID,
+                source_rule_id=rule_id,
                 source_record={"name": name,
                                "identity_status": identity_status,
                                "superseded_label": old_label},
