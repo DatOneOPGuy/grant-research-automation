@@ -39,10 +39,14 @@ METHOD_PRIORITY = {
     "group_exemption": 75,    # denominational group ruling inheritance
     "rule": 70,
     "llm": 50,
+    # Describes ONE GRANT, not the organisation's identity, so it sits below
+    # mission text: it fills gaps and corroborates, never overrides.
+    "grant_purpose": 40,
     "legacy_faith_classification": 30,
     "legacy_tag": 30,
 }
 METHOD_CONFIDENCE_FLOOR = {
+    "grant_purpose": 0.70,
     "human": 0.0,
     "ntee": 0.8,
     "church_code_name": 0.9,
