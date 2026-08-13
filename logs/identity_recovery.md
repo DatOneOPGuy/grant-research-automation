@@ -124,3 +124,100 @@ Of the $4.33B identity-blocked Christian blind spot, this pass has established:
    validation sample before any write.
 4. Treat Step 3's threshold as an open question, informed by the 36.5%
    baseline measured here.
+
+---
+
+# Step 1 write attempt — HALTED at the gate
+
+_2026-08-13. **Nothing was written.** Re-verification dropped 20% of the
+"safe" bucket and found catastrophic errors inside it. Your hard gate says stop
+and report if more than a handful fail; 25 of 125 failed, and two of the
+survivors were worse than the failures._
+
+## What re-verification found
+
+I did not trust the earlier pass. Re-checking all 125 against live BMF rows
+surfaced two bugs **in my own Step 1 classification**:
+
+**Bug 1 — apostrophe normalisation caused false drops.** "Children's" split into
+two tokens while the BMF's "CHILDRENS" is one, so Seattle Children's Hospital,
+St Jude Children's Research Hospital and Samaritan's Purse were being rejected
+as mismatches when they are correct. Fixed by stripping apostrophes.
+
+**Bug 2 — token containment is a SUBSET test, and subsets lie.** A filed name
+whose tokens are all present in the BMF name passes, even when the BMF name is
+a completely different organisation that merely contains those words:
+
+| filed name | dollars | proposed match | verdict |
+|---|---:|---|---|
+| Stanford university | $258,827,824 | CHI ALPHA CHRISTIAN FELLOWSHIP AT STANFORD UNIVERSITY | catastrophic |
+| Massachusetts General Hospital | $233,889,228 | MGH NURSES ALUMNAE ASSOCIATION | wrong entity |
+| Brigham and Women's Hospital | $33,859,597 | PROFESSIONAL NURSES CHAPTER OF THE… | wrong entity |
+| Harvard Business School | $20,358,114 | HARVARD BUSINESS SCHOOL CLASS OF 1982 ASSOCIATION | wrong entity |
+| New York Philharmonic | $18,530,288 | ELAINE AND STEPHEN STAMAS … FUND | wrong entity |
+| filing | $45,900,000 | LOUIS VIGIL SUBDIVISION FILING NO 2 | the filed name is literally "filing" |
+
+Adding a bidirectional check — the BMF name must not introduce substantive
+extra tokens — dropped 25 rows / $1.014B.
+
+## The gate trips again inside the survivors
+
+Even after that, tuning the threshold to "≤2 extra tokens" still passes:
+
+| filed name | dollars | matched to | extra token |
+|---|---:|---|---|
+| **University of Michigan** | **$247,159,738** | **MICHIGAN STATE UNIVERSITY** | `state` |
+| The University of Texas at Dallas | $41,647,394 | UNIVERSITY OF NORTH TEXAS AT DALLAS | `north` |
+| BLOOMBERG FAMILY FOUNDATION | $32,000,000 | JEROME AND SONDRA BLOOMBERG FAMILY… | `jerome`,`sondra` |
+| PFIZER INC | $68,500,000 | PFIZER FOUNDATION INC | `foundation` |
+
+**One extra token — "state" — turns the University of Michigan into Michigan
+State.** No threshold fixes this, because the information that distinguishes
+the two organisations *is* that single token. This is the same lesson as the
+36.5% precision measurement, arrived at from the other direction.
+
+## What is actually safe
+
+Restricting to matches where the BMF name adds **no substantive tokens at all**
+— pure abbreviation expansion and stopwords:
+
+| bucket | rows | dollars |
+|---|---:|---:|
+| **STRICT — abbreviation/stopword only** | **58** | **$3.462B** |
+| LOOSE — BMF adds 1–2 tokens | 42 | $1.306B |
+| dropped in re-verification | 25 | $1.014B |
+
+The strict set is structurally safe because the transformation is
+deterministic: `NATIONAL PHILANTHROPIC TR` → Trust, `KOHLER TR FOR CLEAN WATER`
+→ Trust, `SEATTLE CHILDRENS HOSPITAL`, `TRUSTEES OF DARTMOUTH COLLEGE`,
+`COMMUNITY FDN OF GREATER MEMPHIS` → Foundation. Nothing is being inferred;
+an abbreviation is being expanded.
+
+## Why I stopped rather than writing the 58
+
+Your gate: *"If re-verification drops more than a handful of the 125, stop and
+report — that would mean even the 'safe' bucket isn't as safe as measured."*
+
+25 of 125 dropped, and the pass set still contained a $247M error. The bucket
+was not as safe as measured, so I am reporting instead of writing — including
+the fact that the unsafety came from **my own** Step 1 test, not from the
+original queue.
+
+**I believe the 58 strict rows / $3.462B are genuinely safe** and would write
+them on your say-so. I am not writing them tonight because the honest position
+is that my "safe" label has now been wrong once, and you asked to be told
+before the write, not after.
+
+## Recommendation
+
+1. **Write the 58 strict rows** ($3.462B) after you glance at the list — the
+   transformation is deterministic abbreviation expansion.
+2. **Do not write the 42 loose rows** ($1.306B) automatically. University of
+   Michigan → Michigan State is in there. Hand-confirm or discard.
+3. **Purge the 203 REJECT rows** as planned — but note the purge should also
+   cover the 25 newly-dropped and the University-of-Michigan class, so a future
+   pass cannot regenerate them.
+4. **Retire token-containment matching as an automated method.** Three
+   independent measurements now say the same thing: 36.5% precision on the
+   parked corpus, 20% failure on the hand-picked "safe" subset, and a $247M
+   error surviving two rounds of gating.
