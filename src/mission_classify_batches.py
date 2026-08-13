@@ -33,7 +33,7 @@ def target_items(table: str = "mission_targets") -> list[dict]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--source", choices=("gold", "targets", "ready", "schedo"),
+    ap.add_argument("--source", choices=("gold", "targets", "ready", "schedo", "corrob"),
                     required=True)
     ap.add_argument("--out-dir", type=Path, required=True)
     ap.add_argument("--batch-size", type=int, default=40)
@@ -44,6 +44,8 @@ def main() -> None:
         items = target_items("mission_targets_ready")
     elif args.source == "schedo":
         items = target_items("mission_targets_schedo")
+    elif args.source == "corrob":
+        items = target_items("mission_targets_corrob")
     else:
         items = target_items()
     args.out_dir.mkdir(parents=True, exist_ok=True)
