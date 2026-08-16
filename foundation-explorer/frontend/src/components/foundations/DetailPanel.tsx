@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import {
-  fetchFoundationDetailV5, fetchFoundationGrantsV5, type GrantRowV5,
+  MONTH_NAMES, fetchFoundationDetailV5, fetchFoundationGrantsV5,
+  type GrantRowV5,
 } from '../../lib/apiV5'
 import {
   money, moneyFull, propublicaUrl, titleCase, websiteUrl,
@@ -69,6 +70,21 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 {f && <span className="tabular font-medium text-ink">
                   {money(f.paid_2324)} paid 2023–24</span>}
                 {f && <StatusPill status={f.application_status} />}
+                {f?.deadline_kind === 'dated' && f.deadline_months && (
+                  <span title={f.deadline_text || undefined}
+                    className="text-xs px-1.5 py-0.5 rounded bg-accent/15
+                      text-primary">
+                    Deadline: {f.deadline_months.split(',')
+                      .map((m) => MONTH_NAMES[Number(m) - 1]).join(', ')}
+                  </span>
+                )}
+                {f?.deadline_kind === 'rolling' && (
+                  <span title={f.deadline_text || undefined}
+                    className="text-xs px-1.5 py-0.5 rounded bg-accent/15
+                      text-primary">
+                    Applications year-round
+                  </span>
+                )}
                 {websiteUrl(f?.website) && (
                   <a href={websiteUrl(f?.website) as string}
                     target="_blank" rel="noreferrer"

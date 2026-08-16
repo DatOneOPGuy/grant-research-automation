@@ -30,6 +30,46 @@ SORTS = {"paid": "paid_2324", "christian": "christian_dollars",
 # nothing about at the top of the flagship view, so they are pushed last.
 NULLS_LAST = {"pct_christian"}
 
+# Application-deadline seasons. Grants carry no date on a 990-PF, so these
+# describe when a foundation accepts APPLICATIONS -- the thing a fundraiser
+# schedules around -- not when it writes cheques.
+SEASONS = {
+    "spring": [3, 4, 5], "summer": [6, 7, 8],
+    "fall": [9, 10, 11], "autumn": [9, 10, 11], "winter": [12, 1, 2],
+    "q1": [1, 2, 3], "q2": [4, 5, 6], "q3": [7, 8, 9], "q4": [10, 11, 12],
+    "first_half": [1, 2, 3, 4, 5, 6], "second_half": [7, 8, 9, 10, 11, 12],
+    "year_end": [11, 12], "new_year": [1, 2],
+}
+
+
+def month_mask(months) -> int:
+    mask = 0
+    for month in months:
+        if 1 <= int(month) <= 12:
+            mask |= 1 << (int(month) - 1)
+    return mask
+
+
+def deadline_mask_from(season: str | None, months: str | None,
+                       from_month: int | None, to_month: int | None) -> int:
+    """Combine the three ways a user can express a window into one bitmask."""
+    wanted: set[int] = set()
+    for token in (season or "").split(","):
+        wanted.update(SEASONS.get(token.strip().lower(), []))
+    for token in (months or "").split(","):
+        token = token.strip()
+        if token.isdigit():
+            wanted.add(int(token))
+    if from_month and to_month:
+        # Wraps across the year end: Nov->Feb is Nov, Dec, Jan, Feb.
+        month = int(from_month)
+        for _ in range(12):
+            wanted.add(month)
+            if month == int(to_month):
+                break
+            month = (month % 12) + 1
+    return month_mask(wanted)
+
 
 def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
@@ -73,6 +113,11 @@ def foundations(
     min_christian: int | None = None,
     min_pct_christian: float | None = None,
     include_inactive: bool = False,
+    deadline_season: str | None = None,
+    deadline_months: str | None = None,
+    deadline_from_month: int | None = Query(None, ge=1, le=12),
+    deadline_to_month: int | None = Query(None, ge=1, le=12),
+    deadline_kind: str | None = None,
     sort: str = "paid", order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, le=500), offset: int = 0,
 ):
@@ -176,6 +221,17 @@ def foundations(
     if min_pct_christian is not None:
         where.append(f"{pct_column} >= ?")
         params.append(min_pct_christian)
+    mask = deadline_mask_from(deadline_season, deadline_months,
+                              deadline_from_month, deadline_to_month)
+    if mask:
+        # Bitwise AND: keep foundations whose deadline months overlap the
+        # requested window at all.
+        where.append("(f.deadline_mask & ?) != 0")
+        params.append(mask)
+    if deadline_kind:
+        kinds = [k.strip() for k in deadline_kind.split(",") if k.strip()]
+        where.append(f"f.deadline_kind IN ({','.join('?' for _ in kinds)})")
+        params += kinds
     sql_where = " AND ".join(where)
     with connect() as conn:
         total = conn.execute(
@@ -190,6 +246,7 @@ def foundations(
                    {pct_column} AS pct_christian,
                    auth_christian_dollars, pct_christian_auth,
                    unattributable_reason,
+                   deadline_kind, deadline_months, deadline_text,
                    coverage_pct, coverage_band, application_status, website,
                    assets, revenue, is_testamentary, is_micro
             FROM foundations f WHERE {sql_where}

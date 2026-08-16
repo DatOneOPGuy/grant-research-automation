@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Info, Sparkles } from 'lucide-react'
 import {
   ANY_CHRISTIAN, APPLICATION_STATUSES, CHRISTIAN_TRADITIONS, COVERAGE_BANDS,
+  DEADLINE_KINDS, DEADLINE_QUARTERS, DEADLINE_SEASONS, MONTH_NAMES,
   defaultV5Filters, OTHER_TRADITIONS, PRESETS, US_REGIONS, type V5Filters,
 } from '../../lib/apiV5'
 import { US_STATES } from '../../lib/format'
@@ -123,7 +124,8 @@ const CHRISTIAN_KEYS = CHRISTIAN_TRADITIONS.map(([k]) => k)
 export default function FilterPanel({ filters, onChange }: Props) {
   const set = (patch: Partial<V5Filters>) => onChange({ ...filters, ...patch })
   const toggleIn = (
-    key: 'tradition' | 'state' | 'application_status' | 'coverage_band',
+    key: 'tradition' | 'state' | 'application_status' | 'coverage_band'
+       | 'deadline_season' | 'deadline_months' | 'deadline_kind',
     v: string,
   ) => {
     const cur = filters[key]
@@ -285,6 +287,75 @@ export default function FilterPanel({ filters, onChange }: Props) {
           lo={filters.min_assets} hi={filters.max_assets}
           onLo={(v) => set({ min_assets: v })}
           onHi={(v) => set({ max_assets: v })} />
+        <div className="mt-3 pt-3 border-t border-line/60">
+          <div className="text-xs font-medium text-ink mb-1">
+            Application timing
+          </div>
+          <p className="text-[11px] text-muted mb-2 leading-snug">
+            When the foundation accepts applications, from its 990-PF. Grants
+            carry no date, so this is deadline timing — not when it gave.
+          </p>
+
+          <div className="text-xs text-muted mb-1">Season</div>
+          {DEADLINE_SEASONS.map(([v, label]) => (
+            <Check key={v} label={label}
+              checked={filters.deadline_season.includes(v)}
+              onChange={() => toggleIn('deadline_season', v)} />
+          ))}
+
+          <div className="text-xs text-muted mb-1 mt-2">Quarter / period</div>
+          {DEADLINE_QUARTERS.map(([v, label]) => (
+            <Check key={v} label={label}
+              checked={filters.deadline_season.includes(v)}
+              onChange={() => toggleIn('deadline_season', v)} />
+          ))}
+
+          <div className="text-xs text-muted mb-1 mt-2">Specific months</div>
+          <div className="grid grid-cols-4 gap-1">
+            {MONTH_NAMES.map((label, i) => {
+              const value = String(i + 1)
+              const on = filters.deadline_months.includes(value)
+              return (
+                <button key={value} type="button"
+                  onClick={() => toggleIn('deadline_months', value)}
+                  className={`text-xs py-1 rounded border ${on
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-line text-muted hover:bg-canvas'}`}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="text-xs text-muted mb-1 mt-2">
+            Custom range (wraps across year end)
+          </div>
+          <div className="flex items-center gap-2">
+            <select value={filters.deadline_from_month}
+              onChange={(e) => set({ deadline_from_month: e.target.value })}
+              className="border border-line rounded px-2 py-1 text-sm flex-1">
+              <option value="">From…</option>
+              {MONTH_NAMES.map((m, i) =>
+                <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+            <span className="text-xs text-muted">to</span>
+            <select value={filters.deadline_to_month}
+              onChange={(e) => set({ deadline_to_month: e.target.value })}
+              className="border border-line rounded px-2 py-1 text-sm flex-1">
+              <option value="">To…</option>
+              {MONTH_NAMES.map((m, i) =>
+                <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
+
+          <div className="text-xs text-muted mb-1 mt-2">Deadline type</div>
+          {DEADLINE_KINDS.map(([v, label]) => (
+            <Check key={v} label={label}
+              checked={filters.deadline_kind.includes(v)}
+              onChange={() => toggleIn('deadline_kind', v)} />
+          ))}
+        </div>
+
         <div className="text-xs text-muted mb-1">Min Christian $</div>
         <NumInput value={filters.min_christian}
           onChange={(v) => set({ min_christian: v })} placeholder="Min $" />

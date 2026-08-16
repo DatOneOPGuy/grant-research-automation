@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import os
 import re
 import sqlite3
@@ -119,6 +120,17 @@ CREATE TABLE foundations (
     -- Why this foundation's dollars could not be attributed. Display only:
     -- drives the message shown to the user, never a dollar figure or verdict.
     unattributable_reason TEXT,
+    -- Application submission deadlines from 990-PF Part XV. There is no date
+    -- on an individual grant, so a foundation's GIVING cannot be placed in a
+    -- season; when it accepts APPLICATIONS can be, and that is what a
+    -- fundraiser plans around.
+    --   deadline_kind  : dated | rolling | none | unparseable | NULL (not stated)
+    --   deadline_months: readable CSV, e.g. "3,9"
+    --   deadline_mask  : bitmask, month N = bit N-1, for indexed range queries
+    deadline_kind TEXT,
+    deadline_months TEXT,
+    deadline_mask INTEGER DEFAULT 0,
+    deadline_text TEXT,
     coverage_pct REAL DEFAULT 0, coverage_band TEXT DEFAULT 'Low',
     is_testamentary INTEGER DEFAULT 0, is_micro INTEGER DEFAULT 0,
     active_2023 INTEGER DEFAULT 0, active_2024 INTEGER DEFAULT 0
@@ -164,6 +176,7 @@ CREATE INDEX idx_f_cov ON foundations(coverage_band);
 CREATE INDEX idx_f_pct ON foundations(pct_christian);
 CREATE INDEX idx_f_chr ON foundations(christian_dollars);
 CREATE INDEX idx_f_active ON foundations(paid_2324, pct_christian);
+CREATE INDEX idx_f_deadline ON foundations(deadline_mask);
 CREATE INDEX idx_ts_lookup ON tradition_stats(tradition, tier, dollars);
 CREATE INDEX idx_ts_ein ON tradition_stats(ein);
 CREATE INDEX idx_rs_state ON recipient_states(state, dollars);
@@ -491,6 +504,27 @@ def build_foundations(out: sqlite3.Connection) -> None:
                          / classified_dollars, 1)
             ELSE NULL END
     """)
+    # Application deadlines: materialised locally then indexed, rather than a
+    # correlated probe into the attached database.
+    out.execute("""
+        CREATE TEMP TABLE dl AS
+        SELECT ein, kind, months_json, raw_text FROM p.foundation_deadlines
+    """)
+    out.execute("CREATE INDEX temp.idx_dl ON dl(ein)")
+    deadlines = []
+    for ein, kind, months_json, raw in out.execute(
+            "SELECT ein, kind, months_json, raw_text FROM dl"):
+        months = json.loads(months_json or "[]")
+        mask = 0
+        for month in months:
+            mask |= 1 << (month - 1)
+        deadlines.append((kind, ",".join(str(m) for m in months) or None,
+                          mask, (raw or "")[:200], ein))
+    out.executemany(
+        "UPDATE foundations SET deadline_kind=?, deadline_months=?, "
+        "deadline_mask=?, deadline_text=? WHERE ein=?", deadlines)
+    log(f"foundations: {len(deadlines):,} application deadlines applied")
+
     # Foundation-level reason = the reason accounting for the most
     # nonclassifiable dollars at that foundation, so the message shown matches
     # where the money actually went.

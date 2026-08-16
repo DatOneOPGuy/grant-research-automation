@@ -36,6 +36,9 @@ export type FoundationRowV5 = {
   auth_christian_dollars: number
   pct_christian_auth: number | null
   unattributable_reason: string | null
+  deadline_kind: string | null
+  deadline_months: string | null
+  deadline_text: string | null
   coverage_pct: number
   coverage_band: string
   application_status: string | null
@@ -140,6 +143,28 @@ export const APPLICATION_STATUSES = [
   'Accepting Applications', 'Contact First', 'Invite Only', 'Unknown',
 ]
 export const COVERAGE_BANDS = ['High', 'Moderate', 'Low', 'Not Classifiable']
+
+// When a foundation accepts APPLICATIONS. A 990-PF carries no date on an
+// individual grant, so we cannot say when a foundation gave -- only when it
+// asks to be approached, which is what a fundraiser schedules around.
+export const DEADLINE_SEASONS: [string, string][] = [
+  ['spring', 'Spring (Mar–May)'],
+  ['summer', 'Summer (Jun–Aug)'],
+  ['fall', 'Fall (Sep–Nov)'],
+  ['winter', 'Winter (Dec–Feb)'],
+]
+export const DEADLINE_QUARTERS: [string, string][] = [
+  ['q1', 'Q1 (Jan–Mar)'], ['q2', 'Q2 (Apr–Jun)'],
+  ['q3', 'Q3 (Jul–Sep)'], ['q4', 'Q4 (Oct–Dec)'],
+  ['year_end', 'Year end (Nov–Dec)'], ['new_year', 'New year (Jan–Feb)'],
+]
+export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export const DEADLINE_KINDS: [string, string][] = [
+  ['dated', 'Has a stated deadline'],
+  ['rolling', 'Accepts applications year-round'],
+  ['none', 'States no deadline'],
+]
 
 // ---- geographic regions ----------------------------------------------------
 // Census divisions plus a domain-specific "Bible Belt" grouping that maps to
@@ -250,6 +275,11 @@ export type V5Filters = {
   min_christian: string
   min_pct_christian: string
   include_inactive: boolean
+  deadline_season: string[]
+  deadline_months: string[]
+  deadline_from_month: string
+  deadline_to_month: string
+  deadline_kind: string[]
   sort: string
   order: 'asc' | 'desc'
 }
@@ -289,16 +319,23 @@ export const defaultV5Filters: V5Filters = {
   min_christian: '',
   min_pct_christian: '',
   include_inactive: false,
+  deadline_season: [],
+  deadline_months: [],
+  deadline_from_month: '',
+  deadline_to_month: '',
+  deadline_kind: [],
   sort: 'pct_christian',
   order: 'desc',
 }
 
 const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
-  'application_status', 'coverage_band'] as const
+  'application_status', 'coverage_band', 'deadline_season', 'deadline_months',
+  'deadline_kind'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',
   'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
   'min_assets', 'max_assets', 'min_revenue', 'min_coverage',
-  'min_christian', 'min_pct_christian'] as const
+  'min_christian', 'min_pct_christian', 'deadline_from_month',
+  'deadline_to_month'] as const
 const BOOL_KEYS = ['has_website', 'has_email', 'has_contact',
   'exclude_testamentary', 'exclude_micro', 'include_inactive'] as const
 
