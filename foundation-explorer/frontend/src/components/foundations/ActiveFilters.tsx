@@ -91,6 +91,12 @@ function buildChips(
   return chips
 }
 
+/** How many filter dimensions are currently applied. Shown on the Filters
+ *  button so a collapsed panel never hides the fact that a query is narrowed. */
+export function activeFilterCount(f: V5Filters): number {
+  return buildChips(f, () => {}).length
+}
+
 export default function ActiveFilters({ filters, onChange, onClearAll }: {
   filters: V5Filters
   onChange: (f: V5Filters) => void

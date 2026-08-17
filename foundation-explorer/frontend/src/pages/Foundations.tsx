@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   ArrowDown, ArrowUp, Bookmark, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, HelpCircle, Loader2, PanelLeftClose, PanelLeftOpen,
+  Globe, HelpCircle, Loader2, SlidersHorizontal,
 } from 'lucide-react'
 import {
   defaultV5Filters, fetchFoundationsV5,
@@ -13,7 +13,8 @@ import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
 import { useSavedFoundations } from '../lib/savedContext'
 import { Skeleton, StatusPill } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
-import ActiveFilters from '../components/foundations/ActiveFilters'
+import ActiveFilters, { activeFilterCount }
+  from '../components/foundations/ActiveFilters'
 import DetailPanel from '../components/foundations/DetailPanel'
 import { BucketBar } from '../components/foundations/BucketBar'
 
@@ -120,6 +121,7 @@ export default function Foundations() {
 
   const total = data?.total ?? 0
   const pageCount = Math.ceil(total / PAGE_SIZE)
+  const filterCount = activeFilterCount(filters)
 
   return (
     <div>
@@ -138,6 +140,21 @@ export default function Foundations() {
             )}
           </div>
         </div>
+        <button onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          className={`flex items-center gap-2 text-sm rounded-md border px-3
+            py-1.5 transition-colors ${filtersOpen
+              ? 'border-primary/30 bg-primary/5 text-primary'
+              : 'border-line text-muted hover:text-ink hover:bg-canvas'}`}>
+          <SlidersHorizontal size={15} />
+          {filtersOpen ? 'Hide filters' : 'Filters'}
+          {filterCount > 0 && (
+            <span className="text-xs bg-primary text-white rounded-full
+              px-1.5 py-0.5 font-medium tabular">
+              {filterCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {isError && (
@@ -152,24 +169,8 @@ export default function Foundations() {
           ...defaultV5Filters, sort: f.sort, order: f.order }))} />
 
       <div className="flex gap-4">
-        {filtersOpen ? (
-          <div className="shrink-0">
-            <button onClick={() => setFiltersOpen(false)}
-              className="flex items-center gap-1.5 text-xs text-muted
-                hover:text-ink mb-2">
-              <PanelLeftClose size={14} /> Hide filters
-            </button>
-            <FilterPanel filters={filters} onChange={setFilters} />
-          </div>
-        ) : (
-          <button onClick={() => setFiltersOpen(true)}
-            title="Show filters"
-            className="shrink-0 self-start flex items-center gap-1.5 text-xs
-              text-muted hover:text-ink border border-line rounded-md px-2
-              py-2">
-            <PanelLeftOpen size={14} />
-            <span className="[writing-mode:vertical-rl] py-1">Filters</span>
-          </button>
+        {filtersOpen && (
+          <FilterPanel filters={filters} onChange={setFilters} />
         )}
 
         <div className="flex-1 min-w-0">
