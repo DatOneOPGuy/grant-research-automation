@@ -43,6 +43,14 @@ const COLUMNS: { key: string; label: string; sortKey?: string
   { key: 'paid', label: 'Paid 2023–24', sortKey: 'paid' },
   { key: 'status', label: 'Application' },
   { key: 'median', label: 'Median grant', sortKey: 'median' },
+  {
+    key: 'intl', label: 'International', sortKey: 'foreign',
+    help: 'Dollars this foundation sent outside the US, with the countries '
+      + 'it funded. Destinations come from the country code on the filing '
+      + '(IRS/FIPS codes, not ISO). Where a code could not be verified the '
+      + 'money is counted as international but left unplaced rather than '
+      + 'assigned to a guessed country.',
+  },
   { key: 'actions', label: '' },
 ]
 
@@ -153,11 +161,11 @@ export default function Foundations() {
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && !isError && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={9} className="px-3 py-2">
+                  <tr key={i}><td colSpan={10} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={9} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={10} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -198,6 +206,22 @@ export default function Foundations() {
                     </td>
                     <td className="px-3 tabular text-muted whitespace-nowrap">
                       {money(r.median_grant)}
+                    </td>
+                    <td className="px-3 tabular whitespace-nowrap max-w-40">
+                      {r.foreign_dollars > 0 ? (
+                        <>
+                          <div className="font-medium">
+                            {money(r.foreign_dollars)}
+                          </div>
+                          <div className="text-[11px] text-muted truncate"
+                            title={r.foreign_top_countries || undefined}>
+                            {r.foreign_top_countries
+                              || `${r.foreign_grant_count} grants, country not stated`}
+                            {r.foreign_country_count > 4
+                              && ` +${r.foreign_country_count - 4}`}
+                          </div>
+                        </>
+                      ) : <span className="text-muted">—</span>}
                     </td>
                     <RowActions ein={r.ein} website={r.website} />
                   </tr>

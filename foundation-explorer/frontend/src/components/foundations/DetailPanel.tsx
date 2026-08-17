@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import {
   MONTH_NAMES, fetchFoundationDetailV5, fetchFoundationGrantsV5,
-  type GrantRowV5,
+  type CountryDollarsV5, type GrantRowV5,
 } from '../../lib/apiV5'
 import {
   money, moneyFull, propublicaUrl, titleCase, websiteUrl,
@@ -157,7 +157,10 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 <RecipientsTab recipients={data.recipients} />
               )}
               {tab === 'Grants' && <GrantsTab ein={ein} />}
-              {tab === 'Geography' && <GeographyTab states={data.states} />}
+              {tab === 'Geography' && (
+                <GeographyTab states={data.states}
+                  countries={data.countries} />
+              )}
             </>
           )}
         </div>
@@ -223,17 +226,25 @@ function GrantsTab({ ein }: { ein: string }) {
   )
 }
 
-function GeographyTab({ states }: {
+function GeographyTab({ states, countries }: {
   states: { state: string; dollars: number }[]
+  countries: CountryDollarsV5[]
 }) {
-  if (!states.length) {
+  if (!states.length && !countries.length) {
     return <div className="text-sm text-muted">
       No recipient geography recorded.
     </div>
   }
   const max = Math.max(...states.map((s) => s.dollars), 1)
   return (
+    <div className="space-y-4">
+    {countries.length > 0 && <InternationalBreakdown countries={countries} />}
     <div className="space-y-1.5 max-w-md">
+      {states.length > 0 && (
+        <div className="text-xs font-medium text-ink mb-1">
+          US recipients by state
+        </div>
+      )}
       {states.map((s) => (
         <div key={s.state} className="flex items-center gap-3 text-sm">
           <span className="w-8 text-muted tabular">{s.state || '—'}</span>
@@ -246,6 +257,60 @@ function GeographyTab({ states }: {
           </span>
         </div>
       ))}
+    </div>
+    </div>
+  )
+}
+
+function InternationalBreakdown({ countries }: {
+  countries: CountryDollarsV5[]
+}) {
+  const total = countries.reduce((sum, c) => sum + c.dollars, 0)
+  const christian = countries.reduce((sum, c) => sum + c.christian_dollars, 0)
+  const max = Math.max(...countries.map((c) => c.dollars), 1)
+  const named = countries.filter((c) => c.country_code !== '(unspecified)')
+  const unplaced = countries.find((c) => c.country_code === '(unspecified)')
+  return (
+    <div className="max-w-md">
+      <div className="text-xs font-medium text-ink mb-1">
+        International giving — {money(total)} to {named.length}{' '}
+        {named.length === 1 ? 'country' : 'countries'}
+        {christian > 0 && <>, {money(christian)} Christian</>}
+      </div>
+      <p className="text-[11px] text-muted mb-2 leading-snug">
+        Destinations as coded on the 990-PF (IRS/FIPS codes, not ISO).
+      </p>
+      <div className="space-y-1.5">
+        {countries.map((c) => (
+          <div key={c.country_code} className="flex items-center gap-3 text-sm">
+            <span className="w-32 truncate text-muted"
+              title={`${c.country_name} (${c.country_code})`}>
+              {c.country_name}
+            </span>
+            <div className="flex-1 h-3 bg-line/40 rounded overflow-hidden">
+              {/* Christian portion first, so the split is readable in place */}
+              <div className="h-full flex">
+                <div className="h-full bg-primary/80"
+                  style={{ width: `${(c.christian_dollars / max) * 100}%` }} />
+                <div className="h-full bg-scorehigh/60"
+                  style={{
+                    width: `${((c.dollars - c.christian_dollars) / max) * 100}%`,
+                  }} />
+              </div>
+            </div>
+            <span className="w-20 text-right tabular font-medium">
+              {money(c.dollars)}
+            </span>
+          </div>
+        ))}
+      </div>
+      {unplaced && (
+        <p className="text-[11px] text-muted mt-2 leading-snug">
+          {money(unplaced.dollars)} could not be placed to a country: the
+          filing gave a code we could not verify. It is shown here rather than
+          dropped so the total reconciles.
+        </p>
+      )}
     </div>
   )
 }

@@ -18,6 +18,8 @@ import sys
 import time
 from pathlib import Path
 
+from src import country_codes
+
 PIPELINE_DB = Path("data/grants_v2.db")
 BMF_DB = Path("data/bmf_registry.db")
 OUT_DB = Path("data/explorer_v5.db")
@@ -86,6 +88,16 @@ def unattributable_reason(name: str | None) -> str:
             return reason
     return "not_itemized"
 
+# One canonical definition of "this grant left the country", used by every
+# aggregate so the figures cannot drift apart. Union rather than intersection:
+# some filers give a foreign address element with no country code, others a
+# country code inside a domestic address block. Requiring both would drop real
+# international giving; requiring either can at worst over-include a
+# mis-keyed domestic row, which the country breakdown makes visible.
+DOMESTIC_SQL = ", ".join(f"'{code}'" for code in sorted(country_codes.DOMESTIC))
+FOREIGN_SQL = (f"(g.is_foreign=1 OR (COALESCE(g.recipient_country,'') != '' "
+               f"AND g.recipient_country NOT IN ({DOMESTIC_SQL})))")
+
 SCHEMA = """
 CREATE TABLE foundations (
     ein TEXT PRIMARY KEY, name TEXT, city TEXT, state TEXT,
@@ -94,6 +106,21 @@ CREATE TABLE foundations (
     application_status TEXT, latest_tax_year INTEGER,
     paid_2324 INTEGER DEFAULT 0, grant_count_2324 INTEGER DEFAULT 0,
     recipient_count INTEGER DEFAULT 0, median_grant INTEGER,
+    -- International giving. foreign_dollars is the union of "non-domestic
+    -- country code" and "filing used a foreign-address element": either is
+    -- sufficient evidence the money left the country, and requiring both
+    -- would silently drop grants whose filer supplied one but not the other.
+    foreign_dollars INTEGER DEFAULT 0,
+    foreign_grant_count INTEGER DEFAULT 0,
+    -- Countries we could actually NAME. Lower than the number of distinct
+    -- codes seen, because untrustworthy codes resolve to NULL by design.
+    foreign_country_count INTEGER DEFAULT 0,
+    -- Denormalised "Kenya, Uganda, India" for list rendering without a join.
+    foreign_top_countries TEXT,
+    -- Christian giving that went abroad. The headline number for a client
+    -- funding indigenous overseas mission work.
+    foreign_christian_dollars INTEGER DEFAULT 0,
+    pct_foreign REAL,
     christian_dollars INTEGER DEFAULT 0, nonchristian_dollars INTEGER DEFAULT 0,
     unclassified_dollars INTEGER DEFAULT 0, daf_dollars INTEGER DEFAULT 0,
     nonclassifiable_dollars INTEGER DEFAULT 0,
@@ -164,7 +191,23 @@ CREATE TABLE frs (
 CREATE TABLE grants (
     id INTEGER PRIMARY KEY, funder_ein TEXT, entity_id TEXT,
     recipient_name TEXT, recipient_city TEXT, recipient_state TEXT,
-    amount INTEGER, tax_year INTEGER, purpose TEXT
+    amount INTEGER, tax_year INTEGER, purpose TEXT,
+    -- Raw filing code (FIPS 10-4, not ISO -- see src/country_codes.py) and
+    -- its verified display name. country_name is NULL when the code cannot be
+    -- trusted, which the UI shows as Unspecified rather than guessing.
+    recipient_country TEXT, country_name TEXT,
+    -- Parser flag: the filing used a foreign-address element. Kept alongside
+    -- the country code because the two disagree on ~thousands of rows and a
+    -- researcher deserves to see either signal.
+    is_foreign INTEGER DEFAULT 0
+);
+-- Per-foundation destination breakdown, for the detail panel and the country
+-- filter. Materialised because deriving it per request means scanning 3M
+-- grant rows.
+CREATE TABLE foundation_countries (
+    ein TEXT, country_code TEXT, country_name TEXT,
+    dollars INTEGER, grants INTEGER, christian_dollars INTEGER DEFAULT 0,
+    PRIMARY KEY (ein, country_code)
 );
 """
 
@@ -177,6 +220,9 @@ CREATE INDEX idx_f_pct ON foundations(pct_christian);
 CREATE INDEX idx_f_chr ON foundations(christian_dollars);
 CREATE INDEX idx_f_active ON foundations(paid_2324, pct_christian);
 CREATE INDEX idx_f_deadline ON foundations(deadline_mask);
+CREATE INDEX idx_f_foreign ON foundations(foreign_dollars);
+CREATE INDEX idx_f_fgn_chr ON foundations(foreign_christian_dollars);
+CREATE INDEX idx_g_country ON grants(recipient_country);
 CREATE INDEX idx_ts_lookup ON tradition_stats(tradition, tier, dollars);
 CREATE INDEX idx_ts_ein ON tradition_stats(ein);
 CREATE INDEX idx_rs_state ON recipient_states(state, dollars);
@@ -322,18 +368,46 @@ def build_recipients(out: sqlite3.Connection, run_id: str, release_id: str) -> N
     log(f"recipients: {n:,} ({daf:,} DAF sponsors flagged)")
 
 
+def build_country_map(out: sqlite3.Connection) -> None:
+    """Materialise the verified code->name map as a table.
+
+    A Python UDF would be correct but is measurably slow across 3M grant rows
+    (the standing project lesson about scalar functions in joins), so the map
+    becomes a joinable table instead. Codes deliberately left unnamed --
+    ambiguous ones and the OC catch-all -- are simply absent, so the LEFT JOIN
+    yields NULL and the product says Unspecified.
+    """
+    out.execute("CREATE TEMP TABLE country_map (code TEXT PRIMARY KEY, "
+                "name TEXT)")
+    named = dict(country_codes.FIPS)
+    named.update(country_codes.OVERRIDES)
+    for code in country_codes.AMBIGUOUS | country_codes.UNSPECIFIED:
+        named.pop(code, None)
+    out.executemany("INSERT INTO country_map VALUES (?,?)", named.items())
+    log(f"country map: {len(named):,} codes resolvable to a name "
+        f"({len(country_codes.AMBIGUOUS)} held ambiguous, "
+        f"{len(country_codes.UNSPECIFIED)} filer catch-all)")
+
+
 def build_grants(out: sqlite3.Connection, run_id: str) -> None:
     log("grants: paid 2023-2024 receipt rows…")
+    build_country_map(out)
     out.execute("""
         INSERT INTO grants (funder_ein, entity_id, recipient_name,
                             recipient_city, recipient_state, amount,
-                            tax_year, purpose)
+                            tax_year, purpose, recipient_country,
+                            country_name, is_foreign)
         SELECT t.ein, em.entity_id, g.display_name, g.city, g.state,
-               g.signed_amount, g.tax_year, t.purpose
+               g.signed_amount, g.tax_year, t.purpose,
+               UPPER(TRIM(COALESCE(t.recipient_country,''))),
+               cm.name,
+               CASE WHEN COALESCE(t.is_foreign,0)=1 THEN 1 ELSE 0 END
         FROM p.grant_norm g
         JOIN p.grant_transactions t ON t.grant_id=g.grant_id
         JOIN p.recipient_entity_mentions em
           ON em.run_id=g.run_id AND em.mention_id=g.mention_id
+        LEFT JOIN country_map cm
+          ON cm.code = UPPER(TRIM(COALESCE(t.recipient_country,'')))
         WHERE g.run_id=? AND g.tax_year IN (2023, 2024)
     """, (run_id,))
     out.commit()
@@ -366,6 +440,65 @@ def build_rollups(out: sqlite3.Connection) -> None:
         WHERE recipient_state != '' GROUP BY 1, 2
     """)
     out.commit()
+
+
+def build_foundation_countries(out: sqlite3.Connection) -> None:
+    """Per-foundation destination rollup, plus the denormalised top-country
+    string the list view renders.
+
+    Rows whose code could not be trusted are grouped under a single
+    `(unspecified)` bucket rather than dropped, so the dollars still reconcile
+    to foundations.foreign_dollars.
+    """
+    log("foundations: international destination rollup…")
+    out.execute(f"""
+        INSERT INTO foundation_countries
+            (ein, country_code, country_name, dollars, grants,
+             christian_dollars)
+        SELECT g.funder_ein,
+               CASE WHEN g.country_name IS NULL THEN '(unspecified)'
+                    ELSE g.recipient_country END,
+               COALESCE(g.country_name, 'Unspecified'),
+               SUM(g.amount), COUNT(*),
+               SUM(CASE WHEN r.identity_status NOT IN {NONCLASSIFIABLE_STATUSES}
+                        AND r.is_daf=0 AND r.tradition IN
+                     ('evangelical_protestant','catholic','orthodox_christian',
+                      'christian_unspecified') THEN g.amount ELSE 0 END)
+        FROM grants g JOIN recipients r ON r.entity_id=g.entity_id
+        WHERE {FOREIGN_SQL}
+        GROUP BY 1, 2, 3
+    """)
+    out.execute("CREATE INDEX idx_fc_ein ON foundation_countries(ein, dollars)")
+    out.execute("CREATE INDEX idx_fc_code "
+                "ON foundation_countries(country_code, dollars)")
+    out.commit()
+    # Named countries only in the count and the label: "3 countries" must not
+    # be inflated by the unspecified bucket.
+    out.execute("""
+        CREATE TEMP TABLE fc_named AS
+        SELECT ein, COUNT(*) AS n FROM foundation_countries
+        WHERE country_code != '(unspecified)' GROUP BY 1
+    """)
+    out.execute("CREATE INDEX temp.idx_fcn ON fc_named(ein)")
+    out.execute("""
+        UPDATE foundations SET foreign_country_count =
+            COALESCE((SELECT n FROM fc_named WHERE fc_named.ein=foundations.ein), 0)
+    """)
+    labels = {}
+    for ein, name in out.execute("""
+            SELECT ein, country_name FROM foundation_countries
+            WHERE country_code != '(unspecified)'
+            ORDER BY ein, dollars DESC"""):
+        bucket = labels.setdefault(ein, [])
+        if len(bucket) < 4:
+            bucket.append(name)
+    out.executemany("UPDATE foundations SET foreign_top_countries=? WHERE ein=?",
+                    [(", ".join(names), ein) for ein, names in labels.items()])
+    out.commit()
+    rows, eins = out.execute(
+        "SELECT COUNT(*), COUNT(DISTINCT ein) FROM foundation_countries"
+    ).fetchone()
+    log(f"foundations: {rows:,} destination rows across {eins:,} foundations")
 
 
 def build_foundations(out: sqlite3.Connection) -> None:
@@ -428,10 +561,18 @@ def build_foundations(out: sqlite3.Connection) -> None:
           -- the ratio below can never exceed 100%
           SUM(CASE WHEN r.identity_status NOT IN {statuses}
                    AND (r.tradition IS NOT NULL OR r.is_daf=1)
-              THEN g.amount ELSE 0 END) AS class_num
+              THEN g.amount ELSE 0 END) AS class_num,
+          -- International giving. The predicate is the UNION of the two
+          -- independent signals (see foundations.foreign_dollars).
+          SUM(CASE WHEN {foreign} THEN g.amount ELSE 0 END) AS fgn,
+          SUM(CASE WHEN {foreign} THEN 1 ELSE 0 END) AS fgn_n,
+          SUM(CASE WHEN {foreign} AND r.identity_status NOT IN {statuses}
+                   AND r.is_daf=0 AND r.tradition IN
+                ('evangelical_protestant','catholic','orthodox_christian',
+                 'christian_unspecified') THEN g.amount ELSE 0 END) AS fgn_chr
         FROM grants g JOIN recipients r ON r.entity_id=g.entity_id
         GROUP BY 1
-    """.format(statuses=str(NONCLASSIFIABLE_STATUSES)))
+    """.format(statuses=str(NONCLASSIFIABLE_STATUSES), foreign=FOREIGN_SQL))
     out.execute("CREATE INDEX temp.idx_agg ON agg(ein)")
     out.execute("""
         UPDATE foundations SET
@@ -444,8 +585,23 @@ def build_foundations(out: sqlite3.Connection) -> None:
           christian_dollars=COALESCE((SELECT chr FROM agg WHERE agg.ein=foundations.ein),0),
           nonchristian_dollars=COALESCE((SELECT nonchr FROM agg WHERE agg.ein=foundations.ein),0),
           nonclassifiable_dollars=COALESCE(
-              (SELECT nonclass FROM agg WHERE agg.ein=foundations.ein),0)
+              (SELECT nonclass FROM agg WHERE agg.ein=foundations.ein),0),
+          foreign_dollars=COALESCE(
+              (SELECT fgn FROM agg WHERE agg.ein=foundations.ein),0),
+          foreign_grant_count=COALESCE(
+              (SELECT fgn_n FROM agg WHERE agg.ein=foundations.ein),0),
+          foreign_christian_dollars=COALESCE(
+              (SELECT fgn_chr FROM agg WHERE agg.ein=foundations.ein),0)
     """)
+    # NULL rather than 0 when a foundation gave nothing, matching the
+    # pct_christian convention: "no giving" is not "0% international".
+    out.execute("""
+        UPDATE foundations SET pct_foreign = CASE
+            WHEN paid_2324 > 0
+              THEN ROUND(100.0 * foreign_dollars / paid_2324, 1)
+            ELSE NULL END
+    """)
+    build_foundation_countries(out)
     # unclassified_dollars now means "classifiable, but we have not classified
     # it" -- the honest remaining work. Dollars the filing anonymized are held
     # separately in nonclassifiable_dollars, not counted as our failure.
@@ -640,6 +796,18 @@ def main() -> None:
             "SELECT SUM(nonclassifiable_dollars) FROM foundations").fetchone()[0],
         "with mission text": out.execute(
             "SELECT COUNT(*) FROM recipients WHERE mission_text!=''").fetchone()[0],
+        "international $": out.execute(
+            "SELECT SUM(foreign_dollars) FROM foundations").fetchone()[0],
+        "international christian $": out.execute(
+            "SELECT SUM(foreign_christian_dollars) FROM foundations").fetchone()[0],
+        "foundations giving abroad": out.execute(
+            "SELECT COUNT(*) FROM foundations WHERE foreign_dollars>0").fetchone()[0],
+        "countries named": out.execute(
+            "SELECT COUNT(DISTINCT country_code) FROM foundation_countries "
+            "WHERE country_code!='(unspecified)'").fetchone()[0],
+        "international $ we could not place": out.execute(
+            "SELECT COALESCE(SUM(dollars),0) FROM foundation_countries "
+            "WHERE country_code='(unspecified)'").fetchone()[0],
     }
     for key, value in stats.items():
         log(f"  {key}: {value:,}")

@@ -24,11 +24,15 @@ TRADITIONS = {*CHRISTIAN, "jewish", "muslim", "mormon_lds",
 SORTS = {"paid": "paid_2324", "christian": "christian_dollars",
          "coverage": "coverage_pct", "assets": "assets", "name": "name",
          "median": "median_grant", "recipients": "recipient_count",
-         "pct_christian": "pct_christian"}
+         "pct_christian": "pct_christian",
+         "foreign": "foreign_dollars",
+         "foreign_christian": "foreign_christian_dollars",
+         "pct_foreign": "pct_foreign",
+         "countries": "foreign_country_count"}
 # A NULL pct_christian means "nothing could be classified", not "0% Christian".
 # SQLite sorts NULLs first on DESC, which would put foundations we know
 # nothing about at the top of the flagship view, so they are pushed last.
-NULLS_LAST = {"pct_christian"}
+NULLS_LAST = {"pct_christian", "pct_foreign"}
 
 # Application-deadline seasons. Grants carry no date on a 990-PF, so these
 # describe when a foundation accepts APPLICATIONS -- the thing a fundraiser
@@ -118,6 +122,14 @@ def foundations(
     deadline_from_month: int | None = Query(None, ge=1, le=12),
     deadline_to_month: int | None = Query(None, ge=1, le=12),
     deadline_kind: str | None = None,
+    # International giving. `country` accepts one or more filing codes
+    # (FIPS, e.g. KE,UG,IN) and matches foundations that funded any of them.
+    gives_internationally: bool = False,
+    country: str | None = None,
+    min_foreign: int | None = None,
+    min_pct_foreign: float | None = None,
+    min_foreign_christian: int | None = None,
+    min_countries: int | None = None,
     sort: str = "paid", order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, le=500), offset: int = 0,
 ):
@@ -232,6 +244,29 @@ def foundations(
         kinds = [k.strip() for k in deadline_kind.split(",") if k.strip()]
         where.append(f"f.deadline_kind IN ({','.join('?' for _ in kinds)})")
         params += kinds
+    if gives_internationally:
+        where.append("f.foreign_dollars > 0")
+    if min_foreign is not None:
+        where.append("f.foreign_dollars >= ?")
+        params.append(min_foreign)
+    if min_pct_foreign is not None:
+        where.append("f.pct_foreign >= ?")
+        params.append(min_pct_foreign)
+    if min_foreign_christian is not None:
+        where.append("f.foreign_christian_dollars >= ?")
+        params.append(min_foreign_christian)
+    if min_countries is not None:
+        where.append("f.foreign_country_count >= ?")
+        params.append(min_countries)
+    if country:
+        codes = [c.strip().upper() for c in country.split(",") if c.strip()]
+        if codes:
+            # EXISTS against the indexed rollup, not a join, so the row count
+            # cannot be multiplied by a foundation funding several countries.
+            where.append(f"""EXISTS (SELECT 1 FROM foundation_countries fc
+                WHERE fc.ein=f.ein
+                  AND fc.country_code IN ({','.join('?' for _ in codes)}))""")
+            params += codes
     sql_where = " AND ".join(where)
     with connect() as conn:
         total = conn.execute(
@@ -248,7 +283,10 @@ def foundations(
                    unattributable_reason,
                    deadline_kind, deadline_months, deadline_text,
                    coverage_pct, coverage_band, application_status, website,
-                   assets, revenue, is_testamentary, is_micro
+                   assets, revenue, is_testamentary, is_micro,
+                   foreign_dollars, foreign_grant_count, foreign_country_count,
+                   foreign_top_countries, foreign_christian_dollars,
+                   pct_foreign
             FROM foundations f WHERE {sql_where}
             ORDER BY {order_sql}
             LIMIT ? OFFSET ?""", [*params, limit, offset]).fetchall()
@@ -279,10 +317,15 @@ def foundation_detail(ein: str):
         states = conn.execute(
             "SELECT state, dollars FROM recipient_states WHERE ein=? "
             "ORDER BY dollars DESC", (ein,)).fetchall()
+        countries = conn.execute(
+            "SELECT country_code, country_name, dollars, grants, "
+            "christian_dollars FROM foundation_countries WHERE ein=? "
+            "ORDER BY dollars DESC", (ein,)).fetchall()
     return {"foundation": dict(base),
             "traditions": [dict(r) for r in traditions],
             "recipients": [dict(r) for r in recipients],
-            "states": [dict(r) for r in states]}
+            "states": [dict(r) for r in states],
+            "countries": [dict(r) for r in countries]}
 
 
 @router.get("/foundations/{ein}/grants")
@@ -293,7 +336,8 @@ def foundation_grants(ein: str, limit: int = Query(200, le=1000), offset: int = 
                        AS recipient_name,
                    g.recipient_city, g.recipient_state,
                    g.amount, g.tax_year, g.purpose, g.entity_id,
-                   r.tradition, r.identity_status
+                   r.tradition, r.identity_status,
+                   g.recipient_country, g.country_name, g.is_foreign
             FROM grants g LEFT JOIN recipients r ON r.entity_id=g.entity_id
             WHERE g.funder_ein=? ORDER BY g.amount DESC LIMIT ? OFFSET ?""",
             (ein, limit, offset)).fetchall()
@@ -464,6 +508,28 @@ def recipients_stats():
     return {"by_tradition": [dict(r) for r in by_tradition],
             "by_method": [dict(r) for r in by_method],
             "by_identity": [dict(r) for r in by_identity]}
+
+
+@router.get("/countries")
+def countries(christian_only: bool = False):
+    """Destination countries, for the filter dropdown and the country view.
+
+    The `(unspecified)` bucket is returned rather than hidden: a researcher
+    filtering by country should be able to see how much international money we
+    could not place, instead of silently comparing against a short total.
+    """
+    order = "christian" if christian_only else "dollars"
+    with connect() as conn:
+        rows = conn.execute(f"""
+            SELECT country_code, country_name,
+                   COUNT(DISTINCT ein) AS foundations,
+                   SUM(dollars) AS dollars, SUM(grants) AS grants,
+                   SUM(christian_dollars) AS christian
+            FROM foundation_countries
+            GROUP BY country_code, country_name
+            HAVING {'SUM(christian_dollars) > 0' if christian_only else '1=1'}
+            ORDER BY {order} DESC""").fetchall()
+    return [dict(r) for r in rows]
 
 
 @router.get("/analytics/state-breakdown")

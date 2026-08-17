@@ -47,6 +47,19 @@ export type FoundationRowV5 = {
   revenue: number | null
   is_testamentary: boolean
   is_micro: boolean
+  // International giving. pct_foreign is null when the foundation gave
+  // nothing at all -- "no giving" is not "0% international".
+  foreign_dollars: number
+  foreign_grant_count: number
+  foreign_country_count: number
+  foreign_top_countries: string | null
+  foreign_christian_dollars: number
+  pct_foreign: number | null
+  // Static/Netlify export only: full destination code list, so client-side
+  // country filtering matches the server instead of approximating from the
+  // truncated foreign_top_countries label. Absent in API responses, where the
+  // server does the filtering.
+  foreign_country_codes?: string[]
 }
 
 export type FoundationsResponseV5 = { total: number; rows: FoundationRowV5[] }
@@ -81,6 +94,15 @@ export type FoundationDetailV5 = {
   traditions: TraditionRollupV5[]
   recipients: FoundationRecipientV5[]
   states: StateDollarsV5[]
+  countries: CountryDollarsV5[]
+}
+
+export type CountryDollarsV5 = {
+  country_code: string
+  country_name: string
+  dollars: number
+  grants: number
+  christian_dollars: number
 }
 
 export type GrantRowV5 = {
@@ -93,6 +115,10 @@ export type GrantRowV5 = {
   entity_id: string | null
   tradition: string | null
   identity_status: string | null
+  recipient_country: string | null
+  // null when the filing's code could not be trusted -- render as Unspecified.
+  country_name: string | null
+  is_foreign: boolean
 }
 
 export type RecipientDetailV5 = {
@@ -147,6 +173,16 @@ export const COVERAGE_BANDS = ['High', 'Moderate', 'Low', 'Not Classifiable']
 // When a foundation accepts APPLICATIONS. A 990-PF carries no date on an
 // individual grant, so we cannot say when a foundation gave -- only when it
 // asks to be approached, which is what a fundraiser schedules around.
+// Must stay identical to SEASONS in backend/v5.py: static mode filters
+// client-side and any drift would make Netlify disagree with localhost.
+export const SEASON_MONTHS: Record<string, number[]> = {
+  spring: [3, 4, 5], summer: [6, 7, 8],
+  fall: [9, 10, 11], autumn: [9, 10, 11], winter: [12, 1, 2],
+  q1: [1, 2, 3], q2: [4, 5, 6], q3: [7, 8, 9], q4: [10, 11, 12],
+  first_half: [1, 2, 3, 4, 5, 6], second_half: [7, 8, 9, 10, 11, 12],
+  year_end: [11, 12], new_year: [1, 2],
+}
+
 export const DEADLINE_SEASONS: [string, string][] = [
   ['spring', 'Spring (Mar–May)'],
   ['summer', 'Summer (Jun–Aug)'],
@@ -164,6 +200,40 @@ export const DEADLINE_KINDS: [string, string][] = [
   ['dated', 'Has a stated deadline'],
   ['rolling', 'Accepts applications year-round'],
   ['none', 'States no deadline'],
+]
+
+export type CountryRowV5 = {
+  country_code: string
+  country_name: string
+  foundations: number
+  dollars: number
+  grants: number
+  christian: number
+}
+
+// Mission-field groupings, so a researcher can filter by region rather than
+// picking twenty country codes. Codes are FIPS as filed, not ISO
+// (see src/country_codes.py) -- NI is Nigeria, SZ is Switzerland.
+export const MISSION_REGIONS: [string, string[]][] = [
+  ['Sub-Saharan Africa', ['KE', 'UG', 'TZ', 'NI', 'SF', 'GH', 'ET', 'RW',
+    'CG', 'CF', 'ZI', 'ZA', 'MI', 'MZ', 'SL', 'LI', 'IV', 'SG', 'CM', 'BC',
+    'WA', 'BY', 'UV', 'TO', 'BN', 'ML', 'SO', 'SU', 'OD', 'MA', 'GV', 'GA',
+    'PU', 'NG', 'CD', 'CT', 'ER', 'LT', 'WZ', 'MP', 'GB']],
+  ['Latin America & Caribbean', ['MX', 'BR', 'CO', 'PE', 'GT', 'HA', 'CS',
+    'HO', 'ES', 'DR', 'EC', 'CI', 'AR', 'BL', 'PA', 'PM', 'NU', 'UY', 'VE',
+    'JM', 'BH', 'TD', 'GY', 'NS', 'CU', 'BB', 'ST', 'GJ', 'VC', 'DO']],
+  ['South & Central Asia', ['IN', 'PK', 'NP', 'BG', 'AF', 'CE', 'KZ', 'KG',
+    'TI', 'UZ', 'BT', 'MV']],
+  ['East & Southeast Asia', ['CH', 'ID', 'RP', 'TH', 'VM', 'MY', 'CB', 'KS',
+    'JA', 'TW', 'HK', 'SN', 'BM', 'LA', 'MG', 'MC']],
+  ['Middle East & North Africa', ['IS', 'LE', 'JO', 'EG', 'TU', 'IZ', 'AE',
+    'SA', 'MO', 'TS', 'YM', 'QA', 'BA', 'KU', 'SY', 'IR', 'AG', 'LY', 'WI']],
+  ['Europe', ['UK', 'SZ', 'GM', 'FR', 'NL', 'IT', 'BE', 'SP', 'EI', 'NO',
+    'SW', 'DA', 'AU', 'PL', 'FI', 'PO', 'GR', 'UP', 'RS', 'RO', 'HU', 'EZ',
+    'AL', 'MK', 'RI', 'BK', 'MD', 'HR', 'LH', 'EN', 'LG', 'LO', 'SI', 'BU',
+    'MJ', 'KV', 'LS', 'LU', 'MN', 'MT', 'CY', 'IC', 'AM', 'GG', 'AJ', 'BO',
+    'SM', 'JE', 'FO', 'GI', 'IM']],
+  ['Oceania', ['AS', 'NZ', 'PP', 'FJ', 'WS', 'NC', 'FM', 'BP', 'NR', 'PC']],
 ]
 
 // ---- geographic regions ----------------------------------------------------
@@ -280,6 +350,12 @@ export type V5Filters = {
   deadline_from_month: string
   deadline_to_month: string
   deadline_kind: string[]
+  gives_internationally: boolean
+  country: string[]
+  min_foreign: string
+  min_pct_foreign: string
+  min_foreign_christian: string
+  min_countries: string
   sort: string
   order: 'asc' | 'desc'
 }
@@ -324,20 +400,28 @@ export const defaultV5Filters: V5Filters = {
   deadline_from_month: '',
   deadline_to_month: '',
   deadline_kind: [],
+  gives_internationally: false,
+  country: [],
+  min_foreign: '',
+  min_pct_foreign: '',
+  min_foreign_christian: '',
+  min_countries: '',
   sort: 'pct_christian',
   order: 'desc',
 }
 
 const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
   'application_status', 'coverage_band', 'deadline_season', 'deadline_months',
-  'deadline_kind'] as const
+  'deadline_kind', 'country'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',
   'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
   'min_assets', 'max_assets', 'min_revenue', 'min_coverage',
   'min_christian', 'min_pct_christian', 'deadline_from_month',
-  'deadline_to_month'] as const
+  'deadline_to_month', 'min_foreign', 'min_pct_foreign',
+  'min_foreign_christian', 'min_countries'] as const
 const BOOL_KEYS = ['has_website', 'has_email', 'has_contact',
-  'exclude_testamentary', 'exclude_micro', 'include_inactive'] as const
+  'exclude_testamentary', 'exclude_micro', 'include_inactive',
+  'gives_internationally'] as const
 
 // Build API query params (also used verbatim for URL sharing).
 export function v5FilterParams(f: V5Filters): URLSearchParams {
@@ -582,6 +666,10 @@ async function staticFoundations(qs: string) {
     ['min_coverage', (r, v) => r.coverage_pct >= v],
     ['min_christian', (r, v) => r.christian_dollars >= v],
     ['min_pct_christian', (r, v) => (r.pct_christian ?? -1) >= v],
+    ['min_foreign', (r, v) => r.foreign_dollars >= v],
+    ['min_pct_foreign', (r, v) => (r.pct_foreign ?? -1) >= v],
+    ['min_foreign_christian', (r, v) => r.foreign_christian_dollars >= v],
+    ['min_countries', (r, v) => r.foreign_country_count >= v],
   ]
   for (const [key, test] of pairs) {
     const v = num(p, key)
@@ -602,6 +690,39 @@ async function staticFoundations(qs: string) {
   if (p.get('exclude_micro') === 'true') rows = rows.filter((r) => !r.is_micro)
   if (p.get('daf') === 'exclude') rows = rows.filter((r) => r.daf_dollars === 0)
   if (p.get('daf') === 'only') rows = rows.filter((r) => r.daf_dollars > 0)
+  if (p.get('gives_internationally') === 'true') {
+    rows = rows.filter((r) => r.foreign_dollars > 0)
+  }
+  const wantedCountries = p.get('country')
+  if (wantedCountries) {
+    const want = new Set(wantedCountries.split(',').map((c) => c.trim().toUpperCase()))
+    rows = rows.filter((r) => (r.foreign_country_codes
+      // Without the exported code list we cannot answer this precisely, so
+      // fall back to "gave internationally at all" rather than silently
+      // returning a wrong subset.
+      ? r.foreign_country_codes.some((c) => want.has(c))
+      : r.foreign_dollars > 0))
+  }
+  // Deadline months, mirroring the server's bitmask overlap test.
+  const months = new Set<number>()
+  for (const token of (p.get('deadline_season') || '').split(',')) {
+    for (const m of SEASON_MONTHS[token.trim().toLowerCase()] || []) months.add(m)
+  }
+  for (const token of (p.get('deadline_months') || '').split(',')) {
+    const m = Number(token)
+    if (m >= 1 && m <= 12) months.add(m)
+  }
+  const from = num(p, 'deadline_from_month'), to = num(p, 'deadline_to_month')
+  if (from && to) {
+    // Walk forward so Nov->Feb wraps across the year end, as the server does.
+    let m = from
+    for (;;) { months.add(m); if (m === to) break; m = (m % 12) + 1 }
+  }
+  if (months.size) {
+    rows = rows.filter((r) => (r.deadline_months || '')
+      .split(',').some((x) => months.has(Number(x.trim()))))
+  }
+  listFilter('deadline_kind', (r) => r.deadline_kind)
 
   const sortKey = p.get('sort') || 'pct_christian'
   const desc = (p.get('order') || 'desc') === 'desc'
@@ -615,6 +736,10 @@ async function staticFoundations(qs: string) {
       case 'median': return r.median_grant ?? 0
       case 'recipients': return r.recipient_count
       case 'name': return r.name
+      case 'foreign': return r.foreign_dollars
+      case 'foreign_christian': return r.foreign_christian_dollars
+      case 'pct_foreign': return r.pct_foreign
+      case 'countries': return r.foreign_country_count
       default: return r.paid_2324
     }
   }
