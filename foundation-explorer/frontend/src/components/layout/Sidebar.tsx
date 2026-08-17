@@ -28,7 +28,7 @@ export default function Sidebar() {
     staleTime: Infinity,
   })
   return (
-    <aside className="w-52 xl:w-60 shrink-0 h-screen sticky top-0 bg-primary text-white flex flex-col">
+    <aside className="w-52 min-[1800px]:w-60 shrink-0 h-screen sticky top-0 bg-primary text-white flex flex-col">
       <div className="px-5 py-6">
         <div className="font-display text-xl font-semibold">
           Foundation Explorer

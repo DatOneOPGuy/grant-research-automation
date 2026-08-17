@@ -81,8 +81,14 @@ export default function Foundations() {
   // between the table fitting and the last two columns needing a scroll.
   // Collapsing is safe because the active-filter chips above still show what
   // is applied. Remembered so it does not reset on every navigation.
-  const [filtersOpen, setFiltersOpen] = useState(
-    () => localStorage.getItem('fe.filtersOpen') !== 'false')
+  const [filtersOpen, setFiltersOpen] = useState(() => {
+    const stored = localStorage.getItem('fe.filtersOpen')
+    if (stored !== null) return stored !== 'false'
+    // No stored preference: below ~1400px the rail costs more than it is
+    // worth, because the table would have to scroll to show every column.
+    // An explicit choice always wins over this default afterwards.
+    return window.innerWidth >= 1400
+  })
   useEffect(() => {
     localStorage.setItem('fe.filtersOpen', String(filtersOpen))
   }, [filtersOpen])
@@ -168,7 +174,7 @@ export default function Foundations() {
 
         <div className="flex-1 min-w-0">
           <div className="bg-surface border border-line rounded-lg overflow-x-auto">
-            <table className="w-full text-sm table-fixed min-w-[1000px]">
+            <table className="w-full text-sm table-fixed min-w-[960px]">
               {/* Proportional widths, in COLUMNS order: Foundation,
                   Location, % Christian, Christian $, Paid, Application,
                   International, Actions. Actions gets 9% because that is
@@ -193,6 +199,7 @@ export default function Foundations() {
                       className={`px-2 py-2.5 font-medium align-bottom ${
                         c.key === 'actions'
                           ? 'sticky right-0 bg-canvas border-l border-line/60'
+                            + ' shadow-[-6px_0_6px_-4px_rgba(0,0,0,0.06)]'
                           : ''}`}>
                       {c.sortKey ? (
                         <button onClick={() => sortBy(c.sortKey!)}
@@ -336,7 +343,8 @@ function RowActions({ ein, website }: { ein: string; website: string | null }) {
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
     <td className="px-2 whitespace-nowrap sticky right-0 bg-surface
-      group-hover:bg-canvas border-l border-line/60">
+      group-hover:bg-canvas border-l border-line/60
+      shadow-[-6px_0_6px_-4px_rgba(0,0,0,0.06)]">
       <div className="flex items-center gap-0">
         <button
           onClick={(e) => { stop(e); toggle(ein) }}

@@ -158,7 +158,7 @@ export default function FilterPanel({ filters, onChange }: Props) {
     onChange({ ...defaultV5Filters, ...pf })
 
   return (
-    <div className="w-56 xl:w-64 shrink-0">
+    <div className="w-56 min-[1800px]:w-64 shrink-0">
       <div className="mb-4">
         <div className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted mb-2">
           <Sparkles size={13} /> Presets
