@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
-  ArrowDown, ArrowUp, Bookmark, ChevronLeft, ChevronRight, ExternalLink,
+  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ExternalLink,
   Globe, HelpCircle, Loader2, SlidersHorizontal,
 } from 'lucide-react'
 import {
@@ -10,11 +10,11 @@ import {
   v5FilterParams, v5FiltersFromParams, type V5Filters,
 } from '../lib/apiV5'
 import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
-import { useSavedFoundations } from '../lib/savedContext'
+import SaveMenu from '../components/foundations/SaveMenu'
 import { Skeleton, StatusPill } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
-import ActiveFilters, { activeFilterCount }
-  from '../components/foundations/ActiveFilters'
+import ActiveFilters from '../components/foundations/ActiveFilters'
+import { activeFilterCount } from '../components/foundations/filterChips'
 import DetailPanel from '../components/foundations/DetailPanel'
 import { BucketBar } from '../components/foundations/BucketBar'
 
@@ -338,8 +338,6 @@ export default function Foundations() {
 // Row actions live inside a clickable <tr>, so every control stops
 // propagation -- otherwise saving a foundation would also open its panel.
 function RowActions({ ein, website }: { ein: string; website: string | null }) {
-  const { isSaved, toggle } = useSavedFoundations()
-  const saved = isSaved(ein)
   const site = websiteUrl(website)
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
@@ -347,15 +345,7 @@ function RowActions({ ein, website }: { ein: string; website: string | null }) {
       group-hover:bg-canvas border-l border-line/60
       shadow-[-6px_0_6px_-4px_rgba(0,0,0,0.06)]">
       <div className="flex items-center gap-0">
-        <button
-          onClick={(e) => { stop(e); toggle(ein) }}
-          title={saved ? 'Remove from saved' : 'Save this foundation'}
-          aria-label={saved ? 'Remove from saved' : 'Save this foundation'}
-          aria-pressed={saved}
-          className={`p-1 rounded hover:bg-canvas ${
-            saved ? 'text-primary' : 'text-muted hover:text-ink'}`}>
-          <Bookmark size={15} fill={saved ? 'currentColor' : 'none'} />
-        </button>
+        <SaveMenu ein={ein} />
         {site ? (
           <a href={site} target="_blank" rel="noreferrer" onClick={stop}
             title={`Website: ${site}`} aria-label="Foundation website"

@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { Bookmark, Trash2 } from 'lucide-react'
+import { Bookmark } from 'lucide-react'
 import { fetchFoundationDetailV5, type FoundationRowV5 } from '../lib/apiV5'
 import { useSavedFoundations } from '../lib/savedContext'
-import {
-  money, num, propublicaUrl, TAX_WINDOW_LABEL, titleCase,
-} from '../lib/format'
-import { Card, StatusPill } from '../components/ui/primitives'
+import { num, propublicaUrl, TAX_WINDOW_LABEL } from '../lib/format'
 import DetailPanel from '../components/foundations/DetailPanel'
+import FolderList from '../components/saved/FolderList'
+import SavedTable from '../components/saved/SavedTable'
+import { ALL } from '../components/saved/views'
 
 const CSV_COLUMNS: (keyof FoundationRowV5)[] = [
   'ein', 'name', 'city', 'state', 'paid_2324', 'christian_dollars',
@@ -27,49 +27,42 @@ function toCsv(rows: FoundationRowV5[]): string {
 }
 
 export default function Saved() {
-  const { saved, remove } = useSavedFoundations()
+  const { folders, saved, einsIn } = useSavedFoundations()
   const [selected, setSelected] = useState<string | null>(null)
+  const [view, setView] = useState<string>(ALL)
+
+  // A deleted folder must not leave the page pointing at nothing.
+  const activeView = view !== ALL && !folders.some((f) => f.id === view)
+    ? ALL : view
+  const activeFolder = folders.find((f) => f.id === activeView) || null
+  const eins = activeView === ALL ? saved : einsIn(activeView)
 
   const results = useQueries({
-    queries: saved.map((ein) => ({
+    queries: eins.map((ein) => ({
       queryKey: ['v5foundation', ein],
       queryFn: () => fetchFoundationDetailV5(ein),
     })),
   })
-  const rows = results
-    .map((r) => r.data?.foundation)
-    .filter(Boolean) as FoundationRowV5[]
+  const rows = useMemo(
+    () => results.map((r) => r.data?.foundation).filter(Boolean) as FoundationRowV5[],
+    [results],
+  )
 
   const exportCsv = () => {
     const blob = new Blob([toCsv(rows)], { type: 'text/csv' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = 'saved_foundations.csv'
+    const label = activeFolder
+      ? activeFolder.name.replace(/[^a-z0-9]+/gi, '_').toLowerCase()
+      : 'all'
+    a.download = `saved_foundations_${label}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }
 
-  if (saved.length === 0) {
-    return (
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-primary mb-6">
-          Saved Foundations
-        </h1>
-        <div className="border border-line rounded-lg bg-surface p-12
-          text-center">
-          <Bookmark size={28} className="mx-auto text-line mb-3" />
-          <div className="text-muted">
-            No saved foundations yet. Click the bookmark icon on any foundation
-            to save it here.
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-end justify-between mb-1">
         <h1 className="font-display text-3xl font-semibold text-primary">
           Saved Foundations
         </h1>
@@ -80,64 +73,56 @@ export default function Saved() {
         </button>
       </div>
       <p className="text-sm text-muted mb-4">
-        {num(saved.length)} saved · paid grants, tax years {TAX_WINDOW_LABEL}.
-        Saved list lives in this browser only.
+        {num(saved.length)} saved in {folders.length}{' '}
+        {folders.length === 1 ? 'folder' : 'folders'} · paid grants, tax years{' '}
+        {TAX_WINDOW_LABEL}. Saved lists live in this browser only.
       </p>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted border-b border-line">
-                <th className="py-2">Foundation</th>
-                <th>Location</th>
-                <th className="text-right">Christian</th>
-                <th className="text-right">Paid</th>
-                <th className="text-right">Coverage</th>
-                <th>Applications</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((f) => (
-                <tr key={f.ein} className="border-b border-line/60
-                  hover:bg-canvas">
-                  <td className="py-2 pr-3 font-medium cursor-pointer"
-                    onClick={() => setSelected(f.ein)}>
-                    {titleCase(f.name)}
-                  </td>
-                  <td className="pr-3 text-muted whitespace-nowrap">
-                    {f.city && `${titleCase(f.city)}, `}{f.state}
-                  </td>
-                  <td className="text-right tabular pr-3">
-                    {money(f.christian_dollars)}
-                  </td>
-                  <td className="text-right tabular pr-3">
-                    {money(f.paid_2324)}
-                  </td>
-                  <td className="text-right tabular pr-3">
-                    {Math.round(f.coverage_pct)}%
-                  </td>
-                  <td className="pr-3">
-                    <StatusPill status={f.application_status} />
-                  </td>
-                  <td>
-                    <button onClick={() => remove(f.ein)}
-                      title="Remove from saved"
-                      className="p-1 text-muted hover:text-ink">
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="flex gap-6 items-start">
+        <FolderList activeView={activeView} onSelect={setView} />
+
+        <div className="flex-1 min-w-0">
+          {saved.length === 0 ? (
+            <EmptyState hasFolders={folders.length > 0} />
+          ) : eins.length === 0 ? (
+            <div className="border border-line rounded-lg bg-surface p-12
+              text-center text-muted text-sm">
+              Nothing in{' '}
+              <span className="font-medium text-ink">
+                {activeFolder?.name}
+              </span>{' '}
+              yet. Use the bookmark button on any foundation to add it.
+            </div>
+          ) : (
+            <SavedTable rows={rows} loading={rows.length < eins.length}
+              expected={eins.length}
+              folderId={activeView === ALL ? null : activeView}
+              onOpen={setSelected} />
+          )}
         </div>
-      </Card>
+      </div>
 
       {selected && (
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}
+    </div>
+  )
+}
+
+function EmptyState({ hasFolders }: { hasFolders: boolean }) {
+  return (
+    <div className="border border-line rounded-lg bg-surface p-12 text-center">
+      <Bookmark size={28} className="mx-auto text-line mb-3" />
+      <div className="text-muted text-sm">
+        No saved foundations yet. Click the bookmark icon on any foundation and
+        choose a folder.
+        {!hasFolders && (
+          <>
+            {' '}You have no folders — the bookmark menu will offer to create
+            one.
+          </>
+        )}
+      </div>
     </div>
   )
 }

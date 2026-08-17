@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "build:demo": "DEMO=1 vite build"
+    "build:demo": "DEMO=1 vite build",
+    "test:saved": "node --experimental-strip-types test/savedStore.test.mts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
