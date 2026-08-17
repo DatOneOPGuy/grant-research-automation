@@ -41,29 +41,24 @@ export default function Sidebar() {
     <aside className={`shrink-0 h-screen sticky top-0 bg-primary text-white
       flex flex-col transition-[width] duration-150 ${
         collapsed ? 'w-14' : 'w-52 min-[1800px]:w-60'}`}>
-      <div className={`flex items-start gap-2 ${
-        collapsed ? 'px-2 py-4 justify-center' : 'px-5 py-6'}`}>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <div className="font-display text-xl font-semibold truncate">
-              Foundation Explorer
-            </div>
-            <div className="text-xs text-white/50 mt-1">
-              Christian Foundation Database
-            </div>
+      {!collapsed && (
+        // The title owns its row outright. Sharing it with the collapse
+        // control truncated "Foundation Explorer" to "Foundation…", which
+        // makes the product look broken before a user reads anything else.
+        <div className="px-5 py-6">
+          <div className="font-display text-xl font-semibold leading-tight">
+            Foundation Explorer
           </div>
-        )}
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          title={collapsed ? 'Expand menu' : 'Collapse menu'}
-          aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
-          className="p-1.5 rounded text-white/50 hover:text-white
-            hover:bg-white/10 shrink-0">
-          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        </button>
-      </div>
+          <div className="text-xs text-white/50 mt-1">
+            Christian Foundation Database
+          </div>
+        </div>
+      )}
 
-      <nav className={`flex-1 space-y-1 ${collapsed ? 'px-2' : 'px-3'}`}>
+      {/* Collapsed, the title block is gone, so the nav needs its own top
+          padding or the first icon sits flush against the window edge. */}
+      <nav className={`flex-1 space-y-1 ${
+        collapsed ? 'px-2 pt-4' : 'px-3'}`}>
         {NAV.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
             key={to}
@@ -98,14 +93,25 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {!collapsed && (
-        <div className="px-5 py-4 text-[11px] leading-4 text-white/40
-          border-t border-white/10">
-          {data
-            ? `${num(data.foundations)} foundations · ${num(data.recipients)} recipients`
-            : 'Loading…'}
-        </div>
-      )}
+      <div className={`border-t border-white/10 flex items-center gap-2 ${
+        collapsed ? 'px-2 py-3 justify-center' : 'px-5 py-3'}`}>
+        {!collapsed && (
+          <div className="text-[11px] leading-4 text-white/40 flex-1 min-w-0">
+            {data
+              ? `${num(data.foundations)} foundations · ${num(data.recipients)} recipients`
+              : 'Loading…'}
+          </div>
+        )}
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? 'Expand menu' : 'Collapse menu'}
+          aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+          className="p-1.5 rounded text-white/50 hover:text-white
+            hover:bg-white/10 shrink-0 focus:outline-none focus-visible:ring-2
+            focus-visible:ring-accent/70">
+          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
+      </div>
     </aside>
   )
 }
