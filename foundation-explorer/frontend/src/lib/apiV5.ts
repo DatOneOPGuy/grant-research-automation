@@ -47,6 +47,14 @@ export type FoundationRowV5 = {
   revenue: number | null
   is_testamentary: boolean
   is_micro: boolean
+  // Present on the detail response (SELECT *), absent from the list query,
+  // hence optional rather than a required field the list would have to fake.
+  active_2023?: number
+  active_2024?: number
+  phone?: string | null
+  contact_person?: string | null
+  contact_email?: string | null
+  latest_tax_year?: number
   // International giving. pct_foreign is null when the foundation gave
   // nothing at all -- "no giving" is not "0% international".
   foreign_dollars: number
@@ -95,6 +103,41 @@ export type FoundationDetailV5 = {
   recipients: FoundationRecipientV5[]
   states: StateDollarsV5[]
   countries: CountryDollarsV5[]
+  methods: MethodRollupV5[]
+  size_bands: SizeBandV5[]
+  yearly: YearRollupV5[]
+  top_foreign: ForeignRecipientV5[]
+}
+
+export type MethodRollupV5 = {
+  method: string
+  christian_dollars: number
+  dollars: number
+  recipients: number
+}
+
+export type SizeBandV5 = {
+  band: string
+  grants: number
+  dollars: number
+}
+
+export type YearRollupV5 = {
+  tax_year: number
+  grants: number
+  dollars: number
+  recipients: number
+}
+
+export type ForeignRecipientV5 = {
+  name: string
+  country_name: string | null
+  recipient_country: string | null
+  recipient_city: string | null
+  tradition: string | null
+  method: string | null
+  dollars: number
+  grants: number
 }
 
 export type CountryDollarsV5 = {
@@ -209,6 +252,40 @@ export type CountryRowV5 = {
   dollars: number
   grants: number
   christian: number
+}
+
+// Evidence tiers, in the ledger's priority order. `rank` mirrors the server
+// priority so the Evidence tab can separate independently-verifiable evidence
+// from name-only inference -- the single most important caveat in the product.
+export const METHODS: {
+  key: string; label: string; hint: string; independent: boolean
+}[] = [
+  { key: 'human', label: 'Human review', independent: true,
+    hint: 'A correction from your team. Overrides every automated method.' },
+  { key: 'ntee', label: 'IRS activity code', independent: true,
+    hint: 'An official NTEE religion code on the recipient’s IRS record.' },
+  { key: 'church_code_name', label: 'IRS church coding', independent: true,
+    hint: 'The IRS classifies the recipient as a house of worship.' },
+  { key: 'group_exemption', label: 'Denominational ruling', independent: true,
+    hint: 'A diocese or denomination formally covers this organization.' },
+  { key: 'llm', label: 'Own mission statement', independent: true,
+    hint: 'Read from the recipient’s own 990 filing.' },
+  { key: 'grant_purpose', label: 'Funder’s stated purpose', independent: true,
+    hint: 'What this foundation itself said the money was for.' },
+  { key: 'rule', label: 'Organization name only', independent: false,
+    hint: 'Inferred from the recipient’s name because the filing gave nothing '
+      + 'else — often just a name and a city. Cannot be independently '
+      + 'verified, so treat it as a lead rather than a fact.' },
+  { key: 'unclassified', label: 'Not classified', independent: false,
+    hint: 'We could not determine this recipient’s character.' },
+]
+const METHOD_BY_KEY = Object.fromEntries(METHODS.map((m) => [m.key, m]))
+export function methodLabel(key: string | null | undefined): string {
+  if (!key) return 'Not classified'
+  return METHOD_BY_KEY[key]?.label || key
+}
+export function methodIsIndependent(key: string | null | undefined): boolean {
+  return !!(key && METHOD_BY_KEY[key]?.independent)
 }
 
 // Mission-field groupings, so a researcher can filter by region rather than
@@ -482,8 +559,25 @@ export function fetchFoundationsV5(
   return getV5(`/api/v5/foundations?${p.toString()}`)
 }
 
-export function fetchFoundationDetailV5(ein: string): Promise<FoundationDetailV5> {
-  return getV5(`/api/v5/foundations/${ein}`)
+export async function fetchFoundationDetailV5(
+  ein: string,
+): Promise<FoundationDetailV5> {
+  const d = await getV5<FoundationDetailV5>(`/api/v5/foundations/${ein}`)
+  // Static exports and any pre-existing cached payload predate the newer
+  // rollups. Defaulting them to empty arrays here means a tab renders its own
+  // empty state instead of throwing on `.filter` of undefined — the same
+  // failure mode that once blanked the recipient panel.
+  return {
+    ...d,
+    traditions: d.traditions ?? [],
+    recipients: d.recipients ?? [],
+    states: d.states ?? [],
+    countries: d.countries ?? [],
+    methods: d.methods ?? [],
+    size_bands: d.size_bands ?? [],
+    yearly: d.yearly ?? [],
+    top_foreign: d.top_foreign ?? [],
+  }
 }
 
 export function fetchFoundationGrantsV5(

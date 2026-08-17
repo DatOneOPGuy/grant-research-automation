@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
-import {
-  MONTH_NAMES, fetchFoundationDetailV5, fetchFoundationGrantsV5,
-  type CountryDollarsV5, type GrantRowV5,
-} from '../../lib/apiV5'
-import {
-  money, moneyFull, propublicaUrl, titleCase, websiteUrl,
-} from '../../lib/format'
+import { MONTH_NAMES, fetchFoundationDetailV5 } from '../../lib/apiV5'
+import { money, propublicaUrl, titleCase, websiteUrl } from '../../lib/format'
 import { Skeleton, StatusPill } from '../ui/primitives'
 import { BucketBarLabeled } from './BucketBar'
-import { IdentityChip, TraditionChip } from './V5Chips'
 import RecipientsTab from './RecipientsTab'
+import OverviewTab from './tabs/OverviewTab'
+import GrantsTab from './tabs/GrantsTab'
+import GeographyTab from './tabs/GeographyTab'
+import InternationalTab from './tabs/InternationalTab'
+import EvidenceTab from './tabs/EvidenceTab'
+import ApplicationTab from './tabs/ApplicationTab'
 
 type Props = { ein: string; onClose: () => void }
 
@@ -44,15 +44,22 @@ function unattributableMessage(reason: string | null, amount: string) {
   }
 }
 
-const TABS = ['Recipients', 'Grants', 'Geography'] as const
+const ALL_TABS = ['Overview', 'Recipients', 'Grants', 'International',
+  'Geography', 'Evidence', 'Application'] as const
+type Tab = (typeof ALL_TABS)[number]
 
 export default function DetailPanel({ ein, onClose }: Props) {
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Recipients')
+  const [tab, setTab] = useState<Tab>('Overview')
   const { data, isError } = useQuery({
     queryKey: ['v5foundation', ein],
     queryFn: () => fetchFoundationDetailV5(ein),
   })
   const f = data?.foundation
+  // International is hidden when there is none, so the tab's presence is
+  // itself information rather than a dead end.
+  const tabs = ALL_TABS.filter(
+    (t) => t !== 'International' || (f ? f.foreign_dollars > 0 : false))
+  const active: Tab = tabs.includes(tab) ? tab : 'Overview'
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -83,6 +90,13 @@ export default function DetailPanel({ ein, onClose }: Props) {
                     className="text-xs px-1.5 py-0.5 rounded bg-accent/15
                       text-primary">
                     Applications year-round
+                  </span>
+                )}
+                {f && f.foreign_dollars > 0 && (
+                  <span title={f.foreign_top_countries || undefined}
+                    className="text-xs px-1.5 py-0.5 rounded bg-primary/10
+                      text-primary">
+                    {money(f.foreign_dollars)} international
                   </span>
                 )}
                 {websiteUrl(f?.website) && (
@@ -131,11 +145,11 @@ export default function DetailPanel({ ein, onClose }: Props) {
             </div>
           )}
 
-          <div className="flex gap-1 mt-4">
-            {TABS.map((t) => (
+          <div className="flex gap-1 mt-4 flex-wrap">
+            {tabs.map((t) => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-3 py-1.5 text-sm rounded-md ${
-                  tab === t ? 'bg-primary text-white'
+                  active === t ? 'bg-primary text-white'
                     : 'text-muted hover:bg-canvas'}`}>
                 {t}
               </button>
@@ -153,164 +167,19 @@ export default function DetailPanel({ ein, onClose }: Props) {
           {!data && !isError && <Skeleton className="h-64" />}
           {data && (
             <>
-              {tab === 'Recipients' && (
+              {active === 'Overview' && <OverviewTab data={data} />}
+              {active === 'Recipients' && (
                 <RecipientsTab recipients={data.recipients} />
               )}
-              {tab === 'Grants' && <GrantsTab ein={ein} />}
-              {tab === 'Geography' && (
-                <GeographyTab states={data.states}
-                  countries={data.countries} />
-              )}
+              {active === 'Grants' && <GrantsTab ein={ein} />}
+              {active === 'International' && <InternationalTab data={data} />}
+              {active === 'Geography' && <GeographyTab data={data} />}
+              {active === 'Evidence' && <EvidenceTab data={data} />}
+              {active === 'Application' && <ApplicationTab data={data} />}
             </>
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-const GRANTS_PAGE = 100
-
-function GrantsTab({ ein }: { ein: string }) {
-  const [limit, setLimit] = useState(GRANTS_PAGE)
-  const { data } = useQuery({
-    queryKey: ['v5grants', ein, limit],
-    queryFn: () => fetchFoundationGrantsV5(ein, limit, 0),
-  })
-  if (!data) return <Skeleton className="h-40" />
-  return (
-    <div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs text-muted border-b border-line">
-            <th className="py-2">Recipient</th>
-            <th>Location</th>
-            <th className="text-right">Amount</th>
-            <th>Year</th>
-            <th>Purpose</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.rows.map((g: GrantRowV5, i: number) => (
-            <tr key={i} className="border-b border-line/60">
-              <td className="py-2 pr-3 font-medium">
-                {titleCase(g.recipient_name)}
-                {g.tradition && <span className="ml-1.5">
-                  <TraditionChip tradition={g.tradition} /></span>}
-                {g.identity_status && g.identity_status !== 'matched' && (
-                  <span className="ml-1">
-                    <IdentityChip status={g.identity_status} /></span>
-                )}
-              </td>
-              <td className="pr-3 text-muted whitespace-nowrap">
-                {g.recipient_city && `${titleCase(g.recipient_city)}, `}
-                {g.recipient_state}
-              </td>
-              <td className="text-right tabular pr-3 whitespace-nowrap">
-                {moneyFull(g.amount)}
-              </td>
-              <td className="tabular pr-3">{g.tax_year}</td>
-              <td className="text-muted max-w-56 truncate"
-                title={g.purpose || undefined}>{g.purpose}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {data.rows.length >= limit && (
-        <button onClick={() => setLimit(limit + GRANTS_PAGE)}
-          className="text-sm text-primary mt-3 hover:underline">
-          Load more grants
-        </button>
-      )}
-    </div>
-  )
-}
-
-function GeographyTab({ states, countries }: {
-  states: { state: string; dollars: number }[]
-  countries: CountryDollarsV5[]
-}) {
-  if (!states.length && !countries.length) {
-    return <div className="text-sm text-muted">
-      No recipient geography recorded.
-    </div>
-  }
-  const max = Math.max(...states.map((s) => s.dollars), 1)
-  return (
-    <div className="space-y-4">
-    {countries.length > 0 && <InternationalBreakdown countries={countries} />}
-    <div className="space-y-1.5 max-w-md">
-      {states.length > 0 && (
-        <div className="text-xs font-medium text-ink mb-1">
-          US recipients by state
-        </div>
-      )}
-      {states.map((s) => (
-        <div key={s.state} className="flex items-center gap-3 text-sm">
-          <span className="w-8 text-muted tabular">{s.state || '—'}</span>
-          <div className="flex-1 h-3 bg-line/40 rounded overflow-hidden">
-            <div className="h-full bg-scorehigh/70 rounded"
-              style={{ width: `${(s.dollars / max) * 100}%` }} />
-          </div>
-          <span className="w-20 text-right tabular font-medium">
-            {money(s.dollars)}
-          </span>
-        </div>
-      ))}
-    </div>
-    </div>
-  )
-}
-
-function InternationalBreakdown({ countries }: {
-  countries: CountryDollarsV5[]
-}) {
-  const total = countries.reduce((sum, c) => sum + c.dollars, 0)
-  const christian = countries.reduce((sum, c) => sum + c.christian_dollars, 0)
-  const max = Math.max(...countries.map((c) => c.dollars), 1)
-  const named = countries.filter((c) => c.country_code !== '(unspecified)')
-  const unplaced = countries.find((c) => c.country_code === '(unspecified)')
-  return (
-    <div className="max-w-md">
-      <div className="text-xs font-medium text-ink mb-1">
-        International giving — {money(total)} to {named.length}{' '}
-        {named.length === 1 ? 'country' : 'countries'}
-        {christian > 0 && <>, {money(christian)} Christian</>}
-      </div>
-      <p className="text-[11px] text-muted mb-2 leading-snug">
-        Destinations as coded on the 990-PF (IRS/FIPS codes, not ISO).
-      </p>
-      <div className="space-y-1.5">
-        {countries.map((c) => (
-          <div key={c.country_code} className="flex items-center gap-3 text-sm">
-            <span className="w-32 truncate text-muted"
-              title={`${c.country_name} (${c.country_code})`}>
-              {c.country_name}
-            </span>
-            <div className="flex-1 h-3 bg-line/40 rounded overflow-hidden">
-              {/* Christian portion first, so the split is readable in place */}
-              <div className="h-full flex">
-                <div className="h-full bg-primary/80"
-                  style={{ width: `${(c.christian_dollars / max) * 100}%` }} />
-                <div className="h-full bg-scorehigh/60"
-                  style={{
-                    width: `${((c.dollars - c.christian_dollars) / max) * 100}%`,
-                  }} />
-              </div>
-            </div>
-            <span className="w-20 text-right tabular font-medium">
-              {money(c.dollars)}
-            </span>
-          </div>
-        ))}
-      </div>
-      {unplaced && (
-        <p className="text-[11px] text-muted mt-2 leading-snug">
-          {money(unplaced.dollars)} could not be placed to a country: the
-          filing gave a code we could not verify. It is shown here rather than
-          dropped so the total reconciles.
-        </p>
-      )}
     </div>
   )
 }

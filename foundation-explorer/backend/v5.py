@@ -34,6 +34,14 @@ SORTS = {"paid": "paid_2324", "christian": "christian_dollars",
 # nothing about at the top of the flagship view, so they are pushed last.
 NULLS_LAST = {"pct_christian", "pct_foreign"}
 
+# Must stay identical to FOREIGN_SQL in src/build_explorer_v5.py, or a
+# foundation's per-grant international list would disagree with the
+# foreign_dollars total shown above it.
+FOREIGN_GRANT_SQL = (
+    "(g.is_foreign=1 OR (COALESCE(g.recipient_country,'') != '' "
+    "AND g.recipient_country NOT IN "
+    "('', 'U.S', 'U.S.', 'UNITED STATES', 'US', 'USA')))")
+
 # Application-deadline seasons. Grants carry no date on a 990-PF, so these
 # describe when a foundation accepts APPLICATIONS -- the thing a fundraiser
 # schedules around -- not when it writes cheques.
@@ -321,11 +329,57 @@ def foundation_detail(ein: str):
             "SELECT country_code, country_name, dollars, grants, "
             "christian_dollars FROM foundation_countries WHERE ein=? "
             "ORDER BY dollars DESC", (ein,)).fetchall()
+        # Evidence mix: how much of this foundation's classified giving rests
+        # on each method. This is the rigor question a researcher should ask
+        # before trusting a headline percentage, so it gets its own tab.
+        methods = conn.execute("""
+            SELECT COALESCE(r.method, 'unclassified') AS method,
+                   SUM(CASE WHEN r.tradition IN
+                        ('evangelical_protestant','catholic',
+                         'orthodox_christian','christian_unspecified')
+                       THEN frs.dollars ELSE 0 END) AS christian_dollars,
+                   SUM(frs.dollars) AS dollars,
+                   COUNT(*) AS recipients
+            FROM frs JOIN recipients r ON r.entity_id=frs.entity_id
+            WHERE frs.ein=? AND r.is_daf=0
+            GROUP BY 1 ORDER BY 3 DESC""", (ein,)).fetchall()
+        # Grant-size distribution: tells a fundraiser whether their ask fits.
+        bands = conn.execute("""
+            SELECT CASE
+                     WHEN amount < 1000 THEN 'Under $1k'
+                     WHEN amount < 5000 THEN '$1k–5k'
+                     WHEN amount < 25000 THEN '$5k–25k'
+                     WHEN amount < 100000 THEN '$25k–100k'
+                     WHEN amount < 500000 THEN '$100k–500k'
+                     WHEN amount < 1000000 THEN '$500k–1M'
+                     ELSE 'Over $1M' END AS band,
+                   COUNT(*) AS grants, SUM(amount) AS dollars,
+                   MIN(amount) AS lo
+            FROM grants WHERE funder_ein=? AND amount > 0
+            GROUP BY 1 ORDER BY lo""", (ein,)).fetchall()
+        yearly = conn.execute("""
+            SELECT tax_year, COUNT(*) AS grants, SUM(amount) AS dollars,
+                   COUNT(DISTINCT entity_id) AS recipients
+            FROM grants WHERE funder_ein=? GROUP BY 1 ORDER BY 1""",
+            (ein,)).fetchall()
+        top_foreign = conn.execute(f"""
+            SELECT COALESCE(r.display_name, g.recipient_name) AS name,
+                   g.country_name, g.recipient_country, g.recipient_city,
+                   r.tradition, r.method,
+                   SUM(g.amount) AS dollars, COUNT(*) AS grants
+            FROM grants g LEFT JOIN recipients r ON r.entity_id=g.entity_id
+            WHERE g.funder_ein=? AND {FOREIGN_GRANT_SQL}
+            GROUP BY g.entity_id, g.country_name
+            ORDER BY dollars DESC LIMIT 100""", (ein,)).fetchall()
     return {"foundation": dict(base),
             "traditions": [dict(r) for r in traditions],
             "recipients": [dict(r) for r in recipients],
             "states": [dict(r) for r in states],
-            "countries": [dict(r) for r in countries]}
+            "countries": [dict(r) for r in countries],
+            "methods": [dict(r) for r in methods],
+            "size_bands": [dict(r) for r in bands],
+            "yearly": [dict(r) for r in yearly],
+            "top_foreign": [dict(r) for r in top_foreign]}
 
 
 @router.get("/foundations/{ein}/grants")
