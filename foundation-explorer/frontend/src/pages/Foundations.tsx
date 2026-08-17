@@ -168,12 +168,32 @@ export default function Foundations() {
 
         <div className="flex-1 min-w-0">
           <div className="bg-surface border border-line rounded-lg overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed min-w-[1000px]">
+              {/* Proportional widths, in COLUMNS order: Foundation,
+                  Location, % Christian, Christian $, Paid, Application,
+                  International, Actions. Actions gets 9% because that is
+                  ~90px at the 1000px minimum, which is what the three icon
+                  buttons need; less and they overflow the pinned cell.
+                  No comments or whitespace inside <colgroup> itself -- React
+                  treats stray text nodes there as invalid HTML. */}
+              <colgroup>
+                <col className="w-[19%]" />
+                <col className="w-[11%]" />
+                <col className="w-[11%]" />
+                <col className="w-[14%]" />
+                <col className="w-[13%]" />
+                <col className="w-[11%]" />
+                <col className="w-[12%]" />
+                <col className="w-[9%]" />
+              </colgroup>
               <thead>
-                <tr className="text-left text-xs text-muted border-b border-line bg-canvas/50">
+                <tr className="text-left text-xs text-muted border-b border-line bg-canvas">
                   {COLUMNS.map((c) => (
                     <th key={c.key}
-                      className="px-2 py-2.5 font-medium align-bottom">
+                      className={`px-2 py-2.5 font-medium align-bottom ${
+                        c.key === 'actions'
+                          ? 'sticky right-0 bg-canvas border-l border-line/60'
+                          : ''}`}>
                       {c.sortKey ? (
                         <button onClick={() => sortBy(c.sortKey!)}
                           title={c.help}
@@ -215,14 +235,15 @@ export default function Foundations() {
                 )}
                 {data?.rows.map((r) => (
                   <tr key={r.ein} onClick={() => setSelected(r.ein)}
-                    className="border-b border-line/60 hover:bg-canvas/70 cursor-pointer">
-                    <td className="px-2 py-2.5 w-52 max-w-52">
+                    className="group border-b border-line/60 hover:bg-canvas
+                      cursor-pointer">
+                    <td className="px-2 py-2.5">
                       <span className="font-medium text-primary truncate block"
                         title={titleCase(r.name)}>
                         {titleCase(r.name)}
                       </span>
                     </td>
-                    <td className="px-2 text-muted w-36 max-w-36">
+                    <td className="px-2 text-muted">
                       <span className="truncate block"
                         title={r.city ? `${titleCase(r.city)}, ${r.state}` : r.state || ''}>
                         {r.city ? `${titleCase(r.city)}, ` : ''}{r.state}
@@ -236,7 +257,7 @@ export default function Foundations() {
                       <div className="font-medium">
                         {money(r.christian_dollars)}
                       </div>
-                      <div className="mt-1 w-20">
+                      <div className="mt-1 w-full max-w-24">
                         <BucketBar b={{
                           christian: r.christian_dollars,
                           nonchristian: r.nonchristian_dollars,
@@ -254,7 +275,7 @@ export default function Foundations() {
                     <td className="px-2 whitespace-nowrap">
                       <StatusPill status={r.application_status} />
                     </td>
-                    <td className="px-2 tabular w-32 max-w-32">
+                    <td className="px-2 tabular">
                       {r.foreign_dollars > 0 ? (
                         <>
                           <div className="font-medium whitespace-nowrap">
@@ -314,31 +335,32 @@ function RowActions({ ein, website }: { ein: string; website: string | null }) {
   const site = websiteUrl(website)
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
-    <td className="px-2 whitespace-nowrap">
-      <div className="flex items-center gap-0.5">
+    <td className="px-2 whitespace-nowrap sticky right-0 bg-surface
+      group-hover:bg-canvas border-l border-line/60">
+      <div className="flex items-center gap-0">
         <button
           onClick={(e) => { stop(e); toggle(ein) }}
           title={saved ? 'Remove from saved' : 'Save this foundation'}
           aria-label={saved ? 'Remove from saved' : 'Save this foundation'}
           aria-pressed={saved}
-          className={`p-1.5 rounded hover:bg-canvas ${
+          className={`p-1 rounded hover:bg-canvas ${
             saved ? 'text-primary' : 'text-muted hover:text-ink'}`}>
           <Bookmark size={15} fill={saved ? 'currentColor' : 'none'} />
         </button>
         {site ? (
           <a href={site} target="_blank" rel="noreferrer" onClick={stop}
             title={`Website: ${site}`} aria-label="Foundation website"
-            className="p-1.5 rounded text-muted hover:text-ink hover:bg-canvas">
+            className="p-1 rounded text-muted hover:text-ink hover:bg-canvas">
             <Globe size={15} />
           </a>
         ) : (
-          <span className="p-1.5 text-line" title="No website in the filing"
+          <span className="p-1 text-line" title="No website in the filing"
             aria-hidden><Globe size={15} /></span>
         )}
         <a href={propublicaUrl(ein)} target="_blank" rel="noreferrer"
           onClick={stop} title="View on ProPublica Nonprofit Explorer"
           aria-label="View on ProPublica"
-          className="p-1.5 rounded text-muted hover:text-ink hover:bg-canvas">
+          className="p-1 rounded text-muted hover:text-ink hover:bg-canvas">
           <ExternalLink size={15} />
         </a>
       </div>

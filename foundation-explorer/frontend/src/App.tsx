@@ -8,9 +8,13 @@ export default function App() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 min-w-0 px-6 py-6">
+      <main className="flex-1 min-w-0 px-4 lg:px-6 py-6">
+        {/* Capped and centred: past ~1800px the table stops gaining useful
+            information and just spreads the eye across dead space. */}
+        <div className="mx-auto w-full max-w-[1800px]">
         {STATIC_MODE && <SampleBanner />}
         <Outlet />
+        </div>
       </main>
     </div>
   )
