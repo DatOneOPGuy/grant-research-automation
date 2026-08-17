@@ -64,7 +64,7 @@ export default function InternationalTab({ data }: {
           Overseas recipients
         </SectionTitle>
         {data.top_foreign.length ? (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[520px]">
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
                 <th className="py-1.5">Recipient</th>

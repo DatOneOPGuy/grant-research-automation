@@ -24,7 +24,7 @@ export default function GrantsTab({ ein }: { ein: string }) {
         {shown.length.toLocaleString()} largest grants shown,{' '}
         {money(total)} combined. Purpose text is the funder’s own wording.
       </p>
-      <table className="w-full text-sm">
+      <table className="w-full text-sm min-w-[520px]">
         <thead>
           <tr className="text-left text-xs text-muted border-b border-line">
             <th className="py-2">Recipient</th>

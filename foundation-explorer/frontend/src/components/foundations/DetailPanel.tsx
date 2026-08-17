@@ -64,7 +64,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative w-[52%] min-w-[560px] h-full bg-surface shadow-2xl overflow-y-auto">
+      <div className="relative w-[56%] min-w-[600px] max-w-[1000px] h-full bg-surface shadow-2xl overflow-y-auto">
         <div className="sticky top-0 bg-surface border-b border-line px-6 py-4 z-10">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -157,7 +157,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 overflow-x-auto">
           {isError && (
             <div className="text-sm text-scoremid">
               Could not load foundation detail — is the v5 API running on

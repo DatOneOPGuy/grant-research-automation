@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   ArrowDown, ArrowUp, Bookmark, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, HelpCircle, Loader2,
+  Globe, HelpCircle, Loader2, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import {
   defaultV5Filters, fetchFoundationsV5,
@@ -21,7 +21,7 @@ const PAGE_SIZE = 25
 
 // Table columns; sortKey maps to the API's sort vocabulary.
 const COLUMNS: { key: string; label: string; sortKey?: string
-  help?: string }[] = [
+  help?: string; altSortKey?: string; altLabel?: string }[] = [
   { key: 'name', label: 'Foundation', sortKey: 'name' },
   { key: 'state', label: 'Location' },
   {
@@ -40,9 +40,11 @@ const COLUMNS: { key: string; label: string; sortKey?: string
     help: 'Absolute dollars to Christian organizations. A large foundation '
       + 'can be a small percentage and still be a major Christian funder.',
   },
-  { key: 'paid', label: 'Paid 2023–24', sortKey: 'paid' },
+  {
+    key: 'paid', label: 'Paid 2023–24', sortKey: 'paid', altSortKey: 'median',
+    altLabel: 'median grant',
+  },
   { key: 'status', label: 'Application' },
-  { key: 'median', label: 'Median grant', sortKey: 'median' },
   {
     key: 'intl', label: 'International', sortKey: 'foreign',
     help: 'Dollars this foundation sent outside the US, with the countries '
@@ -75,6 +77,15 @@ export default function Foundations() {
     () => v5FiltersFromParams(urlParams))
   const [selected, setSelected] = useState<string | null>(
     urlParams.get('ein'))
+  // The filter rail costs 240px, which on a 14-inch laptop is the difference
+  // between the table fitting and the last two columns needing a scroll.
+  // Collapsing is safe because the active-filter chips above still show what
+  // is applied. Remembered so it does not reset on every navigation.
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => localStorage.getItem('fe.filtersOpen') !== 'false')
+  useEffect(() => {
+    localStorage.setItem('fe.filtersOpen', String(filtersOpen))
+  }, [filtersOpen])
 
   const [page, setPage] = useState(0)
 
@@ -134,8 +145,26 @@ export default function Foundations() {
         onClearAll={() => setFilters((f) => ({
           ...defaultV5Filters, sort: f.sort, order: f.order }))} />
 
-      <div className="flex gap-6">
-        <FilterPanel filters={filters} onChange={setFilters} />
+      <div className="flex gap-4">
+        {filtersOpen ? (
+          <div className="shrink-0">
+            <button onClick={() => setFiltersOpen(false)}
+              className="flex items-center gap-1.5 text-xs text-muted
+                hover:text-ink mb-2">
+              <PanelLeftClose size={14} /> Hide filters
+            </button>
+            <FilterPanel filters={filters} onChange={setFilters} />
+          </div>
+        ) : (
+          <button onClick={() => setFiltersOpen(true)}
+            title="Show filters"
+            className="shrink-0 self-start flex items-center gap-1.5 text-xs
+              text-muted hover:text-ink border border-line rounded-md px-2
+              py-2">
+            <PanelLeftOpen size={14} />
+            <span className="[writing-mode:vertical-rl] py-1">Filters</span>
+          </button>
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="bg-surface border border-line rounded-lg overflow-x-auto">
@@ -143,7 +172,8 @@ export default function Foundations() {
               <thead>
                 <tr className="text-left text-xs text-muted border-b border-line bg-canvas/50">
                   {COLUMNS.map((c) => (
-                    <th key={c.key} className="px-3 py-3 font-medium">
+                    <th key={c.key}
+                      className="px-2 py-2.5 font-medium align-bottom">
                       {c.sortKey ? (
                         <button onClick={() => sortBy(c.sortKey!)}
                           title={c.help}
@@ -155,17 +185,30 @@ export default function Foundations() {
                               ? <ArrowDown size={12} /> : <ArrowUp size={12} />)}
                         </button>
                       ) : c.label}
+                      {c.altSortKey && (
+                        <button onClick={() => sortBy(c.altSortKey!)}
+                          className={`block text-[11px] font-normal mt-0.5
+                            hover:text-ink ${filters.sort === c.altSortKey
+                              ? 'text-ink' : 'text-muted/70'}`}>
+                          {c.altLabel}
+                          {filters.sort === c.altSortKey && (
+                            <span className="ml-0.5">
+                              {filters.order === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </button>
+                      )}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className={isFetching ? 'opacity-60' : ''}>
                 {!data && !isError && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={10} className="px-3 py-2">
+                  <tr key={i}><td colSpan={COLUMNS.length} className="px-3 py-2">
                     <Skeleton className="h-6" /></td></tr>
                 ))}
                 {data?.rows.length === 0 && (
-                  <tr><td colSpan={10} className="px-3 py-12 text-center text-muted">
+                  <tr><td colSpan={COLUMNS.length} className="px-3 py-12 text-center text-muted">
                     No foundations match these criteria — try broadening your
                     filters.
                   </td></tr>
@@ -173,23 +216,27 @@ export default function Foundations() {
                 {data?.rows.map((r) => (
                   <tr key={r.ein} onClick={() => setSelected(r.ein)}
                     className="border-b border-line/60 hover:bg-canvas/70 cursor-pointer">
-                    <td className="px-3 py-2.5 max-w-56">
-                      <span className="font-medium text-primary truncate block">
+                    <td className="px-2 py-2.5 w-52 max-w-52">
+                      <span className="font-medium text-primary truncate block"
+                        title={titleCase(r.name)}>
                         {titleCase(r.name)}
                       </span>
                     </td>
-                    <td className="px-3 text-muted whitespace-nowrap">
-                      {r.city ? `${titleCase(r.city)}, ` : ''}{r.state}
+                    <td className="px-2 text-muted w-36 max-w-36">
+                      <span className="truncate block"
+                        title={r.city ? `${titleCase(r.city)}, ${r.state}` : r.state || ''}>
+                        {r.city ? `${titleCase(r.city)}, ` : ''}{r.state}
+                      </span>
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td className="px-2 py-2 whitespace-nowrap">
                       <PctChristian pct={r.pct_christian}
                         coverage={r.coverage_pct} />
                     </td>
-                    <td className="px-3 tabular whitespace-nowrap">
+                    <td className="px-2 tabular whitespace-nowrap">
                       <div className="font-medium">
                         {money(r.christian_dollars)}
                       </div>
-                      <div className="mt-1 w-24">
+                      <div className="mt-1 w-20">
                         <BucketBar b={{
                           christian: r.christian_dollars,
                           nonchristian: r.nonchristian_dollars,
@@ -198,27 +245,27 @@ export default function Foundations() {
                         }} />
                       </div>
                     </td>
-                    <td className="px-3 tabular font-medium whitespace-nowrap">
-                      {money(r.paid_2324)}
+                    <td className="px-2 tabular whitespace-nowrap">
+                      <div className="font-medium">{money(r.paid_2324)}</div>
+                      <div className="text-[11px] text-muted">
+                        {money(r.median_grant)} median
+                      </div>
                     </td>
-                    <td className="px-3 whitespace-nowrap">
+                    <td className="px-2 whitespace-nowrap">
                       <StatusPill status={r.application_status} />
                     </td>
-                    <td className="px-3 tabular text-muted whitespace-nowrap">
-                      {money(r.median_grant)}
-                    </td>
-                    <td className="px-3 tabular whitespace-nowrap max-w-40">
+                    <td className="px-2 tabular w-32 max-w-32">
                       {r.foreign_dollars > 0 ? (
                         <>
-                          <div className="font-medium">
+                          <div className="font-medium whitespace-nowrap">
                             {money(r.foreign_dollars)}
                           </div>
                           <div className="text-[11px] text-muted truncate"
-                            title={r.foreign_top_countries || undefined}>
-                            {r.foreign_top_countries
-                              || `${r.foreign_grant_count} grants, country not stated`}
-                            {r.foreign_country_count > 4
-                              && ` +${r.foreign_country_count - 4}`}
+                            title={r.foreign_top_countries
+                              || 'Country not stated in the filing'}>
+                            {r.foreign_country_count > 0
+                              ? `${r.foreign_country_count} ${r.foreign_country_count === 1 ? 'country' : 'countries'}`
+                              : 'country not stated'}
                           </div>
                         </>
                       ) : <span className="text-muted">—</span>}
@@ -267,7 +314,7 @@ function RowActions({ ein, website }: { ein: string; website: string | null }) {
   const site = websiteUrl(website)
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   return (
-    <td className="px-3 whitespace-nowrap">
+    <td className="px-2 whitespace-nowrap">
       <div className="flex items-center gap-0.5">
         <button
           onClick={(e) => { stop(e); toggle(ein) }}
