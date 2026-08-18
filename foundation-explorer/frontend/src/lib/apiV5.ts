@@ -1,5 +1,5 @@
 // Typed client for the v5 API (paid grants, TY2023–2024).
-export const V5_BASE = 'http://localhost:8000'
+export const V5_BASE = ''
 
 export type StatsV5 = {
   foundations: number
@@ -685,9 +685,7 @@ export function fetchDataQualityV5(): Promise<DataQualityV5> {
 // pagination semantics client-side, so the reviewer sees the real product
 // behaviour rather than a mock. Headline aggregates in that dataset are
 // computed over the FULL database; only the browsable rows are sampled.
-export const STATIC_MODE =
-  typeof window !== 'undefined' &&
-  !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)
+export const STATIC_MODE = import.meta.env.VITE_DEMO === '1'
 
 let staticCache: Record<string, unknown> = {}
 
