@@ -12,11 +12,17 @@ exists but is a separate artifact (see [Demo build](#demo-build)).
 | Path | What |
 |---|---|
 | `/opt/fcf/` | The repo, **rsynced** from the laptop — not a clone, there is no deploy key |
-| `/opt/fcf/data/explorer_v5.db` | ~1.33 GB read model, rsynced |
-| `/opt/fcf/venv/` | `fastapi==0.139.0`, `uvicorn[standard]==0.49.0` |
+| `/opt/fcf/data/explorer_v5.db` | ~1.33 GB read model, rsynced. Read-only, rebuildable |
+| `/opt/fcf/venv/` | Python deps, installed from `backend/requirements.lock` |
 | `/var/www/fcf/` | Built SPA (~500 KB) |
-| `/etc/systemd/system/fcf.service` | The uvicorn unit |
+| Postgres (local, `:5432`) | Accounts and shared saved folders. **Not** rebuildable — back this up |
+| `/etc/systemd/system/fcf.service` | The uvicorn unit, plus the `Environment=` lines |
 | `/etc/nginx/sites-available/fcf` | TLS termination, `/api/` proxy, SPA fallback |
+
+Two datastores, with opposite properties. `explorer_v5.db` is a compiled
+artifact: if it is lost, rebuild it from the pipeline. Postgres holds folders
+and notes that people typed, which exist nowhere else. Anything destructive
+should treat them differently for exactly that reason.
 
 `sites-enabled/default` has been removed. nginx proxies `/api/` to
 `127.0.0.1:8000` and serves `/var/www/fcf` with
@@ -32,7 +38,16 @@ production. It is dead config there, still needed for local `vite dev`.
 ```ini
 WorkingDirectory=/opt/fcf/foundation-explorer/backend
 ExecStart=/opt/fcf/venv/bin/uvicorn main_v5:app --host 127.0.0.1 --port 8000
+Environment=DATABASE_URL=postgresql+psycopg://fcf:PASSWORD@127.0.0.1:5432/fcf
+Environment=CF_ACCESS_TEAM_DOMAIN=yourteam.cloudflareaccess.com
+Environment=CF_ACCESS_AUD=<application audience tag>
 ```
+
+The three `Environment=` lines are new with the account system — see
+[Accounts](#accounts-postgres-and-cloudflare-access). Use
+`systemctl edit fcf` and an override file rather than putting the password in
+a unit that gets rsynced, or point `EnvironmentFile=` at a root-owned
+`/etc/fcf.env` with mode 600.
 
 `main_v5.py` does a bare `import v5` (not `from .v5 import ...` — the backend
 is a flat directory of modules, not a package). That resolves only when the
@@ -90,6 +105,114 @@ its own procedure below. Check `journalctl -u fcf -n 50` after a restart; a
 bad import fails at startup, and `main_v5.py` also raises deliberately if
 `explorer_v5.db` is missing.
 
+If the sync changed anything under `backend/`, reinstall from the lockfile and
+run any new migrations before restarting:
+
+```bash
+ssh fcf '/opt/fcf/venv/bin/pip install -r \
+           /opt/fcf/foundation-explorer/backend/requirements.lock'
+ssh fcf 'cd /opt/fcf/foundation-explorer/backend && \
+         /opt/fcf/venv/bin/alembic upgrade head'
+ssh fcf 'systemctl restart fcf'
+```
+
+## Accounts: Postgres and Cloudflare Access
+
+Saved folders are shared across the team and live in Postgres. Identity comes
+from Cloudflare Access — no passwords, sessions, or reset flow are stored by
+this application.
+
+### One-time Postgres setup
+
+```bash
+ssh fcf
+apt install -y postgresql
+sudo -u postgres createuser --pwprompt fcf
+sudo -u postgres createdb --owner=fcf fcf
+```
+
+Keep it bound to localhost (the Debian/Ubuntu default). Nothing outside the
+droplet needs to reach it, and the API connects over `127.0.0.1`.
+
+### Environment
+
+Three variables, read at startup, no defaults. Template in `.env.example`.
+
+| Variable | Meaning |
+|---|---|
+| `DATABASE_URL` | `postgresql+psycopg://fcf:PASSWORD@127.0.0.1:5432/fcf` |
+| `CF_ACCESS_TEAM_DOMAIN` | Zero Trust team domain, no scheme. Determines the JWKS endpoint and the expected issuer |
+| `CF_ACCESS_AUD` | Application Audience tag from the Access application. Without it, any token the team domain issues for any app would be accepted |
+
+There is also `DEV_USER_EMAIL`, for local work without Cloudflare in front.
+**The process refuses to start if it is set alongside either `CF_ACCESS_*`
+variable.** The bypass authenticates every request as that email without
+checking a token, so the unsafe combination is made unbootable rather than
+merely discouraged — a crash on deploy is a better failure than a public
+hostname quietly trusting an unauthenticated header.
+
+### Migrations
+
+Alembic, run from the backend directory — the same `WorkingDirectory` the
+systemd unit requires, so there is only one path convention to remember.
+`alembic.ini` has a deliberately blank `sqlalchemy.url`; `env.py` reads
+`DATABASE_URL` instead, so no DSN is ever committed.
+
+```bash
+cd /opt/fcf/foundation-explorer/backend
+/opt/fcf/venv/bin/alembic upgrade head     # apply
+/opt/fcf/venv/bin/alembic current          # what is applied
+/opt/fcf/venv/bin/alembic check            # does the schema match the models
+```
+
+**Migrations are an explicit deploy step and are never run at app startup.**
+A process that migrates on boot turns a restart into a schema change, and
+turns a crashloop into a schema change repeated several times a second.
+
+The initial revision seeds one team. Every user is assigned to it on first
+login; `team_id` exists on every table so a second team is a data change
+rather than a migration.
+
+### Backups
+
+Unlike `explorer_v5.db`, this cannot be regenerated:
+
+```bash
+ssh fcf 'sudo -u postgres pg_dump fcf | gzip' > fcf-$(date +%F).sql.gz
+```
+
+Small enough to take before any deploy that includes a migration.
+
+### Health
+
+`/api/health` reports components rather than a bare OK:
+
+```json
+{"status": "ok", "model": "/opt/fcf/data/explorer_v5.db",
+ "accounts": {"status": "ok", "auth_mode": "cloudflare"}}
+```
+
+`status` is `degraded` when Postgres is unreachable. That case is deliberately
+**not** fatal: the 13 read routes keep serving, and only the folder endpoints
+return 503. Taking the whole site down to protect the saved-folder feature
+would be the wrong trade. A monitor that only checks the HTTP status code will
+miss this, so alert on `accounts.status` too.
+
+`auth_mode` is `cloudflare`, `dev-bypass`, or `unconfigured`. In production it
+must read `cloudflare`.
+
+### Tests
+
+Cross-team isolation is the thing worth verifying: a user must never read or
+mutate another team's folders even by guessing an id. Those tests need a real
+Postgres and skip without one.
+
+```bash
+createdb fcf_test
+TEST_DATABASE_URL=postgresql+psycopg://localhost/fcf_test \
+  pytest tests/test_folders_api.py
+```
+
 ## Refreshing the database
 
 Never rebuild in place. `src/build_explorer_v5` drops and recreates the file,
@@ -136,32 +259,42 @@ Previously `STATIC_MODE` was inferred from the hostname (anything not
 production deploy served demo data and never called the API.
 
 A demo build *does* need the `public/` shards, so it uses `dist/` unfiltered —
-and must not be rsynced to `/var/www/fcf`.
+and must not be rsynced to `/var/www/fcf`. It also keeps the old
+localStorage-backed saved folders, because a static build has no API to talk
+to; `SavedProvider` picks the store from `STATIC_MODE`.
 
 ## Security state
 
-- No authentication. The site is fully public today.
-- Planned gate: Cloudflare Access (Zero Trust, email policy). It protects the
-  *hostname*, so it is not sufficient on its own — `ufw` must restrict `:443`
-  to Cloudflare's published IP ranges, or `https://162.243.29.41` remains a
-  direct bypass around the policy.
+- **Writes are authenticated; reads are not.** Every folder endpoint requires
+  a verified Access token and is scoped to the caller's team. The 13 read
+  routes are unchanged and unauthenticated at the application layer, so the
+  full database is readable by anything that reaches the origin.
+- **Cloudflare Access is therefore the only gate on the data**, and it
+  protects the *hostname*. Until `ufw` restricts `:443` to Cloudflare's
+  published IP ranges, `https://162.243.29.41` is a direct bypass around the
+  policy — and now that accounts exist, it is also a way to reach the API
+  without ever presenting a token. This is the highest-value item outstanding.
 - SSH key rotation: new key installed, old key removed from `authorized_keys`
   and confirmed rejected. Outstanding: delete the old key from the DigitalOcean
-  dashboard, check whether it is registered as a GitHub deploy key, and delete
-  the local copies.
+  dashboard and check whether it is registered as a GitHub deploy key. (The
+  keypair is not in this repo — not tracked, not in history, not on disk — so
+  there is nothing here to purge with git-filter-repo. If it exists, it is
+  somewhere else.)
 
 ## Known gaps
 
-- **No dependency pinning in version control.** `backend/requirements.txt` is
-  two unpinned lines (`fastapi`, `uvicorn[standard]`). The `0.139.0` /
-  `0.49.0` pins exist only inside the droplet's venv. Transitive deps float
-  freely — starlette resolved to 1.6.0 on the box vs 1.3.1 locally. Generate a
-  lockfile from the working venv (`pip freeze > requirements.lock`) and deploy
-  from that.
 - **Error copy names localhost.** Three strings tell production users to start
   a backend on `localhost:8000`: `pages/Dashboard.tsx:27`,
   `pages/Foundations.tsx:183`, `components/foundations/DetailPanel.tsx:164`.
+- **Demo shards still live in `public/`.** The four `--exclude` flags are the
+  only thing keeping them off the server. Move them out.
 - **Netlify remnants.** `foundation-explorer/frontend/netlify.toml` and
   `.netlify/` are still present; the SPA redirect they define is now nginx's
   `try_files`. Remove once the Netlify site is decommissioned.
 - **Pending kernel reboot** on the droplet.
+- **No Postgres backup schedule.** The `pg_dump` above is manual.
+
+Closed since the last revision: dependency pinning. `backend/requirements.txt`
+now pins every direct dependency and `backend/requirements.lock` pins the full
+resolved set, including `starlette==1.6.0` — the version that was drifting.
+Install on the droplet from the lock, not from `requirements.txt`.
