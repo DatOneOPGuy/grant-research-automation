@@ -1,5 +1,6 @@
 // Typed client for the v5 API (paid grants, TY2023–2024).
-export const V5_BASE = ''
+export const V5_BASE = '';
+
 
 export type StatsV5 = {
   foundations: number
@@ -404,6 +405,7 @@ export type V5Filters = {
   max_median: string
   min_grants: string
   active_year: string // '' | '2023' | '2024'
+  search: string
   recipient_search: string
   state: string[]
   gives_to_state: string[]
@@ -448,6 +450,7 @@ export const defaultV5Filters: V5Filters = {
   max_median: '',
   min_grants: '',
   active_year: '',
+  search: '',
   recipient_search: '',
   state: [],
   gives_to_state: [],
@@ -511,6 +514,7 @@ export function v5FilterParams(f: V5Filters): URLSearchParams {
   })
   BOOL_KEYS.forEach((k) => { if (f[k]) p.set(k, 'true') })
   if (f.active_year) p.set('active_year', f.active_year)
+  if (f.search.trim()) p.set('search', f.search.trim())
   if (f.recipient_search.trim()) p.set('recipient_search', f.recipient_search.trim())
   if (f.daf !== 'include') p.set('daf', f.daf)
   if (f.sort !== defaultV5Filters.sort) p.set('sort', f.sort)
@@ -530,6 +534,7 @@ export function v5FiltersFromParams(sp: URLSearchParams): V5Filters {
   NUM_KEYS.forEach((k) => { const v = sp.get(k); if (v) f[k] = v })
   BOOL_KEYS.forEach((k) => { if (sp.get(k) === 'true') f[k] = true })
   f.active_year = sp.get('active_year') || ''
+  f.search = sp.get('search') || ''
   f.recipient_search = sp.get('recipient_search') || ''
   const daf = sp.get('daf')
   if (daf === 'exclude' || daf === 'only') f.daf = daf
@@ -745,6 +750,18 @@ async function staticFoundations(qs: string) {
       const dollars = anyChristian ? r.christian_dollars : r.nonchristian_dollars
       return dollars > Math.max(minTradDollars, 0)
     })
+  }
+  // Mirrors the server: 9 digits with no letters is an EIN lookup,
+  // anything else is a case-insensitive substring match on the name.
+  const search = (p.get('search') || '').trim()
+  if (search) {
+    const digits = search.replace(/\D/g, '')
+    if (digits.length === 9 && !/[a-z]/i.test(search)) {
+      rows = rows.filter((r) => r.ein === digits)
+    } else {
+      const needle = search.toLowerCase()
+      rows = rows.filter((r) => (r.name || '').toLowerCase().includes(needle))
+    }
   }
   const pairs: [string, (r: FoundationRowV5, v: number) => boolean][] = [
     ['min_paid', (r, v) => r.paid_2324 >= v],

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, HelpCircle, Loader2, SlidersHorizontal,
+  Globe, HelpCircle, Loader2, Search, SlidersHorizontal, X,
 } from 'lucide-react'
 import {
   defaultV5Filters, fetchFoundationsV5,
@@ -140,7 +140,27 @@ export default function Foundations() {
             )}
           </div>
         </div>
-        <button onClick={() => setFiltersOpen((o) => !o)}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={15}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+            <input type="search" value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              placeholder="Search by foundation name or EIN"
+              aria-label="Search foundations by name or EIN"
+              className="w-72 text-sm border border-line rounded-md bg-surface
+                pl-8 pr-7 py-1.5 placeholder:text-muted/70 focus:outline-none
+                focus:border-primary/40" />
+            {filters.search && (
+              <button onClick={() => setFilters((f) => ({ ...f, search: '' }))}
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5
+                  rounded text-muted hover:text-ink">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <button onClick={() => setFiltersOpen((o) => !o)}
           aria-expanded={filtersOpen}
           className={`flex items-center gap-2 text-sm rounded-md border px-3
             py-1.5 transition-colors ${filtersOpen
@@ -154,7 +174,8 @@ export default function Foundations() {
               {filterCount}
             </span>
           )}
-        </button>
+          </button>
+        </div>
       </div>
 
       {isError && (

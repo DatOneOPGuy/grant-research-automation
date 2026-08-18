@@ -110,6 +110,10 @@ def foundations(
     min_median: int | None = None, max_median: int | None = None,
     min_grants: int | None = None,
     active_year: int | None = Query(None, ge=2023, le=2024),
+    # Free-text search over the foundation's own name, plus EIN, because a
+    # researcher working from a filing or a spreadsheet often has the number
+    # rather than the name.
+    search: str | None = None,
     recipient_search: str | None = None,
     state: str | None = None,
     gives_to_state: str | None = None,
@@ -218,6 +222,22 @@ def foundations(
         bands = [b.strip() for b in coverage_band.split(",")]
         where.append(f"f.coverage_band IN ({','.join('?' for _ in bands)})")
         params += bands
+    if search and search.strip():
+        term = search.strip()
+        digits = "".join(ch for ch in term if ch.isdigit())
+        # Substring rather than word-boundary: this is a person typing into a
+        # search box, where "endow" should find "Lilly Endowment". The
+        # word-boundary discipline that governs classification rules is about
+        # not asserting facts from a name, which is a different problem.
+        if len(digits) == 9 and not any(ch.isalpha() for ch in term):
+            where.append("f.ein = ?")
+            params.append(digits)
+        else:
+            where.append("f.name LIKE ? ESCAPE '\\'")
+            # Escape LIKE wildcards so a literal % or _ searches for itself.
+            safe = (term.replace("\\", "\\\\")
+                        .replace("%", "\\%").replace("_", "\\_"))
+            params.append(f"%{safe}%")
     if recipient_search:
         where.append("""EXISTS (
             SELECT 1 FROM frs JOIN recipients r ON r.entity_id=frs.entity_id

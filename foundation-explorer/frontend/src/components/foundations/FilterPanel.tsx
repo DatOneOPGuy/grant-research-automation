@@ -265,6 +265,58 @@ export default function FilterPanel({ filters, onChange }: Props) {
         </div>
         <StateMultiSelect values={filters.gives_to_state}
           onSet={(next) => set({ gives_to_state: next })} />
+
+        <div className="mt-3 pt-3 border-t border-line/60">
+          <div className="text-xs font-medium text-ink mb-1">
+            International giving
+          </div>
+          <p className="text-[11px] text-muted mb-2 leading-snug">
+            Grants the filing sent outside the US. Country codes are as filed
+            (IRS/FIPS, not ISO); where a code cannot be trusted the money is
+            reported as unspecified rather than assigned to a guess.
+          </p>
+          <Check label="Gives internationally"
+            checked={filters.gives_internationally}
+            onChange={() => set({
+              gives_internationally: !filters.gives_internationally })} />
+
+          <div className="text-xs text-muted mb-1 mt-2">Mission region</div>
+          {MISSION_REGIONS.map(([label, codes]) => {
+            // A region is "on" only when every one of its codes is selected,
+            // so toggling it off cannot strip codes the user picked by hand.
+            const on = codes.every((c) => filters.country.includes(c))
+            return (
+              <Check key={label} label={label} checked={on}
+                onChange={() => set({
+                  country: on
+                    ? filters.country.filter((c) => !codes.includes(c))
+                    : [...new Set([...filters.country, ...codes])],
+                })} />
+            )
+          })}
+
+          <div className="text-xs text-muted mb-1 mt-2">
+            Min international $
+          </div>
+          <NumInput value={filters.min_foreign}
+            onChange={(v) => set({ min_foreign: v })} placeholder="Min $" />
+          <div className="text-xs text-muted mb-1 mt-2">
+            Min international Christian $
+          </div>
+          <NumInput value={filters.min_foreign_christian}
+            onChange={(v) => set({ min_foreign_christian: v })}
+            placeholder="Min $" />
+          <div className="text-xs text-muted mb-1 mt-2">
+            Min % of giving sent abroad
+          </div>
+          <NumInput value={filters.min_pct_foreign}
+            onChange={(v) => set({ min_pct_foreign: v })} placeholder="0-100" />
+          <div className="text-xs text-muted mb-1 mt-2">
+            Min countries funded
+          </div>
+          <NumInput value={filters.min_countries}
+            onChange={(v) => set({ min_countries: v })} placeholder="e.g. 3" />
+        </div>
       </Section>
 
       <Section title="Reachability" defaultOpen={false}>
@@ -358,59 +410,7 @@ export default function FilterPanel({ filters, onChange }: Props) {
           ))}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-line/60">
-          <div className="text-xs font-medium text-ink mb-1">
-            International giving
-          </div>
-          <p className="text-[11px] text-muted mb-2 leading-snug">
-            Grants the filing sent outside the US. Country codes are as filed
-            (IRS/FIPS, not ISO); where a code cannot be trusted the money is
-            reported as unspecified rather than assigned to a guess.
-          </p>
-          <Check label="Gives internationally"
-            checked={filters.gives_internationally}
-            onChange={() => set({
-              gives_internationally: !filters.gives_internationally })} />
-
-          <div className="text-xs text-muted mb-1 mt-2">Mission region</div>
-          {MISSION_REGIONS.map(([label, codes]) => {
-            // A region is "on" only when every one of its codes is selected,
-            // so toggling it off cannot strip codes the user picked by hand.
-            const on = codes.every((c) => filters.country.includes(c))
-            return (
-              <Check key={label} label={label} checked={on}
-                onChange={() => set({
-                  country: on
-                    ? filters.country.filter((c) => !codes.includes(c))
-                    : [...new Set([...filters.country, ...codes])],
-                })} />
-            )
-          })}
-
-          <div className="text-xs text-muted mb-1 mt-2">
-            Min international $
-          </div>
-          <NumInput value={filters.min_foreign}
-            onChange={(v) => set({ min_foreign: v })} placeholder="Min $" />
-          <div className="text-xs text-muted mb-1 mt-2">
-            Min international Christian $
-          </div>
-          <NumInput value={filters.min_foreign_christian}
-            onChange={(v) => set({ min_foreign_christian: v })}
-            placeholder="Min $" />
-          <div className="text-xs text-muted mb-1 mt-2">
-            Min % of giving sent abroad
-          </div>
-          <NumInput value={filters.min_pct_foreign}
-            onChange={(v) => set({ min_pct_foreign: v })} placeholder="0-100" />
-          <div className="text-xs text-muted mb-1 mt-2">
-            Min countries funded
-          </div>
-          <NumInput value={filters.min_countries}
-            onChange={(v) => set({ min_countries: v })} placeholder="e.g. 3" />
-        </div>
-
-        <div className="text-xs text-muted mb-1">Min Christian $</div>
+        <div className="text-xs text-muted mb-1 mt-3">Min Christian $</div>
         <NumInput value={filters.min_christian}
           onChange={(v) => set({ min_christian: v })} placeholder="Min $" />
         <div className="text-xs text-muted mb-1 mt-2">Min % Christian

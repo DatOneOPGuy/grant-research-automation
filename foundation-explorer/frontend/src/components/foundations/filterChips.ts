@@ -56,6 +56,10 @@ export function buildChips(
     id: 'yr', label: `Active ${f.active_year}`,
     onRemove: () => set({ active_year: '' }),
   })
+  if (f.search.trim()) chips.push({
+    id: 'fs', label: `Name: “${f.search.trim()}”`,
+    onRemove: () => set({ search: '' }),
+  })
   if (f.recipient_search.trim()) chips.push({
     id: 'rs', label: `Recipient: “${f.recipient_search.trim()}”`,
     onRemove: () => set({ recipient_search: '' }),
