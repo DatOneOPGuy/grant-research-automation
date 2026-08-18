@@ -28,7 +28,6 @@ ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT / "data" / "explorer_v5.db"
 OUT = Path(__file__).resolve().parent.parent / "frontend" / "public" / "demo-v5"
 
-FOUNDATION_SAMPLE = 2500      # browsable foundations
 GRANTS_PER_FOUNDATION = 60
 RECIPIENTS_PER_FOUNDATION = 40
 GRANTS_SAMPLE = 4000          # grants explorer page
@@ -76,15 +75,13 @@ def main() -> None:
     started = time.monotonic()
     conn = connect()
 
-    # --- browsable sample: the foundations worth reviewing -----------------
-    # Ranked by Christian dollars so the sample is the product's actual value,
-    # then padded with large secular funders so the reviewer can see the
+    # --- browsable set: every foundation with confirmed Christian giving ---
+    # Padded with the 500 largest secular funders so the reviewer can see the
     # honest low-percentage cases too, not a curated success reel.
     rows = conn.execute(f"""
         SELECT {FOUNDATION_COLUMNS} FROM foundations
         WHERE paid_2324 > 0 AND christian_dollars > 0
-        ORDER BY christian_dollars DESC LIMIT ?""",
-        (FOUNDATION_SAMPLE - 500,)).fetchall()
+        ORDER BY christian_dollars DESC""").fetchall()
     eins = {r["ein"] for r in rows}
     extra = conn.execute(f"""
         SELECT {FOUNDATION_COLUMNS} FROM foundations
