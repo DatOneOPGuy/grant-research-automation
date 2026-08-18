@@ -1,2 +1,17 @@
-fastapi
-uvicorn[standard]
+# Direct dependencies of the Explorer API, pinned.
+#
+# This file is the intent; requirements.lock is what actually gets installed
+# on the droplet. Deploy from the lock -- these pins leave transitive versions
+# free, which is how starlette drifted between the laptop and the box.
+
+# API
+fastapi==0.139.0
+uvicorn[standard]==0.49.0
+
+# Accounts: Postgres, schema migrations, Cloudflare Access token verification.
+# pyjwt[crypto] rather than plain pyjwt: RS256 verification needs cryptography.
+sqlalchemy==2.0.44
+alembic==1.17.1
+psycopg[binary]==3.2.12
+pyjwt[crypto]==2.12.1
+httpx==0.28.1
