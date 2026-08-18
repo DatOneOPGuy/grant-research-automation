@@ -17,7 +17,9 @@ export default function SavedTable({
   folderId: string | null
   onOpen: (ein: string) => void
 }) {
-  const { folders, foldersFor, removeFrom, removeAll } = useSavedFoundations()
+  const {
+    folders, foldersFor, removeFrom, removeAll, busy,
+  } = useSavedFoundations()
 
   return (
     <Card>
@@ -67,15 +69,17 @@ export default function SavedTable({
                 </td>
                 <td>
                   <button
-                    onClick={() => (folderId
+                    onClick={() => void (folderId
                       ? removeFrom(f.ein, folderId) : removeAll(f.ein))}
+                    disabled={busy}
                     title={folderId
                       ? 'Remove from this folder'
                       : 'Remove from Saved entirely'}
                     aria-label={folderId
                       ? 'Remove from this folder'
                       : 'Remove from Saved'}
-                    className="p-1 text-muted hover:text-scoremid">
+                    className="p-1 text-muted hover:text-scoremid
+                      disabled:opacity-40">
                     {folderId
                       ? <FolderMinus size={14} /> : <Trash2 size={14} />}
                   </button>

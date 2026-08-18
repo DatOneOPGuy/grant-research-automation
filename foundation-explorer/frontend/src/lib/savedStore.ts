@@ -1,6 +1,10 @@
-/* Persistence boundaries for saved foundations and session filters.
- * Swap LocalSavedStore for API-backed persistence when user accounts land;
- * the interface consumed by the provider stays identical.
+/* Persistence boundary for saved foundations, and the browser-local
+ * implementation of it.
+ *
+ * Two stores implement this interface. ApiSavedStore (the live app) keeps
+ * folders in Postgres, shared across the team. LocalSavedStore (the static
+ * demo build) keeps them in localStorage, because a demo build has no API to
+ * talk to. Which one is used is decided in SavedProvider.
  *
  * Foundations are organised into folders. Membership is many-to-many: the same
  * foundation can sit in "Catholic prospects" and "Ask in Q1" at once, which is
@@ -10,27 +14,35 @@
  *
  * Every folder is deletable, including Favorites. A product that seeds a
  * folder you cannot remove is making a filing decision on the user's behalf.
+ *
+ * The interface is asynchronous because the real store is a network away.
+ * Even LocalSavedStore returns promises: one shape for both means the
+ * components never need to know which one they are talking to.
  */
 
 export type SavedFolder = { id: string; name: string; createdAt: string }
 
-export interface SavedFoundationsStore {
-  getFolders(): SavedFolder[]
+/** Everything the UI derives its saved state from, in one shape. */
+export type SavedState = {
+  folders: SavedFolder[]
   /** ein -> folder ids, for every saved foundation. */
-  getMembership(): Record<string, string[]>
-  createFolder(name: string): SavedFolder
-  renameFolder(id: string, name: string): void
-  deleteFolder(id: string): void
-  addTo(ein: string, folderId: string): void
-  removeFrom(ein: string, folderId: string): void
+  members: Record<string, string[]>
+}
+
+export interface SavedFoundationsStore {
+  /** Full state. Called on mount and again after every mutation. */
+  load(): Promise<SavedState>
+  createFolder(name: string): Promise<SavedFolder>
+  renameFolder(id: string, name: string): Promise<void>
+  deleteFolder(id: string): Promise<void>
+  addTo(ein: string, folderId: string): Promise<void>
+  removeFrom(ein: string, folderId: string): Promise<void>
   /** Unsave entirely, across every folder. */
-  removeAll(ein: string): void
+  removeAll(ein: string): Promise<void>
 }
 
 const STATE_KEY = 'fe.saved.v2'
-const LEGACY_KEY = 'fe.saved.eins'
 const FILTER_KEY = 'fe.filters'
-const DEFAULT_FOLDER_NAME = 'Favorites'
 
 type State = { folders: SavedFolder[]; members: Record<string, string[]> }
 
@@ -43,10 +55,6 @@ function newId(): string {
   return `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-function emptyState(): State {
-  return { folders: [], members: {} }
-}
-
 function readState(): State {
   try {
     const raw = localStorage.getItem(STATE_KEY)
@@ -56,46 +64,31 @@ function readState(): State {
         return { folders: parsed.folders, members: parsed.members }
       }
     }
-  } catch { /* fall through to migration */ }
-
-  // Migrate the flat pre-folder list into a starting Favorites folder, so an
-  // existing saved list survives the upgrade instead of silently emptying.
-  let legacy: string[] = []
-  try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]') }
-  catch { legacy = [] }
-
-  const state = emptyState()
-  const folder: SavedFolder = {
-    id: newId(), name: DEFAULT_FOLDER_NAME, createdAt: new Date().toISOString(),
-  }
-  state.folders.push(folder)
-  legacy.filter(Boolean).forEach((ein) => { state.members[ein] = [folder.id] })
-  return state
+  } catch { /* fall through to an empty store */ }
+  return { folders: [], members: {} }
 }
 
-class LocalSavedStore implements SavedFoundationsStore {
+/** localStorage-backed store. Used only by the static demo build. */
+export class LocalSavedStore implements SavedFoundationsStore {
   private state: State
 
   constructor() {
     this.state = readState()
-    this.persist()
   }
 
   private persist() {
     localStorage.setItem(STATE_KEY, JSON.stringify(this.state))
   }
 
-  getFolders() { return [...this.state.folders] }
-  getMembership() {
-    // Deep-ish copy: callers should not be able to mutate stored arrays.
-    const out: Record<string, string[]> = {}
+  async load(): Promise<SavedState> {
+    const members: Record<string, string[]> = {}
     for (const [ein, ids] of Object.entries(this.state.members)) {
-      if (ids.length) out[ein] = [...ids]
+      if (ids.length) members[ein] = [...ids]
     }
-    return out
+    return { folders: [...this.state.folders], members }
   }
 
-  createFolder(name: string) {
+  async createFolder(name: string): Promise<SavedFolder> {
     const clean = name.trim() || 'Untitled folder'
     const existing = this.state.folders.find(
       (f) => f.name.toLowerCase() === clean.toLowerCase())
@@ -108,7 +101,7 @@ class LocalSavedStore implements SavedFoundationsStore {
     return folder
   }
 
-  renameFolder(id: string, name: string) {
+  async renameFolder(id: string, name: string): Promise<void> {
     const clean = name.trim()
     if (!clean) return
     const folder = this.state.folders.find((f) => f.id === id)
@@ -117,7 +110,7 @@ class LocalSavedStore implements SavedFoundationsStore {
     this.persist()
   }
 
-  deleteFolder(id: string) {
+  async deleteFolder(id: string): Promise<void> {
     this.state.folders = this.state.folders.filter((f) => f.id !== id)
     for (const [ein, ids] of Object.entries(this.state.members)) {
       const next = ids.filter((x) => x !== id)
@@ -129,14 +122,14 @@ class LocalSavedStore implements SavedFoundationsStore {
     this.persist()
   }
 
-  addTo(ein: string, folderId: string) {
+  async addTo(ein: string, folderId: string): Promise<void> {
     if (!this.state.folders.some((f) => f.id === folderId)) return
     const ids = this.state.members[ein] || []
     if (!ids.includes(folderId)) this.state.members[ein] = [...ids, folderId]
     this.persist()
   }
 
-  removeFrom(ein: string, folderId: string) {
+  async removeFrom(ein: string, folderId: string): Promise<void> {
     const ids = this.state.members[ein]
     if (!ids) return
     const next = ids.filter((x) => x !== folderId)
@@ -145,13 +138,11 @@ class LocalSavedStore implements SavedFoundationsStore {
     this.persist()
   }
 
-  removeAll(ein: string) {
+  async removeAll(ein: string): Promise<void> {
     delete this.state.members[ein]
     this.persist()
   }
 }
-
-export const savedFoundationsStore: SavedFoundationsStore = new LocalSavedStore()
 
 export function loadPersistedFilters<T>(): Partial<T> | null {
   try { return JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null') }

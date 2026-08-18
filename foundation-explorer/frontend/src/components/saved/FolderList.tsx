@@ -11,22 +11,31 @@ export default function FolderList({ activeView, onSelect }: {
   onSelect: (view: string) => void
 }) {
   const {
-    folders, saved, einsIn, createFolder, renameFolder, deleteFolder,
+    folders, saved, einsIn, createFolder, renameFolder, deleteFolder, busy,
   } = useSavedFoundations()
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
 
-  const submitNew = () => {
+  const submitNew = async () => {
     const clean = draft.trim()
     if (!clean) return
-    onSelect(createFolder(clean).id)
+    const folder = await createFolder(clean)
+    // On failure the provider shows the reason; keep the draft so the user can
+    // retry rather than retype.
+    if (!folder) return
+    onSelect(folder.id)
     setDraft('')
     setCreating(false)
   }
 
-  const confirmDelete = (id: string, name: string) => {
+  const commitRename = async (id: string) => {
+    setEditing(null)
+    await renameFolder(id, editName)
+  }
+
+  const confirmDelete = async (id: string, name: string) => {
     // Deleting a folder can unsave foundations that live nowhere else, so the
     // prompt says how many rather than just asking "are you sure".
     const orphans = einsIn(id).filter((ein) => {
@@ -39,8 +48,10 @@ export default function FolderList({ activeView, onSelect }: {
         + 'removed from Saved entirely.'
       : '\n\nEvery foundation in it is also in another folder, so nothing '
         + 'will be lost from Saved.'
-    if (confirm(`Delete the folder "${name}"?${detail}`)) {
-      deleteFolder(id)
+    // Shared folders: this deletes the folder for the whole team, not just
+    // for the person clicking.
+    if (confirm(`Delete the folder "${name}" for everyone?${detail}`)) {
+      await deleteFolder(id)
       if (activeView === id) onSelect(ALL)
     }
   }
@@ -67,14 +78,12 @@ export default function FolderList({ activeView, onSelect }: {
                 <input autoFocus value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      renameFolder(f.id, editName); setEditing(null)
-                    }
+                    if (e.key === 'Enter') void commitRename(f.id)
                     if (e.key === 'Escape') setEditing(null)
                   }}
                   className="flex-1 min-w-0 border border-line rounded px-2
                     py-1 text-sm" />
-                <button onClick={() => { renameFolder(f.id, editName); setEditing(null) }}
+                <button onClick={() => void commitRename(f.id)}
                   aria-label="Save name"
                   className="p-1 text-primary hover:bg-canvas rounded">
                   <Check size={14} />
@@ -101,9 +110,11 @@ export default function FolderList({ activeView, onSelect }: {
                   className="p-1 text-muted hover:text-ink rounded">
                   <Pencil size={13} />
                 </button>
-                <button onClick={() => confirmDelete(f.id, f.name)}
+                <button onClick={() => void confirmDelete(f.id, f.name)}
+                  disabled={busy}
                   title="Delete folder" aria-label={`Delete ${f.name}`}
-                  className="p-1 text-muted hover:text-scoremid rounded">
+                  className="p-1 text-muted hover:text-scoremid rounded
+                    disabled:opacity-40">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -118,13 +129,14 @@ export default function FolderList({ activeView, onSelect }: {
             <input autoFocus value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submitNew()
+                if (e.key === 'Enter') void submitNew()
                 if (e.key === 'Escape') { setCreating(false); setDraft('') }
               }}
               placeholder="Folder name"
               className="flex-1 min-w-0 border border-line rounded px-2 py-1
                 text-sm" />
-            <button onClick={submitNew} disabled={!draft.trim()}
+            <button onClick={() => void submitNew()}
+              disabled={!draft.trim() || busy}
               aria-label="Create folder"
               className="p-1.5 text-primary hover:bg-canvas rounded
                 disabled:opacity-40">

@@ -27,7 +27,9 @@ function toCsv(rows: FoundationRowV5[]): string {
 }
 
 export default function Saved() {
-  const { folders, saved, einsIn } = useSavedFoundations()
+  const {
+    folders, saved, einsIn, loading, loadError, reload,
+  } = useSavedFoundations()
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<string>(ALL)
 
@@ -75,14 +77,36 @@ export default function Saved() {
       <p className="text-sm text-muted mb-4">
         {num(saved.length)} saved in {folders.length}{' '}
         {folders.length === 1 ? 'folder' : 'folders'} · paid grants, tax years{' '}
-        {TAX_WINDOW_LABEL}. Saved lists live in this browser only.
+        {TAX_WINDOW_LABEL}. Folders are shared with your team — everyone sees
+        and edits the same lists.
       </p>
+
+      {loadError && (
+        <div className="mb-4 rounded-md border border-scoremid/40 bg-amber-50
+          px-4 py-2.5 text-sm text-scoremid flex items-center gap-3">
+          <span className="flex-1">
+            Could not load your saved folders. {loadError}
+          </span>
+          <button onClick={() => void reload()}
+            className="underline underline-offset-2 shrink-0">
+            Try again
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-6 items-start">
         <FolderList activeView={activeView} onSelect={setView} />
 
         <div className="flex-1 min-w-0">
-          {saved.length === 0 ? (
+          {/* An empty list before the first load resolves is not "nothing
+              saved" -- it is "not known yet", and saying the former would be
+              a claim we cannot support. */}
+          {loading ? (
+            <div className="border border-line rounded-lg bg-surface p-12
+              text-center text-muted text-sm">
+              Loading your team's saved folders…
+            </div>
+          ) : loadError ? null : saved.length === 0 ? (
             <EmptyState hasFolders={folders.length > 0} />
           ) : eins.length === 0 ? (
             <div className="border border-line rounded-lg bg-surface p-12

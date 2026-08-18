@@ -18,7 +18,7 @@ const MENU_WIDTH = 232
 
 export default function SaveMenu({ ein, align = 'right' }: Props) {
   const {
-    folders, foldersFor, isSaved, addTo, removeFrom, createFolder,
+    folders, foldersFor, isSaved, addTo, removeFrom, createFolder, busy,
   } = useSavedFoundations()
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -67,10 +67,16 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
 
-  const submitNew = () => {
+  // Two round trips, and the second depends on the first: the folder has to
+  // exist server-side before anything can be filed into it. The input stays
+  // put until both land, so a failed create does not silently discard what
+  // the user typed.
+  const submitNew = async () => {
     const clean = name.trim()
     if (!clean) return
-    addTo(ein, createFolder(clean).id)
+    const folder = await createFolder(clean)
+    if (!folder) return // the provider is already showing why
+    await addTo(ein, folder.id)
     setName('')
     setCreating(false)
   }
@@ -110,9 +116,11 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
               const on = mine.includes(f.id)
               return (
                 <button key={f.id}
-                  onClick={() => (on ? removeFrom(ein, f.id) : addTo(ein, f.id))}
+                  onClick={() => void (on
+                    ? removeFrom(ein, f.id) : addTo(ein, f.id))}
+                  disabled={busy}
                   className="w-full flex items-center gap-2 px-3 py-1.5
-                    hover:bg-canvas text-left">
+                    hover:bg-canvas text-left disabled:opacity-50">
                   <span className={`w-4 h-4 rounded border flex items-center
                     justify-center shrink-0 ${on
                       ? 'bg-primary border-primary text-white'
@@ -131,13 +139,14 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
                 <input autoFocus value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitNew()
+                    if (e.key === 'Enter') void submitNew()
                     if (e.key === 'Escape') { setCreating(false); setName('') }
                   }}
                   placeholder="Folder name"
                   className="flex-1 min-w-0 border border-line rounded px-2
                     py-1 text-sm" />
-                <button onClick={submitNew} disabled={!name.trim()}
+                <button onClick={() => void submitNew()}
+                  disabled={!name.trim() || busy}
                   aria-label="Create folder"
                   className="p-1.5 rounded text-primary hover:bg-canvas
                     disabled:opacity-40">
