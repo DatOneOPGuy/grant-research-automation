@@ -39,6 +39,8 @@ select = ["E", "F", "I", "B", "UP"]
 # FastAPI intentionally declares dependency/query metadata in signatures.
 "foundation-explorer/backend/models.py" = ["B008"]
 "foundation-explorer/backend/routes/*.py" = ["B008"]
+"foundation-explorer/backend/folders.py" = ["B008"]
+"foundation-explorer/backend/auth.py" = ["B008"]
 
 [tool.ruff.format]
 quote-style = "double"
