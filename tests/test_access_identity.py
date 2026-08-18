@@ -82,16 +82,21 @@ def env(signing_key):
     except sqlalchemy.exc.SQLAlchemyError as exc:
         pytest.skip(f"Postgres unreachable: {exc}")
 
-    # Point the JWKS cache at our key instead of Cloudflare's endpoint. This is
-    # the only stub: verification, issuer, audience and expiry are all real.
+    # Substitute the key lookup so these tests do not depend on Cloudflare.
+    # This is the only stub: verification, issuer, audience and expiry are all
+    # real. Note what it cannot cover -- the construction of the real
+    # PyJWKClient, which is the seam a lifespan=0 bug slipped through into
+    # production. tests/test_jwks_client.py exists to cover exactly that, and
+    # asserting the stub target still exists here keeps this file from
+    # silently going quiet if the function is renamed again.
+    assert hasattr(auth, "_signing_key"), (
+        "auth._signing_key is gone; this stub would silently no-op and every "
+        "test below would hit the live JWKS endpoint")
+
     class _Key:
         key = signing_key.public_key()
 
-    class _Stub:
-        def signing_key(self, token):
-            return _Key()
-
-    auth._jwks = _Stub()
+    auth._signing_key = lambda token: _Key()
 
     from fastapi import FastAPI
 

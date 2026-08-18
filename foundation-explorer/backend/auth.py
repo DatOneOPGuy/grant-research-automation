@@ -15,9 +15,7 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 
-import httpx
 import jwt
 from db_session import get_db
 from fastapi import Depends, Header, HTTPException
@@ -31,53 +29,66 @@ import config
 
 log = logging.getLogger(__name__)
 
+# TTL for the cached JWK set, in seconds. PyJWKClient requires this to be
+# strictly positive and raises PyJWKClientError at construction otherwise.
 JWKS_TTL_SECONDS = 900  # 15 minutes
+JWKS_TIMEOUT_SECONDS = 10
 DEFAULT_TEAM_NAME = "Foundation Explorer"
 
 
-class _JwksCache:
-    """PyJWKClient with a TTL, plus a forced refresh on an unrecognised kid.
+def jwks_url() -> str:
+    return f"https://{config.CF_ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs"
 
-    Cloudflare rotates signing keys without warning. A pure TTL cache would
-    reject every request for up to the TTL after a rotation, so an unknown kid
-    triggers one immediate refetch before the token is judged invalid.
+
+def build_jwks_client() -> PyJWKClient:
+    """Construct the JWKS client. Separated so a test can call it directly.
+
+    PyJWKClient already provides everything this module needs, and an earlier
+    version of this file reimplemented all of it badly:
+
+      - a TTL cache of the JWK set. PyJWKClient's tier-1 cache does this via
+        `lifespan`, which must be a positive number of seconds.
+      - a refetch when a token's kid is not in the cached set. PyJWKClient's
+        get_signing_key already refreshes and retries once on a kid miss, so
+        a key rotation is handled without waiting out the TTL.
+
+    The hand-rolled version passed lifespan=0 to disable PyJWT's cache and let
+    the wrapper own the policy. PyJWT rejects that value at construction, so
+    every verification raised before a single key was fetched -- which in
+    production meant a blanket 401 that looked exactly like a bad audience or
+    a bad issuer. The local tests never caught it because they stubbed the
+    key lookup, which is precisely the seam where the bug lived.
+
+    cache_keys is left at its default of False on purpose. That tier-2 LRU
+    caches keys by kid with no expiry at all, so a key Cloudflare has rotated
+    out would be retained indefinitely.
     """
-
-    def __init__(self) -> None:
-        self._client: PyJWKClient | None = None
-        self._fetched_at = 0.0
-        self._lock = threading.Lock()
-
-    @property
-    def _url(self) -> str:
-        return (f"https://{config.CF_ACCESS_TEAM_DOMAIN}"
-                "/cdn-cgi/access/certs")
-
-    def _build(self) -> PyJWKClient:
-        # lifespan=0 so PyJWKClient's own cache never masks ours; this class
-        # owns the refresh policy.
-        return PyJWKClient(self._url, cache_keys=False, lifespan=0)
-
-    def signing_key(self, token: str):
-        with self._lock:
-            expired = time.monotonic() - self._fetched_at > JWKS_TTL_SECONDS
-            if self._client is None or expired:
-                self._client = self._build()
-                self._fetched_at = time.monotonic()
-            client = self._client
-
-        try:
-            return client.get_signing_key_from_jwt(token)
-        except jwt.PyJWKClientError:
-            # Unknown kid: refetch once in case the keys just rotated.
-            with self._lock:
-                self._client = self._build()
-                self._fetched_at = time.monotonic()
-                client = self._client
-            return client.get_signing_key_from_jwt(token)
+    return PyJWKClient(
+        jwks_url(),
+        lifespan=JWKS_TTL_SECONDS,
+        timeout=JWKS_TIMEOUT_SECONDS,
+    )
 
 
-_jwks = _JwksCache()
+_jwks_client: PyJWKClient | None = None
+_jwks_lock = threading.Lock()
+
+
+def _signing_key(token: str):
+    """The signing key for this token, from a lazily built shared client.
+
+    Built on first use rather than at import: the team domain is not known at
+    import time in dev-bypass mode, and a module that constructs network
+    clients on import is harder to test than one that does not.
+    """
+    global _jwks_client
+    client = _jwks_client
+    if client is None:
+        with _jwks_lock:
+            if _jwks_client is None:
+                _jwks_client = build_jwks_client()
+            client = _jwks_client
+    return client.get_signing_key_from_jwt(token)
 
 
 def _unauthorised(reason: str) -> HTTPException:
@@ -92,7 +103,7 @@ def email_from_token(token: str) -> str:
     if not config.CF_CONFIGURED:
         raise _unauthorised("Cloudflare Access is not configured")
     try:
-        key = _jwks.signing_key(token)
+        key = _signing_key(token)
         claims = jwt.decode(
             token,
             key.key,
@@ -101,7 +112,11 @@ def email_from_token(token: str) -> str:
             issuer=f"https://{config.CF_ACCESS_TEAM_DOMAIN}",
             options={"require": ["exp", "iat", "aud", "iss"]},
         )
-    except (jwt.PyJWTError, httpx.HTTPError, OSError) as exc:
+    # PyJWKClient fetches with urllib, and wraps transport failures in
+    # PyJWKClientConnectionError, which is itself a PyJWTError -- so the JWKS
+    # and verification failures both land here. OSError is belt and braces for
+    # a socket error that escapes that wrapping.
+    except (jwt.PyJWTError, OSError) as exc:
         raise _unauthorised(f"{type(exc).__name__}: {exc}") from exc
 
     # Service tokens carry no email. They are a different kind of principal
