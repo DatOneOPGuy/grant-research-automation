@@ -55,15 +55,215 @@ process's working directory *is* the backend directory. Change or drop
 `WorkingDirectory` and the unit dies at import with `ModuleNotFoundError: v5`.
 Same reason `main_v5:app` works as a bare module path rather than a dotted one.
 
+## Releasing an update
+
+### Downtime, measured
+
+| Step | Interruption | What a user sees |
+|---|---|---|
+| Frontend deploy (two-phase, below) | **none** | nothing |
+| `systemctl restart fcf` | **~1.5 s** | one failed API call, then recovery |
+| `alembic upgrade head` | none by itself | nothing |
+| Database refresh (`mv` + restart) | ~1.5 s | as above |
+| Pruning old asset bundles | none, if done later | nothing |
+
+The 1.5 s is `0.25 s` to stop, `~1.1 s` of Python interpreter and imports, and
+`~0.07 s` of application startup, taken from `journalctl -o short-precise` and
+by timing `import main_v5` on the box. During that window nginx cannot reach
+`127.0.0.1:8000` and returns **502**.
+
+The frontend's react-query is configured with `retry: 1`, so a single call
+crossing the restart usually retries and succeeds. A save in flight will show
+the "That change was not saved" banner and can simply be repeated — nothing is
+written half-way, because every mutation is one transaction.
+
+**There is no way to reach zero backend downtime with the current single-process
+setup.** See [Toward zero downtime](#toward-zero-downtime) for the upgrade
+path. Until then, deploy when the team is not mid-session; 1.5 s is cheap but
+it is not nothing.
+
+### Order of operations
+
+Deploy back to front. The API tolerates an older frontend far better than a new
+frontend tolerates an older API — a new bundle calling an endpoint that does not
+exist yet fails with no recovery, whereas an old bundle simply does not call the
+new endpoint.
+
+```
+1. pre-flight   → tests, lint, build, confirm clean tree
+2. backup       → pg_dump, if the release contains a migration
+3. backend      → rsync, pip install, alembic upgrade, restart
+4. verify       → health, a read route, a 401 on folders
+5. frontend     → phase 1 (additive rsync)
+6. verify       → load the site, check the bundle hash
+7. later        → prune superseded asset bundles
+```
+
+Skip steps that do not apply: a copy-only frontend change needs 1, 5, 6, 7.
+
+### Pre-flight, on the laptop
+
+```bash
+cd foundation-explorer/frontend && npm run lint && npx tsc -b --force && npm run test:saved
+cd ../.. && python3 -m ruff check foundation-explorer/backend/ tests/
+python3 -m pytest tests/ -q                       # pipeline suite
+
+# Account + identity suite needs a Postgres:
+createdb fcf_test
+TEST_DATABASE_URL=postgresql+psycopg://localhost/fcf_test \
+  foundation-explorer/backend/.venv/bin/python -m pytest \
+  tests/test_folders_api.py tests/test_access_identity.py tests/test_jwks_client.py
+
+git status --porcelain     # must be empty; deploy what is committed
+git push
+```
+
+A dirty tree is the most common way to ship something that is not in git and
+cannot be rolled back to. `/opt/fcf` is an rsync target, not a clone, so the
+droplet has no record of what version it is running — the repo is the only
+record, which is why the tree must be clean.
+
+### Backend release
+
+```bash
+# 2. Back up first if this release migrates. Cheap; do it anyway.
+ssh fcf 'sudo -u postgres pg_dump fcf | gzip' > fcf-$(date +%F-%H%M).sql.gz
+
+# 3. Ship code. Note the excludes -- venv/ lives inside the target and
+#    --delete would remove the interpreter mid-deploy.
+rsync -av --delete \
+  --exclude 'venv/' --exclude '.venv/' --exclude 'data/' --exclude '.git/' \
+  --exclude 'node_modules/' --exclude 'foundation-explorer/frontend/' \
+  --exclude '__pycache__/' --exclude '*.pyc' \
+  ./ fcf:/opt/fcf/
+
+# Dependencies, only if requirements.lock changed
+ssh fcf '/opt/fcf/venv/bin/pip install -r \
+           /opt/fcf/foundation-explorer/backend/requirements.lock'
+
+# Migrations, only if a new revision was added. Explicit, never at startup.
+ssh fcf 'cd /opt/fcf/foundation-explorer/backend && \
+         DATABASE_URL=$(grep ^DATABASE_URL= /etc/fcf/fcf.env | cut -d= -f2-) \
+         /opt/fcf/venv/bin/alembic upgrade head'
+
+ssh fcf 'systemctl restart fcf'
+```
+
+`alembic` imports `config`, which validates the whole Access environment. Pass
+`DATABASE_URL` alone as above rather than sourcing the env file — with
+`CF_ACCESS_TEAM_DOMAIN` set and no AUD in scope it will refuse to run.
+
+**Migrations must be backward compatible with the running code**, because they
+apply before the restart. Adding a nullable column or a table is safe. Dropping
+or renaming one is not — split that across two releases: deploy code that stops
+using the column, then remove it in the next release.
+
+### Verify
+
+```bash
+ssh fcf 'curl -s localhost:8000/api/health'
+# expect: "status":"ok" AND accounts.status":"ok" AND auth_mode":"cloudflare"
+
+ssh fcf 'curl -s -o /dev/null -w "stats=%{http_code}\n"  localhost:8000/api/v5/stats'
+ssh fcf 'curl -s -o /dev/null -w "folders=%{http_code}\n" localhost:8000/api/v5/folders'
+# expect: stats=200, folders=401
+
+curl -s -o /dev/null -w "public=%{http_code}\n" https://fcf.drakesdev.com/
+# expect: 302 (Access login) -- a 200 here would mean Access is not gating
+
+ssh fcf 'journalctl -u fcf -n 20 --no-pager | grep -iE "error|critical|traceback"'
+```
+
+`auth_mode` reading anything but `cloudflare`, or `accounts.status` not `ok`,
+means the environment did not load — check `EnvironmentFile` and restart.
+
+After the frontend phase, confirm the browser is on the new code: the hash in
+`https://fcf.drakesdev.com/` → view-source → `assets/index-<hash>.js` should
+match `ls foundation-explorer/frontend/dist/assets/`.
+
+### Rollback
+
+The backend rolls back the same way it ships — there is no release history on
+the box, so roll back in git and redeploy:
+
+```bash
+git revert <bad-sha>          # or: git checkout <good-sha> -- <paths>
+# then re-run the backend release steps above
+```
+
+Faster, if the tree on the droplet is still good and only the process is
+unhealthy: `ssh fcf 'systemctl restart fcf'`.
+
+**A migration is the one thing that does not roll back cleanly.** `alembic
+downgrade -1` works and revision `0001` has a tested `downgrade()`, but it drops
+tables — running it against production destroys every saved folder. Restore from
+the `pg_dump` instead:
+
+```bash
+gunzip -c fcf-<stamp>.sql.gz | ssh fcf 'sudo -u postgres psql -d fcf'
+```
+
+The frontend rolls back by rebuilding at the previous commit and re-running
+phase 1. Because the old bundle is still on disk until pruned, this is fast.
+
+### Toward zero downtime
+
+Not implemented; recorded so the choice is deliberate rather than forgotten.
+
+The 1.5 s gap exists because one uvicorn process owns `:8000` and nginx has a
+single `proxy_pass` with no fallback. The smallest change that removes it:
+
+1. Run two instances via a templated unit, `fcf@8000` and `fcf@8001`.
+2. Give nginx an `upstream` block with both, plus
+   `proxy_next_upstream error timeout http_502;` so a refused connection is
+   retried against the sibling rather than surfaced.
+3. Restart them one at a time, verifying health between.
+
+Cost is a second ~475 MB process; the droplet has ~3.2 GB available, so it
+fits. This only helps rolling code deploys — a migration that is incompatible
+with the running code still needs the two-release split described above, and a
+database refresh still restarts both.
+
+Worth doing when deploys become frequent enough that 1.5 s matters, or when
+someone other than the person deploying is relying on the site.
+
 ## Deploying the frontend
+
+Two phases, in this order. Do **not** collapse them into one `rsync --delete`.
 
 ```bash
 cd foundation-explorer/frontend
 npm run build
-rsync -av --delete \
+
+# 1. New assets first, WITHOUT --delete. Filenames are content-hashed, so
+#    these are additions and cannot collide with what is already live.
+rsync -av \
   --exclude 'demo/' --exclude 'demo-v5/' --exclude 'sample/' --exclude 'report/' \
   dist/ fcf:/var/www/fcf/
 ```
+
+Phase 1 also overwrites `index.html`, which is the cutover: the moment it
+lands, new page loads reference the new bundle, which is already in place.
+
+```bash
+# 2. Later -- next day, or at least after every open tab has reloaded --
+#    prune the superseded bundles.
+ssh fcf 'ls -lt /var/www/fcf/assets/'      # confirm what is old
+ssh fcf 'rm /var/www/fcf/assets/index-<OLDHASH>.js /var/www/fcf/assets/index-<OLDHASH>.css'
+```
+
+### Why not `--delete` in one shot
+
+Vite content-hashes asset filenames, and `index.html` references them by hash.
+A single `rsync --delete` removes the old bundle at the same moment it installs
+the new one. Any browser still holding the previous `index.html` — a tab open
+since before the deploy, or a cached copy — then requests
+`assets/index-<oldhash>.js` and gets a **404 and a blank page**, until the user
+thinks to hard-reload. That is a worse outage than a backend restart, because
+it does not resolve itself.
+
+Deploying additively leaves both bundles on disk, so old tabs keep working and
+new loads get the new code. Disk cost is a few hundred KB.
 
 ### The excludes are load-bearing
 
@@ -93,28 +293,18 @@ exclude list as part of the command, never shortened.
 
 ## Deploying the backend
 
-```bash
-rsync -av --delete \
-  --exclude '.git/' --exclude 'node_modules/' --exclude 'data/' \
-  ./ fcf:/opt/fcf/
-ssh fcf 'systemctl restart fcf'
-```
+See [Backend release](#backend-release) above — the commands live there so
+there is one copy to keep correct.
 
-Exclude `data/` so a repo sync never touches the 1.33 GB database — that has
-its own procedure below. Check `journalctl -u fcf -n 50` after a restart; a
-bad import fails at startup, and `main_v5.py` also raises deliberately if
-`explorer_v5.db` is missing.
+Two things that section encodes and an ad-hoc `rsync` will not:
 
-If the sync changed anything under `backend/`, reinstall from the lockfile and
-run any new migrations before restarting:
+- **`--exclude 'venv/'`.** `/opt/fcf/venv` sits inside the rsync target, so
+  `--delete` without it removes the interpreter mid-deploy.
+- **`--exclude 'data/'`.** Keeps a code sync away from the 1.3 GB read model,
+  which has its own procedure below.
 
-```bash
-ssh fcf '/opt/fcf/venv/bin/pip install -r \
-           /opt/fcf/foundation-explorer/backend/requirements.lock'
-ssh fcf 'cd /opt/fcf/foundation-explorer/backend && \
-         /opt/fcf/venv/bin/alembic upgrade head'
-ssh fcf 'systemctl restart fcf'
-```
+After any restart, check `journalctl -u fcf -n 50`. A bad import fails at
+startup, and `main_v5.py` raises deliberately if `explorer_v5.db` is missing.
 
 ## Accounts: Postgres and Cloudflare Access
 
