@@ -56,13 +56,16 @@ TIER = {
 EXTRA_HIT_BONUS = 0.5
 EXTRA_HIT_CAP = 25
 
-# How many rows to pull from each FTS table before merging. Generous enough
-# that the merge has something to work with, bounded so a single-letter query
-# cannot drag the whole index into memory.
-FTS_LIMIT = 200
-# Cap on funder<-recipient edges. A popular grantee has thousands of funders;
-# without this, one common word fans out across the entire database.
-EDGE_LIMIT = 600
+# Fan-out is scaled to what the caller asked for. Typeahead wants 20 results
+# and should stay under a keystroke; the results table wants 100 and can
+# afford to look wider. A fixed large value would make every keystroke pay for
+# the table's depth. Both are bounded so a one-letter query cannot drag the
+# whole index into memory.
+def _fan_out(limit: int) -> tuple[int, int]:
+    """(rows per FTS table, cap on funder<-grantee edges)."""
+    fts = min(800, max(200, limit * 6))
+    edges = min(2400, max(600, limit * 18))
+    return fts, edges
 
 MAX_QUERY_CHARS = 200
 SNIPPET_TOKENS = 14
@@ -221,7 +224,7 @@ def _rel(bm25_value: float) -> float:
 @router.get("/search", response_model=SearchOut)
 def search(
     q: str = Query(..., min_length=1, max_length=MAX_QUERY_CHARS),
-    limit: int = Query(20, ge=1, le=50),
+    limit: int = Query(20, ge=1, le=200),
 ) -> SearchOut:
     started = time.perf_counter()
     conn = v5.connect()
@@ -247,9 +250,10 @@ def search(
                 detail="Enter at least one letter or digit to search.")
 
         if expr:
-            _foundations(conn, expr, acc)
-            _recipients(conn, expr, acc)
-            _purposes(conn, expr, acc)
+            fts, edge_cap = _fan_out(limit)
+            _foundations(conn, expr, acc, fts)
+            _recipients(conn, expr, acc, fts, edge_cap)
+            _purposes(conn, expr, acc, fts)
 
         if not acc:
             return SearchOut(query=q, count=0, results=[],
@@ -264,7 +268,7 @@ def search(
         conn.close()
 
 
-def _foundations(conn, expr: str, acc: dict[str, _Acc]) -> None:
+def _foundations(conn, expr: str, acc: dict[str, _Acc], fts: int) -> None:
     rows = conn.execute(f"""
         SELECT ein,
                bm25(search_foundation, 12.0, 3.0) AS rank,
@@ -273,7 +277,7 @@ def _foundations(conn, expr: str, acc: dict[str, _Acc]) -> None:
         FROM search_foundation
         WHERE search_foundation MATCH ?
         ORDER BY rank
-        LIMIT {FTS_LIMIT}
+        LIMIT {fts}
     """, (expr,)).fetchall()
     for row in rows:
         entry = acc.setdefault(row["ein"], _Acc())
@@ -285,7 +289,8 @@ def _foundations(conn, expr: str, acc: dict[str, _Acc]) -> None:
             entry.add("location", "Location", _rel(row["rank"]), row["loc_hit"])
 
 
-def _recipients(conn, expr: str, acc: dict[str, _Acc]) -> None:
+def _recipients(conn, expr: str, acc: dict[str, _Acc], fts: int,
+                edge_cap: int) -> None:
     rows = conn.execute(f"""
         SELECT entity_id,
                bm25(search_recipient, 8.0, 2.0) AS rank,
@@ -295,7 +300,7 @@ def _recipients(conn, expr: str, acc: dict[str, _Acc]) -> None:
         FROM search_recipient
         WHERE search_recipient MATCH ?
         ORDER BY rank
-        LIMIT {FTS_LIMIT}
+        LIMIT {fts}
     """, (expr,)).fetchall()
     if not rows:
         return
@@ -311,7 +316,7 @@ def _recipients(conn, expr: str, acc: dict[str, _Acc]) -> None:
         FROM search_edge
         WHERE entity_id IN ({placeholders})
         ORDER BY dollars DESC
-        LIMIT {EDGE_LIMIT}
+        LIMIT {edge_cap}
     """, tuple(by_entity)).fetchall()
 
     for edge in edges:
@@ -328,7 +333,7 @@ def _recipients(conn, expr: str, acc: dict[str, _Acc]) -> None:
                       row["mission_hit"], who)
 
 
-def _purposes(conn, expr: str, acc: dict[str, _Acc]) -> None:
+def _purposes(conn, expr: str, acc: dict[str, _Acc], fts: int) -> None:
     rows = conn.execute(f"""
         SELECT ein,
                bm25(search_purpose) AS rank,
@@ -336,7 +341,7 @@ def _purposes(conn, expr: str, acc: dict[str, _Acc]) -> None:
         FROM search_purpose
         WHERE search_purpose MATCH ?
         ORDER BY rank
-        LIMIT {FTS_LIMIT}
+        LIMIT {fts}
     """, (expr,)).fetchall()
     for row in rows:
         entry = acc.setdefault(row["ein"], _Acc())

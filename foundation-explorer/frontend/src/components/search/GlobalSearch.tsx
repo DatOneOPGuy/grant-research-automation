@@ -7,6 +7,7 @@
 // someone typing "Lilly" wants Lilly Endowment, not the funders of a grantee
 // whose mission happens to contain the word.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Loader2, Search, X } from 'lucide-react'
 import {
   searchFoundations, type SearchResult, type SearchResponse,
@@ -27,9 +28,13 @@ export default function GlobalSearch({ onOpen }: {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
+  // Whether the user has explicitly moved the selection with the arrows.
+  // Enter means "show me the table" until they have.
+  const [arrowed, setArrowed] = useState(false)
   const [popover, setPopover] = useState<
     { result: SearchResult; top: number; left: number } | null>(null)
 
+  const navigate = useNavigate()
   const boxRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -49,6 +54,7 @@ export default function GlobalSearch({ onOpen }: {
       setData(res)
       setError(null)
       setActive(0)
+      setArrowed(false)
     } catch (err) {
       if (controller.signal.aborted || seq !== seqRef.current) return
       setError(err instanceof Error ? err.message : 'Search failed')
@@ -104,15 +110,32 @@ export default function GlobalSearch({ onOpen }: {
     setPopover(null)
   }
 
+  const seeAll = () => {
+    const term = q.trim()
+    if (!term) return
+    setOpen(false)
+    setPopover(null)
+    navigate(`/search?q=${encodeURIComponent(term)}`)
+  }
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { setOpen(false); setPopover(null); return }
-    if (!results.length) return
     if (e.key === 'ArrowDown') {
-      e.preventDefault(); setActive((i) => Math.min(i + 1, results.length - 1))
+      e.preventDefault()
+      setArrowed(true)
+      setActive((i) => Math.min(i + 1, Math.max(0, results.length - 1)))
     } else if (e.key === 'ArrowUp') {
-      e.preventDefault(); setActive((i) => Math.max(i - 1, 0))
+      e.preventDefault()
+      setArrowed(true)
+      setActive((i) => Math.max(i - 1, 0))
     } else if (e.key === 'Enter') {
-      e.preventDefault(); choose(results[active].ein)
+      e.preventDefault()
+      // Enter runs the search and shows the table, which is what the old
+      // search box did and what someone who has typed a query rather than
+      // picked from a list expects. Arrowing to a row is an explicit choice
+      // of that row, so Enter opens it instead.
+      if (arrowed && results[active]) choose(results[active].ein)
+      else seeAll()
     }
   }
 
@@ -222,14 +245,18 @@ export default function GlobalSearch({ onOpen }: {
                   </li>
                 ))}
               </ul>
-              <div className="px-3 py-1.5 border-t border-line bg-canvas
-                text-[11px] text-muted flex justify-between">
+              <button onClick={seeAll}
+                className="w-full px-3 py-2 border-t border-line bg-canvas
+                  text-[11px] text-muted hover:text-primary flex justify-between
+                  items-center">
                 <span>
-                  {data?.count} result{data?.count === 1 ? '' : 's'} · hover a
-                  row to see what matched
+                  {data?.count} result{data?.count === 1 ? '' : 's'} ·{' '}
+                  <span className="text-primary font-medium">
+                    press Enter to see them in a table
+                  </span>
                 </span>
                 <span className="tabular">{data?.took_ms} ms</span>
-              </div>
+              </button>
             </>
           )}
         </div>
