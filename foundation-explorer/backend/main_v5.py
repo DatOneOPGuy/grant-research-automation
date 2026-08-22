@@ -14,6 +14,7 @@ from pathlib import Path
 
 import db_session
 import folders
+import search
 import v5
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -85,4 +86,5 @@ def health() -> dict:
 
 
 app.include_router(v5.router)
+app.include_router(search.router)
 app.include_router(folders.router)
