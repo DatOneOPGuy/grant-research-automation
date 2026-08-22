@@ -1,10 +1,16 @@
+import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar'
 import { useQuery } from '@tanstack/react-query'
 import { STATIC_MODE, fetchSampleMeta } from './lib/apiV5'
 import { num } from './lib/format'
+import GlobalSearch from './components/search/GlobalSearch'
+import DetailPanel from './components/foundations/DetailPanel'
+import RecentlyViewed from './components/foundations/RecentlyViewed'
 
 export default function App() {
+  const [selected, setSelected] = useState<string | null>(null)
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -12,10 +18,22 @@ export default function App() {
         {/* Capped and centred: past ~1800px the table stops gaining useful
             information and just spreads the eye across dead space. */}
         <div className="mx-auto w-full max-w-[1800px]">
+        {/* Search sits above every page rather than on one of them: the thing
+            a user wants to find is rarely on the page they happen to be on.
+            Not rendered in the demo build, which has no API to query. */}
+        {!STATIC_MODE && (
+          <div className="mb-5 space-y-3">
+            <GlobalSearch onOpen={setSelected} />
+            <RecentlyViewed onOpen={setSelected} />
+          </div>
+        )}
         {STATIC_MODE && <SampleBanner />}
         <Outlet />
         </div>
       </main>
+      {selected && (
+        <DetailPanel ein={selected} onClose={() => setSelected(null)} />
+      )}
     </div>
   )
 }

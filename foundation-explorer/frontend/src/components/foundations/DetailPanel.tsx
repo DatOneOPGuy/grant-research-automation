@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
 import { MONTH_NAMES, fetchFoundationDetailV5 } from '../../lib/apiV5'
+import { recordView } from '../../lib/recentStore'
+import SaveMenu from './SaveMenu'
 import { money, propublicaUrl, titleCase, websiteUrl } from '../../lib/format'
 import { Skeleton, StatusPill } from '../ui/primitives'
 import { BucketBarLabeled } from './BucketBar'
@@ -55,6 +57,15 @@ export default function DetailPanel({ ein, onClose }: Props) {
     queryFn: () => fetchFoundationDetailV5(ein),
   })
   const f = data?.foundation
+
+  // Recorded once the name has loaded, so the history never holds a bare EIN.
+  // Keyed on ein rather than on the object: re-renders must not re-record.
+  useEffect(() => {
+    if (!f?.name) return
+    recordView({ ein, name: f.name, city: f.city, state: f.state })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ein, f?.name])
+
   // International is hidden when there is none, so the tab's presence is
   // itself information rather than a dead end.
   const tabs = ALL_TABS.filter(
@@ -113,9 +124,16 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 </a>
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded hover:bg-canvas">
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Saving belongs where the decision is made. Reading the
+                  detail is when someone decides a foundation is worth
+                  keeping, and sending them back to the table to bookmark it
+                  loses the thought. */}
+              <SaveMenu ein={ein} align="right" />
+              <button onClick={onClose} className="p-1.5 rounded hover:bg-canvas">
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           {f && (
