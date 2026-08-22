@@ -97,11 +97,15 @@ export default function SearchResults() {
         <div className="bg-surface border border-line rounded-lg
           overflow-x-auto">
           <table className="w-full text-sm table-fixed min-w-[1040px]">
+            {/* Matched holds badges, which are narrow and fixed-width, so it
+                does not need the space a text column does. The extra goes to
+                Foundation, where names wrap to two lines, and to the actions
+                column, which was clipping its second icon. */}
             <colgroup>
-              <col className="w-[26%]" /><col className="w-[11%]" />
-              <col className="w-[19%]" /><col className="w-[9%]" />
-              <col className="w-[11%]" /><col className="w-[11%]" />
-              <col className="w-[9%]" /><col className="w-[4%]" />
+              <col className="w-[30%]" /><col className="w-[12%]" />
+              <col className="w-[14%]" /><col className="w-[8%]" />
+              <col className="w-[10%]" /><col className="w-[10%]" />
+              <col className="w-[9%]" /><col className="w-[7%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
@@ -172,12 +176,12 @@ function Row({ r, onOpen }: {
       <td className="px-3 text-right tabular">{money(r.paid_2324)}</td>
       <td className="px-3"><StatusPill status={r.application_status} /></td>
       <td className="px-3">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-0.5">
           <SaveMenu ein={r.ein} align="right" />
           <a href={propublicaUrl(r.ein)} target="_blank" rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
             title="ProPublica" aria-label="Open on ProPublica"
-            className="p-1 text-muted hover:text-primary">
+            className="p-1 text-muted hover:text-primary shrink-0">
             <ExternalLink size={13} />
           </a>
         </div>
