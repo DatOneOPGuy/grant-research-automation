@@ -15,7 +15,7 @@ import {
 import { money, num, propublicaUrl, titleCase } from '../lib/format'
 import SaveMenu from '../components/foundations/SaveMenu'
 import DetailPanel from '../components/foundations/DetailPanel'
-import MatchPopover from '../components/search/MatchPopover'
+import MatchPopover, { Highlighted } from '../components/search/MatchPopover'
 import { Skeleton, StatusPill } from '../components/ui/primitives'
 
 const LIMIT = 100
@@ -96,16 +96,17 @@ export default function SearchResults() {
       {rows.length > 0 && (
         <div className="bg-surface border border-line rounded-lg
           overflow-x-auto">
-          <table className="w-full text-sm table-fixed min-w-[1040px]">
+          <table className="w-full text-sm table-fixed min-w-[1400px]">
             {/* Matched holds badges, which are narrow and fixed-width, so it
-                does not need the space a text column does. The extra goes to
-                Foundation, where names wrap to two lines, and to the actions
-                column, which was clipping its second icon. */}
+                does not need the space a text column does. Grantee and Mission
+                are the two indirect routes into a result, and they carry real
+                text, so they get the width. */}
             <colgroup>
-              <col className="w-[30%]" /><col className="w-[12%]" />
-              <col className="w-[14%]" /><col className="w-[8%]" />
-              <col className="w-[10%]" /><col className="w-[10%]" />
-              <col className="w-[9%]" /><col className="w-[7%]" />
+              <col className="w-[19%]" /><col className="w-[8%]" />
+              <col className="w-[8%]" /><col className="w-[14%]" />
+              <col className="w-[17%]" /><col className="w-[6%]" />
+              <col className="w-[8%]" /><col className="w-[8%]" />
+              <col className="w-[7%]" /><col className="w-[5%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
@@ -115,7 +116,21 @@ export default function SearchResults() {
                   Matched
                   <span className="block font-normal normal-case
                     text-[10px] text-muted/80">
-                    hover for the evidence
+                    hover for evidence
+                  </span>
+                </th>
+                <th className="px-3">
+                  Grantee
+                  <span className="block font-normal normal-case
+                    text-[10px] text-muted/80">
+                    matching recipient
+                  </span>
+                </th>
+                <th className="px-3">
+                  Mission
+                  <span className="block font-normal normal-case
+                    text-[10px] text-muted/80">
+                    matching text
                   </span>
                 </th>
                 <th className="px-3 text-right">% Christian</th>
@@ -165,6 +180,16 @@ function Row({ r, onOpen }: {
       <td className="px-3">
         <MatchCell matches={r.matches} />
       </td>
+      {/* The two indirect routes, shown as text rather than left in a hover.
+          A grantee name or a line of mission text is the thing a researcher
+          is actually reading, so it belongs on the row. */}
+      <td className="px-3 text-xs">
+        <TextMatch match={r.matches.find((m) => m.field === 'recipient')} />
+      </td>
+      <td className="px-3 text-xs">
+        <TextMatch match={r.matches.find((m) => m.field === 'mission')}
+          showDetail />
+      </td>
       <td className="px-3 text-right tabular">
         {/* NULL means nothing could be classified. Rendering it as 0% would
             assert the giving is non-Christian, which is a different claim. */}
@@ -187,6 +212,30 @@ function Row({ r, onOpen }: {
         </div>
       </td>
     </tr>
+  )
+}
+
+/** A matched text field, or an em dash when this route did not contribute.
+ *
+ *  An em dash rather than an empty cell: blank reads as missing data, and
+ *  "this foundation was not reached through a grantee" is a fact about the
+ *  match, not an absence in the record.
+ */
+function TextMatch({ match, showDetail = false }: {
+  match: SearchMatch | undefined
+  showDetail?: boolean
+}) {
+  if (!match) return <span className="text-muted/50">—</span>
+  return (
+    <div title={match.detail ?? undefined}>
+      <div className="line-clamp-2 leading-snug text-ink
+        [&_b]:bg-accent/30 [&_b]:rounded-sm [&_b]:px-0.5">
+        <Highlighted html={match.snippet} />
+      </div>
+      {showDetail && match.detail && (
+        <div className="text-muted truncate mt-0.5">{match.detail}</div>
+      )}
+    </div>
   )
 }
 

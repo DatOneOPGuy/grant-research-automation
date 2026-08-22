@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ExternalLink,
-  Globe, HelpCircle, Loader2, Search, SlidersHorizontal, X,
+  Globe, HelpCircle, Loader2, SlidersHorizontal,
 } from 'lucide-react'
 import {
   defaultV5Filters, fetchFoundationsV5,
@@ -141,26 +141,13 @@ export default function Foundations() {
             )}
           </div>
         </div>
+        {/* The name/EIN box that used to live here is gone. The search bar
+            above every page covers the same ground and more -- it also reaches
+            grantees, mission text and grant purposes -- so keeping a second,
+            narrower box invited the question of which one to use. A `search`
+            value arriving in the URL still applies and still shows as a
+            removable chip. */}
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search size={15}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-            <input type="search" value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-              placeholder="Search by foundation name or EIN"
-              aria-label="Search foundations by name or EIN"
-              className="w-72 text-sm border border-line rounded-md bg-surface
-                pl-8 pr-7 py-1.5 placeholder:text-muted/70 focus:outline-none
-                focus:border-primary/40" />
-            {filters.search && (
-              <button onClick={() => setFilters((f) => ({ ...f, search: '' }))}
-                aria-label="Clear search"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5
-                  rounded text-muted hover:text-ink">
-                <X size={13} />
-              </button>
-            )}
-          </div>
           <RecentlyViewed onOpen={setSelected} />
           <button onClick={() => setFiltersOpen((o) => !o)}
           aria-expanded={filtersOpen}

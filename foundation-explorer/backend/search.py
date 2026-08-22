@@ -289,9 +289,17 @@ def _foundations(conn, expr: str, acc: dict[str, _Acc], fts: int) -> None:
             entry.add("location", "Location", _rel(row["rank"]), row["loc_hit"])
 
 
-def _recipients(conn, expr: str, acc: dict[str, _Acc], fts: int,
-                edge_cap: int) -> None:
-    rows = conn.execute(f"""
+def _recipient_rows(conn, expr: str, column: str, limit: int):
+    """Top grantees matching within one column.
+
+    Queried per column rather than once across both. A single query ranks
+    name and mission together, and since names are weighted higher and are
+    far shorter, name matches take almost every slot: "gospel" returned 69
+    grantee-name matches and zero mission matches, so the mission column was
+    empty for exactly the queries it existed to serve. Giving each column its
+    own budget guarantees both routes are represented.
+    """
+    return conn.execute(f"""
         SELECT entity_id,
                bm25(search_recipient, 8.0, 2.0) AS rank,
                name,
@@ -300,12 +308,25 @@ def _recipients(conn, expr: str, acc: dict[str, _Acc], fts: int,
         FROM search_recipient
         WHERE search_recipient MATCH ?
         ORDER BY rank
-        LIMIT {fts}
-    """, (expr,)).fetchall()
+        LIMIT {limit}
+    """, (f"{{{column}}} : ({expr})",)).fetchall()
+
+
+def _recipients(conn, expr: str, acc: dict[str, _Acc], fts: int,
+                edge_cap: int) -> None:
+    half = max(60, fts // 2)
+    rows = [*_recipient_rows(conn, expr, "name", half),
+            *_recipient_rows(conn, expr, "mission", half)]
     if not rows:
         return
 
-    by_entity = {r["entity_id"]: r for r in rows}
+    # A grantee whose name and mission both match appears in both result
+    # sets; keep the better-ranked row (bm25 is negative, so lower is better).
+    by_entity: dict[str, object] = {}
+    for row in rows:
+        best = by_entity.get(row["entity_id"])
+        if best is None or row["rank"] < best["rank"]:
+            by_entity[row["entity_id"]] = row
     placeholders = ",".join("?" for _ in by_entity)
     # search_edge is the precomputed funder<-grantee rollup, so this is an
     # indexed scan rather than a GROUP BY over 3M grant rows. Ordered by

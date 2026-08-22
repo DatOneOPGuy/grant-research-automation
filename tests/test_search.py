@@ -134,6 +134,22 @@ def test_every_result_explains_itself():
                 assert m.snippet
 
 
+def test_mission_matches_are_not_crowded_out_by_name_matches():
+    """Both grantee routes must be represented, not just the louder one.
+
+    Ranking name and mission in one query gave names almost every slot --
+    they are weighted higher and far shorter, so "gospel" returned 69
+    grantee-name matches and zero mission matches. The mission column was
+    empty for exactly the queries it exists to serve.
+    """
+    for query in ("gospel", "jesus", "orphan"):
+        out = run(query, limit=100)
+        fields = {m.field for r in out.results for m in r.matches}
+        assert "mission" in fields, (
+            f"{query!r} produced no mission matches in {len(out.results)} "
+            "results; mission-only grantees are being crowded out")
+
+
 def test_indirect_matches_name_the_grantee_behind_them():
     out = run("young life", limit=20)
     indirect = [m for r in out.results for m in r.matches
