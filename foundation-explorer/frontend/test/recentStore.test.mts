@@ -61,7 +61,7 @@ mem = {}; s = await load()
 for (let i = 0; i < 40; i++) {
   s.recordView({ ein: String(i).padStart(9, '0'), name: `F${i}`, city: null, state: null })
 }
-ok('capped at 25', s.getRecent().length === 25)
+ok('capped at 30', s.getRecent().length === 30)
 ok('kept the newest', s.getRecent()[0].name === 'F39')
 ok('dropped the oldest', !s.getRecent().some((e: any) => e.name === 'F0'))
 

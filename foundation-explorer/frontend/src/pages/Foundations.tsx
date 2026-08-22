@@ -16,6 +16,7 @@ import FilterPanel from '../components/foundations/FilterPanel'
 import ActiveFilters from '../components/foundations/ActiveFilters'
 import { activeFilterCount } from '../components/foundations/filterChips'
 import DetailPanel from '../components/foundations/DetailPanel'
+import RecentlyViewed from '../components/foundations/RecentlyViewed'
 import { BucketBar } from '../components/foundations/BucketBar'
 
 const PAGE_SIZE = 25
@@ -160,6 +161,7 @@ export default function Foundations() {
               </button>
             )}
           </div>
+          <RecentlyViewed onOpen={setSelected} />
           <button onClick={() => setFiltersOpen((o) => !o)}
           aria-expanded={filtersOpen}
           className={`flex items-center gap-2 text-sm rounded-md border px-3

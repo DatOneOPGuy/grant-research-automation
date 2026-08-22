@@ -6,7 +6,6 @@ import { STATIC_MODE, fetchSampleMeta } from './lib/apiV5'
 import { num } from './lib/format'
 import GlobalSearch from './components/search/GlobalSearch'
 import DetailPanel from './components/foundations/DetailPanel'
-import RecentlyViewed from './components/foundations/RecentlyViewed'
 
 export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
@@ -22,9 +21,8 @@ export default function App() {
             a user wants to find is rarely on the page they happen to be on.
             Not rendered in the demo build, which has no API to query. */}
         {!STATIC_MODE && (
-          <div className="mb-5 space-y-3">
+          <div className="mb-5">
             <GlobalSearch onOpen={setSelected} />
-            <RecentlyViewed onOpen={setSelected} />
           </div>
         )}
         {STATIC_MODE && <SampleBanner />}

@@ -12,7 +12,7 @@
  */
 
 const KEY = 'fe.recent.v1'
-const CAP = 25
+const CAP = 30
 
 export type RecentEntry = {
   ein: string
