@@ -426,7 +426,37 @@ curl -s https://fcf.drakesdev.com/api/health
 
 The `mv` must be a rename within one filesystem, which is why the temp file
 goes in `/opt/fcf/data/` rather than `/tmp`. Keep an eye on free space: two
-copies of the db is ~2.7 GB of the 80 GB disk.
+copies of the db is ~3.7 GB of the 80 GB disk.
+
+### The search index rides with the database
+
+`/api/v5/search` reads FTS5 tables that live inside `explorer_v5.db`. A rebuilt
+read model does not have them, so **every refresh must rebuild the index too**
+or search returns 500s while the rest of the site looks healthy.
+
+Either build it locally before shipping (`python3 -m src.build_search_index`,
+~17 s, and the file grows 1.33 GB → 1.85 GB), or build it on the droplet
+against a copy, which moves 500 MB less over the wire:
+
+```bash
+ssh fcf 'cd /opt/fcf && cp data/explorer_v5.db data/explorer_v5.db.new \
+         && python3 -m src.build_search_index --db data/explorer_v5.db.new \
+         && chown fcf:fcf data/explorer_v5.db.new'          # ~51 s on the box
+ssh fcf 'ls /opt/fcf/data/explorer_v5.db.new-wal 2>/dev/null && echo REFUSE'
+ssh fcf 'systemctl stop fcf \
+         && mv /opt/fcf/data/explorer_v5.db.new /opt/fcf/data/explorer_v5.db \
+         && systemctl start fcf'
+```
+
+`chown` matters: a file built as root is unreadable by the service user and
+the API fails at startup. The `-wal` check is the rule from the project's
+SQLite notes — sidecars follow the *filename*, so swapping a database that
+still has one is how this project corrupted one before. `build_search_index`
+checkpoints and drops the WAL before exiting precisely so this check passes.
+
+Verify afterwards with `curl -s 'localhost:8000/api/v5/search?q=youth&limit=3'`
+rather than only `/api/health`: health does not touch the FTS tables and will
+report `ok` against a database that has none.
 
 Note the SQLite hazards documented for `grants_v2.db` apply here too — never
 move a `.db` without its `-wal`/`-shm` sidecars if the source was checkpointed

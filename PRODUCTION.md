@@ -51,6 +51,7 @@ nginx :443  ── TLS (certbot) ── ufw: only Cloudflare ranges may reach :4
    └── /api/        → 127.0.0.1:8000        uvicorn
                           │
                           ├── v5.router      13 GETs   → explorer_v5.db (SQLite, read-only)
+                          ├── search.router   1 GET     → FTS5 tables in the same file
                           └── folders.router  8 routes → Postgres (accounts, all authenticated)
 ```
 
@@ -62,7 +63,7 @@ nothing but the port.
 | Path | Contents |
 |---|---|
 | `/opt/fcf/` | The repo, **rsynced** from the laptop — not a clone, no deploy key |
-| `/opt/fcf/data/explorer_v5.db` | 1.3 GB read model, rsynced. Rebuildable |
+| `/opt/fcf/data/explorer_v5.db` | 1.85 GB read model incl. FTS5 search index, rsynced. Rebuildable |
 | `/opt/fcf/venv/` | Python 3.12.3, installed from `backend/requirements.lock` |
 | `/var/www/fcf/` | Built SPA, 500 KB |
 | `/etc/fcf/fcf.env` | Service environment, `640 root:fcf` |
@@ -70,7 +71,7 @@ nothing but the port.
 | `/etc/nginx/sites-available/fcf` | TLS, `/api/` proxy, SPA fallback |
 | Postgres 16.15, localhost only | Accounts and shared folders. **Not** rebuildable |
 
-Disk: 4.4 GB of 77 GB used.
+Disk: 6.5 GB of 77 GB used.
 
 ### Two datastores, opposite properties
 
