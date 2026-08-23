@@ -483,7 +483,11 @@ def stats():
                    SUM(christian_dollars) AS christian,
                    SUM(nonchristian_dollars) AS nonchristian,
                    SUM(unclassified_dollars) AS unclassified,
-                   SUM(daf_dollars) AS daf
+                   SUM(daf_dollars) AS daf,
+                   -- Dollars the filings never attributed to an organisation.
+                   -- Without this the headline bar sums to $174B against $236B
+                   -- paid, and the $62B difference is simply missing.
+                   SUM(nonclassifiable_dollars) AS nonclassifiable
             FROM foundations""").fetchone()
         recipients = conn.execute(
             "SELECT COUNT(*), SUM(mission_text IS NOT NULL AND mission_text!='') "

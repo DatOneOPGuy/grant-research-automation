@@ -8,13 +8,24 @@ export type Buckets = {
   nonchristian: number
   unclassified: number
   daf: number
+  /** Dollars the filing never attributed to an organisation -- HIPAA patient
+   *  programs, PDF attachments, unitemized lists. Optional so existing callers
+   *  keep working, but omitting it on a foundation that has some will draw a
+   *  bar narrower than the money it represents. */
+  nonclassifiable?: number
 }
+
+// Striped rather than solid, because this segment is not a classification.
+// The other four say what the money funded; this one says the filing never
+// named a recipient, so it is deliberately rendered as absence.
+const HATCH = 'bg-[repeating-linear-gradient(135deg,#d6d3c7_0_4px,#efece2_4px_8px)]'
 
 const SEGMENTS: { key: keyof Buckets; label: string; cls: string }[] = [
   { key: 'christian', label: 'Christian', cls: 'bg-scorehigh' },
   { key: 'nonchristian', label: 'Non-Christian', cls: 'bg-slate-400' },
   { key: 'unclassified', label: 'Unclassified', cls: 'bg-amber-400' },
   { key: 'daf', label: 'DAF pass-through', cls: 'bg-purple-400' },
+  { key: 'nonclassifiable', label: 'Not attributable', cls: HATCH },
 ]
 
 // Mini stacked bar for table rows: christian / nonchristian / unclassified /
@@ -22,20 +33,21 @@ const SEGMENTS: { key: keyof Buckets; label: string; cls: string }[] = [
 export function BucketBar({ b, className = '' }: {
   b: Buckets; className?: string
 }) {
-  const total = b.christian + b.nonchristian + b.unclassified + b.daf
+  const total = SEGMENTS.reduce((sum, s) => sum + (b[s.key] ?? 0), 0)
   if (total <= 0) {
     return <div className={`h-2 rounded bg-line/60 ${className}`}
       title="No paid dollars in window" />
   }
   const tip = SEGMENTS
-    .map((s) => `${s.label}: ${money(b[s.key])}`)
+    .filter((s) => (b[s.key] ?? 0) > 0)
+    .map((s) => `${s.label}: ${money(b[s.key] ?? 0)}`)
     .join(' · ')
   return (
     <div className={`flex h-2 rounded overflow-hidden bg-line/40 ${className}`}
       title={tip}>
-      {SEGMENTS.map((s) => b[s.key] > 0 && (
+      {SEGMENTS.map((s) => (b[s.key] ?? 0) > 0 && (
         <div key={s.key} className={s.cls}
-          style={{ width: `${(b[s.key] / total) * 100}%` }} />
+          style={{ width: `${((b[s.key] ?? 0) / total) * 100}%` }} />
       ))}
     </div>
   )
@@ -59,7 +71,8 @@ export function BucketBarLabeled({ b, sectors = [] }: {
     <div>
       <BucketBar b={b} className="h-3" />
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs">
-        {SEGMENTS.map((s) => {
+        {SEGMENTS.filter((s) => s.key !== 'nonclassifiable'
+          || (b.nonclassifiable ?? 0) > 0).map((s) => {
           const swatch = (
             <span className={`inline-block w-2.5 h-2.5 rounded-sm ${s.cls}`} />
           )
@@ -67,7 +80,7 @@ export function BucketBarLabeled({ b, sectors = [] }: {
             <>
               {swatch}
               {s.label}: <span className="tabular font-medium text-ink">
-                {money(b[s.key])}
+                {money(b[s.key] ?? 0)}
               </span>
             </>
           )

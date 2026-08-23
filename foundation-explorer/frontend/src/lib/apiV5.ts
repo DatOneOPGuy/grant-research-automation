@@ -10,6 +10,7 @@ export type StatsV5 = {
   nonchristian: number
   unclassified: number
   daf: number
+  nonclassifiable: number
   recipients: number
   with_mission: number
   window: string

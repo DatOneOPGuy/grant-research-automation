@@ -54,12 +54,17 @@ export default function Dashboard() {
               nonchristian: stats.nonchristian,
               unclassified: stats.unclassified,
               daf: stats.daf,
+              nonclassifiable: stats.nonclassifiable,
             }} />
             <p className="text-xs text-muted mt-3">
               Unclassified dollars are grants to recipients we have not yet
               classified — they are shown, never hidden. DAF dollars are
               pass-throughs to donor-advised funds whose final destination is
-              not public.
+              not public. Not-attributable dollars are grants the filing never
+              tied to a named organisation at all — patient-assistance
+              programs protected by HIPAA, recipient lists filed as PDF
+              attachments, unitemized schedules — so there is nothing to
+              classify, in either direction.
             </p>
           </>
         ) : <Skeleton className="h-16" />}

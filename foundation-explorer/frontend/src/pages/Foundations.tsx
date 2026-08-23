@@ -285,6 +285,7 @@ export default function Foundations() {
                           nonchristian: r.nonchristian_dollars,
                           unclassified: r.unclassified_dollars,
                           daf: r.daf_dollars,
+                          nonclassifiable: r.nonclassifiable_dollars,
                         }} />
                       </div>
                     </td>

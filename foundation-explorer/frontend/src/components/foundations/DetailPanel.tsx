@@ -143,6 +143,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
                 nonchristian: f.nonchristian_dollars,
                 unclassified: f.unclassified_dollars,
                 daf: f.daf_dollars,
+                nonclassifiable: f.nonclassifiable_dollars,
               }} />
               <div className="text-xs text-muted mt-1.5">
                 {f.classifiable_dollars > 0 && (
