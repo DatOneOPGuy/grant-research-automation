@@ -258,6 +258,17 @@ def test_a_foundations_sectors_sum_to_its_non_christian_total():
         "non-Christian figure")
 
 
+def test_the_precomputed_national_rollup_matches_the_live_aggregate():
+    """sector_totals is a cache of a GROUP BY; caches drift."""
+    conn = _conn()
+    cached = dict(conn.execute("SELECT sector, dollars FROM sector_totals"))
+    live = dict(conn.execute(
+        "SELECT sector, SUM(dollars) FROM sector_stats WHERE tier='all' "
+        "GROUP BY sector"))
+    conn.close()
+    assert cached == live, "sector_totals disagrees with sector_stats"
+
+
 def test_most_dollars_rest_on_irs_evidence_not_inference():
     """A breakdown mostly built from name guesses would not be worth showing."""
     conn = _conn()

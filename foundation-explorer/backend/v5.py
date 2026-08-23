@@ -658,15 +658,11 @@ def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
     """
     with connect() as conn:
         try:
-            sectors = conn.execute("""
-                SELECT sector, SUM(dollars) AS dollars,
-                       SUM(recipients) AS recipients,
-                       SUM(grants) AS grants,
-                       COUNT(DISTINCT ein) AS funders,
-                       SUM(d_high) AS d_high, SUM(d_medium) AS d_medium,
-                       SUM(d_low) AS d_low, SUM(d_none) AS d_none
-                FROM sector_stats WHERE tier='all'
-                GROUP BY sector ORDER BY dollars DESC""").fetchall()
+            # Precomputed 18-row rollup. The equivalent GROUP BY scans every
+            # sector_stats row -- 1.0s on the droplet -- for an answer that is
+            # identical on every request.
+            sectors = conn.execute(
+                "SELECT * FROM sector_totals ORDER BY dollars DESC").fetchall()
         except sqlite3.OperationalError:
             raise HTTPException(
                 503, "The sector index has not been built for this read "

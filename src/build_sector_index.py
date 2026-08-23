@@ -93,6 +93,26 @@ CREATE TABLE sector_stats (
 );
 """
 
+# National rollup, 18 rows. The GROUP BY that produces it scans all 403k
+# sector_stats rows: 251ms on a laptop, but 1.0s on the droplet's slower disk,
+# paid on every load of the Non-Christian page. The answer never varies between
+# requests, so it is computed once here.
+TOTALS = """
+DROP TABLE IF EXISTS sector_totals;
+CREATE TABLE sector_totals AS
+SELECT sector,
+       SUM(dollars)    AS dollars,
+       SUM(recipients) AS recipients,
+       SUM(grants)     AS grants,
+       COUNT(DISTINCT ein) AS funders,
+       SUM(d_high)   AS d_high,
+       SUM(d_medium) AS d_medium,
+       SUM(d_low)    AS d_low,
+       SUM(d_none)   AS d_none
+FROM sector_stats WHERE tier = 'all'
+GROUP BY sector;
+"""
+
 INDEXES = """
 CREATE INDEX idx_rs_sector ON recipient_sectors(sector);
 CREATE INDEX idx_ss_ein ON sector_stats(ein, tier, dollars DESC);
@@ -286,6 +306,7 @@ def main() -> int:
 
     step = time.monotonic()
     rows = rollup(conn)
+    conn.executescript(TOTALS)
     conn.executescript(INDEXES)
     conn.commit()
     log(f"rolled up {rows:,} (ein, sector, tier) rows "
