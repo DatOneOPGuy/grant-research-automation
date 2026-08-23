@@ -458,6 +458,45 @@ Verify afterwards with `curl -s 'localhost:8000/api/v5/search?q=youth&limit=3'`
 rather than only `/api/health`: health does not touch the FTS tables and will
 report `ok` against a database that has none.
 
+### The sector index rides with it too
+
+`/api/v5/analytics/non-christian` and the cause breakdown in the detail panel
+read `recipient_sectors` and `sector_stats`, built by
+`src/build_sector_index.py`. Same rule as the search index: rebuild the read
+model and they vanish.
+
+**This one cannot be built on the droplet as things stand** — it needs
+`data/bmf_registry.db` (852 MB), which is excluded from the code rsync and is
+not on the box. So build both indexes locally, in this order, then ship the
+finished database:
+
+```bash
+python3 -m src.build_search_index      # ~17 s, 1.33 GB -> 1.85 GB
+python3 -m src.build_sector_index      # ~16 s, -> 1.93 GB, needs bmf_registry.db
+```
+
+Both refuse to run while anything else holds the database open, and both
+checkpoint and drop the WAL before exiting.
+
+Shipping 1.93 GB takes ~9 minutes at the ~3.7 MB/s this link measures. To let
+rsync compute a delta instead, seed the target from the copy already on the
+box:
+
+```bash
+ssh fcf 'cp /opt/fcf/data/explorer_v5.db /opt/fcf/data/explorer_v5.db.new'
+rsync -av --inplace --progress data/explorer_v5.db \
+      fcf:/opt/fcf/data/explorer_v5.db.new
+```
+
+`--inplace` is safe here only because `.new` is a scratch copy nothing is
+reading. Never point it at the live file.
+
+Then verify with an actual query, not just health:
+
+```bash
+curl -s 'localhost:8000/api/v5/analytics/non-christian' | head -c 200
+```
+
 Note the SQLite hazards documented for `grants_v2.db` apply here too — never
 move a `.db` without its `-wal`/`-shm` sidecars if the source was checkpointed
 mid-write. Build, let the writer exit cleanly, then ship.
