@@ -6,9 +6,9 @@
 // column that makes the ranking legible: every row can be interrogated for
 // why it is here and how strong the evidence is.
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ExternalLink, Globe, Loader2, Search } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Globe, Loader2, Search } from 'lucide-react'
 import {
   MATCH_STYLE, searchFoundations, type SearchMatch, type SearchResult,
 } from '../lib/apiSearch'
@@ -38,6 +38,14 @@ export default function SearchResults() {
     <div>
       <div className="flex items-end justify-between mb-5 gap-4">
         <div className="min-w-0">
+          {/* Search is reached from anywhere, so it needs its own way out
+              rather than relying on the browser's back button. Foundations
+              is the table this page is a filtered view of. */}
+          <Link to="/foundations"
+            className="inline-flex items-center gap-1 text-sm text-muted
+              hover:text-primary mb-1">
+            <ArrowLeft size={14} /> Back to foundations
+          </Link>
           <h1 className="font-display text-3xl font-semibold text-primary">
             Search results
           </h1>

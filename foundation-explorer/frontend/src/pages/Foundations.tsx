@@ -84,15 +84,19 @@ export default function Foundations() {
   // Collapsing is safe because the active-filter chips above still show what
   // is applied. Remembered so it does not reset on every navigation.
   const [filtersOpen, setFiltersOpen] = useState(() => {
-    const stored = localStorage.getItem('fe.filtersOpen')
+    const stored = localStorage.getItem('fe.filtersOpen.v2')
     if (stored !== null) return stored !== 'false'
-    // No stored preference: below ~1400px the rail costs more than it is
-    // worth, because the table would have to scroll to show every column.
-    // An explicit choice always wins over this default afterwards.
-    return window.innerWidth >= 1400
+    // Open by default, at any width. The previous default opened the rail
+    // only above 1400px, then immediately persisted that decision -- so a
+    // narrower window silently recorded "closed" as though the user had
+    // chosen it, and it stayed closed forever. The filters are the main way
+    // this page is used; hiding them by default buries the feature to save
+    // a horizontal scroll. Hence the new key: the old value was the
+    // heuristic's opinion, not the user's.
+    return true
   })
   useEffect(() => {
-    localStorage.setItem('fe.filtersOpen', String(filtersOpen))
+    localStorage.setItem('fe.filtersOpen.v2', String(filtersOpen))
   }, [filtersOpen])
 
   const [page, setPage] = useState(0)
