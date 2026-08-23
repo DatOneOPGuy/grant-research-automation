@@ -100,18 +100,25 @@ export default function SearchResults() {
                 out of sight -- which is how the links column disappeared.
                 Location moved into the Foundation cell and Paid moved to the
                 detail panel to buy the room. */}
+            {/* Six columns: Foundation (with location beneath), the match
+                badges, the matched text, % Christian, Christian $ (with the
+                paid denominator beneath), and the row actions. */}
             <colgroup>
-              <col className="w-[23%]" /><col className="w-[12%]" />
-              <col className="w-[18%]" /><col className="w-[21%]" />
-              <col className="w-[8%]" /><col className="w-[12%]" />
-              <col className="w-[6%]" />
+              <col className="w-[24%]" /><col className="w-[13%]" />
+              <col className="w-[34%]" /><col className="w-[7%]" />
+              <col className="w-[12%]" /><col className="w-[10%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
                 <th className="py-2 px-3 font-medium">Foundation</th>
                 <th className="px-2 font-medium">Matched</th>
-                <th className="px-2 font-medium">Grantee</th>
-                <th className="px-2 font-medium">Mission</th>
+                <th className="px-2 font-medium">
+                  Matched text
+                  <span className="block font-normal normal-case
+                    text-[10px] text-muted/80">
+                    from the grantee, its mission, or the grant purpose
+                  </span>
+                </th>
                 <th className="px-2 text-right font-medium">% Chr.</th>
                 <th className="px-2 text-right font-medium">Christian $</th>
                 <th className="px-2" />
@@ -161,15 +168,18 @@ function Row({ r, onOpen }: {
       <td className="px-2">
         <MatchCell matches={r.matches} />
       </td>
-      {/* The two indirect routes, shown as text rather than left in a hover.
-          A grantee name or a line of mission text is the thing a researcher
-          is actually reading, so it belongs on the row. */}
+      {/* One column, not one per field. Grantee and mission were separate
+          headings, and which of them filled depended entirely on what the
+          user typed: searching an organisation's name filled Grantee and
+          left Mission empty on every row, searching a concept did the
+          reverse. Two columns that are never both populated read as broken
+          data. "Mission" was also mislabelled -- it is the grantee's mission
+          statement, from the grantee's own filing, not the foundation's, and
+          only 3.6% of recipients have one at all. The badge beside it already
+          names which field matched, so the heading does not have to. */}
       <td className="px-2 text-xs">
-        <TextMatch match={r.matches.find((m) => m.field === 'recipient')} />
-      </td>
-      <td className="px-2 text-xs">
-        <TextMatch match={r.matches.find((m) => m.field === 'mission')}
-          showDetail />
+        <TextMatch match={r.matches.find((m) => m.field !== 'name'
+          && m.field !== 'location')} showDetail />
       </td>
       <td className="px-2 text-right tabular">
         {/* NULL means nothing could be classified. Rendering it as 0% would
