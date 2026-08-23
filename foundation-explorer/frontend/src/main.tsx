@@ -9,6 +9,7 @@ import Foundations from './pages/Foundations'
 import BestProspects from './pages/BestProspects'
 import Saved from './pages/Saved'
 import SearchResults from './pages/SearchResults'
+import NonChristian from './pages/NonChristian'
 import Grants from './pages/Grants'
 import Recipients from './pages/Recipients'
 import Analytics from './pages/Analytics'
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
       { path: 'foundations', element: <Foundations />, errorElement: <RouteError /> },
       { path: 'saved', element: <Saved />, errorElement: <RouteError /> },
       { path: 'search', element: <SearchResults />, errorElement: <RouteError /> },
+      { path: 'non-christian', element: <NonChristian />, errorElement: <RouteError /> },
       { path: 'grants', element: <Grants />, errorElement: <RouteError /> },
       { path: 'recipients', element: <Recipients />, errorElement: <RouteError /> },
       { path: 'analytics', element: <Analytics />, errorElement: <RouteError /> },

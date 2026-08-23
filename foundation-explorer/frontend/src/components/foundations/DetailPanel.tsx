@@ -138,7 +138,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
 
           {f && (
             <div className="mt-4">
-              <BucketBarLabeled b={{
+              <BucketBarLabeled sectors={data?.sectors ?? []} b={{
                 christian: f.christian_dollars,
                 nonchristian: f.nonchristian_dollars,
                 unclassified: f.unclassified_dollars,

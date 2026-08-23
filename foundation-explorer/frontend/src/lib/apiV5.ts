@@ -146,6 +146,24 @@ const SECTOR_LABELS: Record<string, string> = {
   unknown: 'Sector unknown',
 }
 
+export type NonChristianSector = {
+  sector: string
+  dollars: number
+  recipients: number
+  grants: number
+  funders: number
+  top_funders: { ein: string; name: string; dollars: number }[]
+}
+
+export type NonChristianOverview = {
+  sectors: NonChristianSector[]
+  evidence: { confidence: string; dollars: number }[]
+}
+
+export function fetchNonChristianOverview(): Promise<NonChristianOverview> {
+  return getV5<NonChristianOverview>('/api/v5/analytics/non-christian')
+}
+
 export function sectorLabel(s: string): string {
   return SECTOR_LABELS[s] || s
 }

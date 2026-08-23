@@ -648,6 +648,61 @@ def countries(christian_only: bool = False):
     return [dict(r) for r in rows]
 
 
+@router.get("/analytics/non-christian")
+def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
+    """National view of the non-Christian bucket, by cause area.
+
+    The read model reports $107B of non-Christian giving as one number. That
+    is the largest figure in the product and the least informative: it says
+    what the money was not, and nothing about what it was. This decomposes it
+    and names the biggest funder behind each cause, so the page answers
+    "who funds youth work" rather than only "how much is not Christian".
+    """
+    with connect() as conn:
+        try:
+            sectors = conn.execute("""
+                SELECT sector, SUM(dollars) AS dollars,
+                       SUM(recipients) AS recipients,
+                       SUM(grants) AS grants,
+                       COUNT(DISTINCT ein) AS funders
+                FROM sector_stats WHERE tier='all'
+                GROUP BY sector ORDER BY dollars DESC""").fetchall()
+        except sqlite3.OperationalError:
+            raise HTTPException(
+                503, "The sector index has not been built for this read "
+                     "model. Run: python3 -m src.build_sector_index") from None
+        if not sectors:
+            raise HTTPException(503, "The sector index is empty.")
+
+        # Evidence mix nationally, so the page can state up front how much of
+        # what follows the IRS assigned and how much we inferred.
+        evidence = conn.execute("""
+            SELECT COALESCE(s.confidence,'none') AS confidence,
+                   SUM(g.amount) AS dollars
+            FROM grants g JOIN recipient_sectors s ON s.entity_id=g.entity_id
+            GROUP BY 1""").fetchall()
+
+        # Top funders per sector. One query, ranked in SQL, rather than a
+        # query per sector: 18 round trips for a page header is not worth it.
+        top = conn.execute(f"""
+            SELECT sector, ein, name, dollars FROM (
+              SELECT ss.sector, ss.ein, f.name, ss.dollars,
+                     ROW_NUMBER() OVER (PARTITION BY ss.sector
+                                        ORDER BY ss.dollars DESC) AS rn
+              FROM sector_stats ss JOIN foundations f ON f.ein=ss.ein
+              WHERE ss.tier='all' AND ss.dollars > 0
+            ) WHERE rn <= {limit_funders}""").fetchall()
+    by_sector: dict[str, list] = {}
+    for row in top:
+        by_sector.setdefault(row["sector"], []).append(
+            {"ein": row["ein"], "name": row["name"], "dollars": row["dollars"]})
+    return {
+        "sectors": [{**dict(r), "top_funders": by_sector.get(r["sector"], [])}
+                    for r in sectors],
+        "evidence": [dict(r) for r in evidence],
+    }
+
+
 @router.get("/analytics/state-breakdown")
 def state_breakdown():
     with connect() as conn:
