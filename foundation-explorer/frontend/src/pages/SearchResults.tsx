@@ -8,11 +8,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Loader2, Search } from 'lucide-react'
+import { ExternalLink, Globe, Loader2, Search } from 'lucide-react'
 import {
   MATCH_STYLE, searchFoundations, type SearchMatch, type SearchResult,
 } from '../lib/apiSearch'
-import { money, num, titleCase } from '../lib/format'
+import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
 import SaveMenu from '../components/foundations/SaveMenu'
 import DetailPanel from '../components/foundations/DetailPanel'
 import MatchPopover, { Highlighted } from '../components/search/MatchPopover'
@@ -85,17 +85,17 @@ export default function SearchResults() {
       {rows.length > 0 && (
         <div className="bg-surface border border-line rounded-lg
           overflow-x-auto">
-          <table className="w-full text-sm table-fixed min-w-[1120px]">
+          <table className="w-full text-sm table-fixed min-w-[1280px]">
             {/* Nine columns, sized so nothing wraps into a tower. Application
                 status and the ProPublica link are deliberately absent: both
                 live in the detail panel one click away, and carrying them here
                 pushed the table past the viewport on a laptop. */}
             <colgroup>
-              <col className="w-[19%]" /><col className="w-[8%]" />
-              <col className="w-[14%]" /><col className="w-[16%]" />
-              <col className="w-[16%]" /><col className="w-[6%]" />
-              <col className="w-[8%]" /><col className="w-[8%]" />
-              <col className="w-[5%]" />
+              <col className="w-[19%]" /><col className="w-[9%]" />
+              <col className="w-[15%]" /><col className="w-[14%]" />
+              <col className="w-[18%]" /><col className="w-[5%]" />
+              <col className="w-[7%]" /><col className="w-[7%]" />
+              <col className="w-[6%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
@@ -107,7 +107,7 @@ export default function SearchResults() {
                 <th className="px-2 text-right font-medium">% Chr.</th>
                 <th className="px-3 text-right font-medium">Christian $</th>
                 <th className="px-3 text-right font-medium">Paid 23–24</th>
-                <th />
+                <th className="px-2" />
               </tr>
             </thead>
             <tbody>
@@ -178,8 +178,25 @@ function Row({ r, onOpen }: {
         {money(r.paid_2324)}
       </td>
       <td className="px-2">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-0.5">
           <SaveMenu ein={r.ein} align="right" />
+          {websiteUrl(r.website) ? (
+            <a href={websiteUrl(r.website) as string}
+              target="_blank" rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title={r.website ?? undefined} aria-label="Open website"
+              className="p-1 text-muted hover:text-primary shrink-0">
+              <Globe size={13} />
+            </a>
+          ) : (
+            <a href={propublicaUrl(r.ein)} target="_blank" rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="No website on file — open on ProPublica"
+              aria-label="Open on ProPublica"
+              className="p-1 text-muted/60 hover:text-primary shrink-0">
+              <ExternalLink size={13} />
+            </a>
+          )}
         </div>
       </td>
     </tr>
@@ -252,7 +269,7 @@ function MatchCell({ matches }: { matches: SearchMatch[] }) {
         onFocus={(e) => show(e as unknown as React.MouseEvent, matches)}
         onBlur={hide}
         aria-label={`Matched on ${matches.map((m) => m.label).join(', ')}`}
-        className="flex items-center gap-1 cursor-help overflow-hidden">
+        className="flex flex-wrap items-center gap-1 cursor-help">
         {matches.map((m) => (
           <span key={m.field}
             title={m.label}

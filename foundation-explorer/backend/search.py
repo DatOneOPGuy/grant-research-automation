@@ -95,6 +95,7 @@ class ResultOut(BaseModel):
     pct_christian: float | None
     coverage_band: str | None
     application_status: str | None
+    website: str | None
     score: float
     matches: list[MatchOut]
 
@@ -377,7 +378,7 @@ def _hydrate(conn, ranked: list[tuple[str, _Acc]]) -> list[ResultOut]:
     rows = {
         r["ein"]: r for r in conn.execute(f"""
             SELECT ein, name, city, state, paid_2324, christian_dollars,
-                   pct_christian, coverage_band, application_status
+                   pct_christian, coverage_band, application_status, website
             FROM foundations WHERE ein IN ({placeholders})
         """, tuple(eins)).fetchall()
     }
@@ -397,6 +398,7 @@ def _hydrate(conn, ranked: list[tuple[str, _Acc]]) -> list[ResultOut]:
             pct_christian=row["pct_christian"],
             coverage_band=row["coverage_band"],
             application_status=row["application_status"],
+            website=row["website"],
             score=round(entry.score, 2), matches=entry.finish(),
         ))
     return out

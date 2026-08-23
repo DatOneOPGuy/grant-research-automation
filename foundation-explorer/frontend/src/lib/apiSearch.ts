@@ -30,6 +30,7 @@ export type SearchResult = {
   pct_christian: number | null
   coverage_band: string | null
   application_status: string | null
+  website: string | null
   score: number
   matches: SearchMatch[]
 }
