@@ -321,6 +321,38 @@ def foundations(
     return {"total": total, "rows": [dict(row) for row in rows]}
 
 
+def _sector_breakdown(conn, ein: str) -> list[dict]:
+    """Non-Christian giving by cause area, or [] if the index is absent.
+
+    Returns the 'all' tier only. The authoritative tier exists in the table
+    for parity with tradition_stats, but showing two sector tiers side by
+    side asks the reader to hold a distinction that does not change what the
+    money funded -- confidence is reported per sector instead.
+    """
+    try:
+        rows = conn.execute("""
+            SELECT s.sector, s.dollars, s.recipients, s.grants
+            FROM sector_stats s
+            WHERE s.ein = ? AND s.tier = 'all'
+            ORDER BY s.dollars DESC""", (ein,)).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    if not rows:
+        return []
+    # Evidence mix per sector, so a category resting on name guesses can say
+    # so rather than looking as solid as one the IRS coded.
+    conf = {}
+    for sector, confidence, dollars in conn.execute("""
+            SELECT rs.sector, COALESCE(rs.confidence, 'none'), SUM(g.amount)
+            FROM grants g
+            JOIN recipient_sectors rs ON rs.entity_id = g.entity_id
+            WHERE g.funder_ein = ?
+            GROUP BY 1, 2""", (ein,)):
+        conf.setdefault(sector, {})[confidence] = dollars
+    return [{**dict(r), "confidence": conf.get(r["sector"], {})}
+            for r in rows]
+
+
 @router.get("/foundations/{ein}")
 def foundation_detail(ein: str):
     with connect() as conn:
@@ -349,6 +381,15 @@ def foundation_detail(ein: str):
             "SELECT country_code, country_name, dollars, grants, "
             "christian_dollars FROM foundation_countries WHERE ein=? "
             "ORDER BY dollars DESC", (ein,)).fetchall()
+        # Cause areas inside the non-Christian bucket. Without this, a
+        # fundraiser sees "97% non-Christian" and learns nothing about
+        # whether the funder is a plausible fit; with it they can see that
+        # the money went to human services, or to other grantmakers.
+        #
+        # Optional by design: the tables come from src/build_sector_index.py,
+        # which is a separate step, and a read model built without it must
+        # still serve this endpoint rather than 500.
+        sectors = _sector_breakdown(conn, ein)
         # Evidence mix: how much of this foundation's classified giving rests
         # on each method. This is the rigor question a researcher should ask
         # before trusting a headline percentage, so it gets its own tab.
@@ -393,6 +434,7 @@ def foundation_detail(ein: str):
             ORDER BY dollars DESC LIMIT 100""", (ein,)).fetchall()
     return {"foundation": dict(base),
             "traditions": [dict(r) for r in traditions],
+            "sectors": sectors,
             "recipients": [dict(r) for r in recipients],
             "states": [dict(r) for r in states],
             "countries": [dict(r) for r in countries],

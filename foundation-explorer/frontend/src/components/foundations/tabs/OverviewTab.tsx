@@ -5,6 +5,7 @@ import {
 } from '../../../lib/apiV5'
 import { money } from '../../../lib/format'
 import { BarRow, Empty, SectionTitle, Stat } from './parts'
+import SectorBreakdown from './SectorBreakdown'
 
 export default function OverviewTab({ data }: { data: FoundationDetailV5 }) {
   const f = data.foundation
@@ -53,6 +54,10 @@ export default function OverviewTab({ data }: { data: FoundationDetailV5 }) {
           </div>
         ) : <Empty>No classified giving to break down.</Empty>}
       </div>
+
+      {/* Sits directly under the faith mix: the question it answers is the
+          one the faith mix provokes. */}
+      <SectorBreakdown sectors={data.sectors ?? []} />
 
       <div>
         <SectionTitle note="What a realistic ask looks like. The tallest bar is

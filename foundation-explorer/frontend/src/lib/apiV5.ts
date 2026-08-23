@@ -108,6 +108,46 @@ export type FoundationDetailV5 = {
   size_bands: SizeBandV5[]
   yearly: YearRollupV5[]
   top_foreign: ForeignRecipientV5[]
+  /** Cause-area breakdown of the non-Christian bucket. Empty when the read
+   *  model was built without src/build_sector_index.py. */
+  sectors: SectorStat[]
+}
+
+export type SectorStat = {
+  sector: string
+  dollars: number
+  recipients: number
+  grants: number
+  /** Dollars behind this sector by evidence strength: high | medium | low |
+   *  none. Lets the UI say when a category rests on inference. */
+  confidence: Record<string, number>
+}
+
+// Must stay in step with src/sector_taxonomy.py. Duplicated rather than
+// fetched because it is a fixed vocabulary, not data.
+const SECTOR_LABELS: Record<string, string> = {
+  regranting: 'Regranting & intermediaries',
+  faith_jewish: 'Jewish',
+  faith_muslim: 'Muslim',
+  faith_mormon_lds: 'Latter-day Saints',
+  faith_christian_science: 'Christian Science',
+  faith_other: 'Other faith',
+  religion_unspecified: 'Religion, unspecified',
+  education: 'Education',
+  health: 'Health & medicine',
+  human_services: 'Human services & poverty',
+  youth: 'Youth & recreation',
+  arts: 'Arts & culture',
+  international: 'International relief & development',
+  environment: 'Environment & animals',
+  civic: 'Civic, justice & advocacy',
+  science: 'Science & research',
+  other: 'Other',
+  unknown: 'Sector unknown',
+}
+
+export function sectorLabel(s: string): string {
+  return SECTOR_LABELS[s] || s
 }
 
 export type MethodRollupV5 = {
