@@ -8,24 +8,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ExternalLink, Loader2, Search } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 import {
   MATCH_STYLE, searchFoundations, type SearchMatch, type SearchResult,
 } from '../lib/apiSearch'
-import { money, num, propublicaUrl, titleCase } from '../lib/format'
+import { money, num, titleCase } from '../lib/format'
 import SaveMenu from '../components/foundations/SaveMenu'
 import DetailPanel from '../components/foundations/DetailPanel'
 import MatchPopover, { Highlighted } from '../components/search/MatchPopover'
-import { Skeleton, StatusPill } from '../components/ui/primitives'
+import { Skeleton } from '../components/ui/primitives'
 
 const LIMIT = 100
 
 export default function SearchResults() {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const q = params.get('q') ?? ''
   const [selected, setSelected] = useState<string | null>(null)
-  const [draft, setDraft] = useState(q)
-  useEffect(() => { setDraft(q) }, [q])
 
   const { data, isFetching, isError, error } = useQuery({
     queryKey: ['v5search', q],
@@ -58,18 +56,9 @@ export default function SearchResults() {
           </div>
         </div>
 
-        <form
-          onSubmit={(e) => { e.preventDefault(); setParams({ q: draft }) }}
-          className="relative shrink-0">
-          <Search size={15}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-          <input value={draft} onChange={(e) => setDraft(e.target.value)}
-            aria-label="Refine search"
-            placeholder="Refine this search…"
-            className="w-80 text-sm border border-line rounded-md bg-surface
-              pl-8 pr-3 py-1.5 placeholder:text-muted/70 focus:outline-none
-              focus:border-primary/40" />
-        </form>
+        {/* No second search box here. The bar directly above this page is
+            the search box, and putting another one alongside it just asks
+            which of the two is the real one. */}
       </div>
 
       {isError && (
@@ -96,47 +85,28 @@ export default function SearchResults() {
       {rows.length > 0 && (
         <div className="bg-surface border border-line rounded-lg
           overflow-x-auto">
-          <table className="w-full text-sm table-fixed min-w-[1400px]">
-            {/* Matched holds badges, which are narrow and fixed-width, so it
-                does not need the space a text column does. Grantee and Mission
-                are the two indirect routes into a result, and they carry real
-                text, so they get the width. */}
+          <table className="w-full text-sm table-fixed min-w-[1120px]">
+            {/* Nine columns, sized so nothing wraps into a tower. Application
+                status and the ProPublica link are deliberately absent: both
+                live in the detail panel one click away, and carrying them here
+                pushed the table past the viewport on a laptop. */}
             <colgroup>
               <col className="w-[19%]" /><col className="w-[8%]" />
-              <col className="w-[8%]" /><col className="w-[14%]" />
-              <col className="w-[17%]" /><col className="w-[6%]" />
+              <col className="w-[14%]" /><col className="w-[16%]" />
+              <col className="w-[16%]" /><col className="w-[6%]" />
               <col className="w-[8%]" /><col className="w-[8%]" />
-              <col className="w-[7%]" /><col className="w-[5%]" />
+              <col className="w-[5%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
-                <th className="py-2 px-3">Foundation</th>
-                <th className="px-3">Location</th>
-                <th className="px-3">
-                  Matched
-                  <span className="block font-normal normal-case
-                    text-[10px] text-muted/80">
-                    hover for evidence
-                  </span>
-                </th>
-                <th className="px-3">
-                  Grantee
-                  <span className="block font-normal normal-case
-                    text-[10px] text-muted/80">
-                    matching recipient
-                  </span>
-                </th>
-                <th className="px-3">
-                  Mission
-                  <span className="block font-normal normal-case
-                    text-[10px] text-muted/80">
-                    matching text
-                  </span>
-                </th>
-                <th className="px-3 text-right">% Christian</th>
-                <th className="px-3 text-right">Christian $</th>
-                <th className="px-3 text-right">Paid 2023–24</th>
-                <th className="px-3">Application</th>
+                <th className="py-2 px-3 font-medium">Foundation</th>
+                <th className="px-3 font-medium">Location</th>
+                <th className="px-3 font-medium">Matched</th>
+                <th className="px-3 font-medium">Grantee</th>
+                <th className="px-3 font-medium">Mission</th>
+                <th className="px-2 text-right font-medium">% Chr.</th>
+                <th className="px-3 text-right font-medium">Christian $</th>
+                <th className="px-3 text-right font-medium">Paid 23–24</th>
                 <th />
               </tr>
             </thead>
@@ -174,8 +144,12 @@ function Row({ r, onOpen }: {
         onClick={() => onOpen(r.ein)}>
         <span className="line-clamp-2">{titleCase(r.name)}</span>
       </td>
-      <td className="px-3 text-muted whitespace-nowrap">
-        {r.city && `${titleCase(r.city)}, `}{r.state}
+      {/* Wraps rather than nowrap: "Jacksonville Beach, FL" in a fixed
+          9% column was overflowing into the badges beside it. */}
+      <td className="px-3 text-muted text-xs">
+        <span className="line-clamp-2">
+          {r.city && `${titleCase(r.city)}, `}{r.state}
+        </span>
       </td>
       <td className="px-3">
         <MatchCell matches={r.matches} />
@@ -190,25 +164,22 @@ function Row({ r, onOpen }: {
         <TextMatch match={r.matches.find((m) => m.field === 'mission')}
           showDetail />
       </td>
-      <td className="px-3 text-right tabular">
+      <td className="px-2 text-right tabular">
         {/* NULL means nothing could be classified. Rendering it as 0% would
             assert the giving is non-Christian, which is a different claim. */}
         {r.pct_christian === null
           ? <span className="text-muted" title="Nothing could be classified">—</span>
           : `${Math.round(r.pct_christian)}%`}
       </td>
-      <td className="px-3 text-right tabular">{money(r.christian_dollars)}</td>
-      <td className="px-3 text-right tabular">{money(r.paid_2324)}</td>
-      <td className="px-3"><StatusPill status={r.application_status} /></td>
-      <td className="px-3">
-        <div className="flex items-center justify-end gap-0.5">
+      <td className="px-3 text-right tabular whitespace-nowrap">
+        {money(r.christian_dollars)}
+      </td>
+      <td className="px-3 text-right tabular whitespace-nowrap">
+        {money(r.paid_2324)}
+      </td>
+      <td className="px-2">
+        <div className="flex justify-end">
           <SaveMenu ein={r.ein} align="right" />
-          <a href={propublicaUrl(r.ein)} target="_blank" rel="noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title="ProPublica" aria-label="Open on ProPublica"
-            className="p-1 text-muted hover:text-primary shrink-0">
-            <ExternalLink size={13} />
-          </a>
         </div>
       </td>
     </tr>
@@ -268,30 +239,29 @@ function MatchCell({ matches }: { matches: SearchMatch[] }) {
     if (timer.current) window.clearTimeout(timer.current)
   }, [])
 
+  // One row, never wrapping. Wrapping turned a three-match row into a tower
+  // of badges four deep and tripled the row height, which made the table
+  // unreadable well before it made it informative. Hovering any badge shows
+  // every match, so there is no separate "all" affordance to fit in either.
   return (
     <>
-      <div className="flex flex-wrap gap-1">
+      <div
+        onMouseEnter={(e) => show(e, matches)}
+        onMouseLeave={hide}
+        tabIndex={0}
+        onFocus={(e) => show(e as unknown as React.MouseEvent, matches)}
+        onBlur={hide}
+        aria-label={`Matched on ${matches.map((m) => m.label).join(', ')}`}
+        className="flex items-center gap-1 cursor-help overflow-hidden">
         {matches.map((m) => (
-          <button key={m.field}
-            onMouseEnter={(e) => show(e, [m])}
-            onMouseLeave={hide}
-            onFocus={(e) => show(e as unknown as React.MouseEvent, [m])}
-            onBlur={hide}
-            aria-label={`Why this matched: ${m.label}`}
-            className={`px-1.5 py-0.5 rounded border text-[10px] font-medium
-              uppercase tracking-wide cursor-help ${MATCH_STYLE[m.field].cls}`}>
+          <span key={m.field}
+            title={m.label}
+            className={`px-1 py-0.5 rounded border text-[9px] font-semibold
+              uppercase tracking-wide leading-none shrink-0
+              ${MATCH_STYLE[m.field].cls}`}>
             {MATCH_STYLE[m.field].short}
-          </button>
+          </span>
         ))}
-        {matches.length > 1 && (
-          <button
-            onMouseEnter={(e) => show(e, matches)}
-            onMouseLeave={hide}
-            className="px-1.5 py-0.5 rounded border border-line text-[10px]
-              text-muted hover:text-ink cursor-help">
-            all
-          </button>
-        )}
       </div>
       {hover && (
         <MatchPopover matches={hover.matches}
