@@ -223,6 +223,41 @@ def test_every_assigned_sector_is_in_the_taxonomy():
     assert found <= set(SECTORS), f"undeclared sectors in the data: {found - set(SECTORS)}"
 
 
+def test_confidence_columns_reconcile_to_the_row_total():
+    """The precomputed evidence split must add up to the row it splits.
+
+    These four columns exist because deriving them at query time cost 525ms
+    on a large foundation. Precomputing trades a live join for a value that
+    can go stale, so the reconciliation is asserted rather than assumed.
+    """
+    conn = _conn()
+    row = conn.execute("""
+        SELECT SUM(dollars), SUM(d_high + d_medium + d_low + d_none)
+        FROM sector_stats WHERE tier='all'""").fetchone()
+    bad = conn.execute("""
+        SELECT COUNT(*) FROM sector_stats
+        WHERE dollars != d_high + d_medium + d_low + d_none""").fetchone()[0]
+    conn.close()
+    assert row[0] == row[1], f"{row[0]} != {row[1]}"
+    assert bad == 0, f"{bad} rows whose confidence split misses their total"
+
+
+def test_a_foundations_sectors_sum_to_its_non_christian_total():
+    """Per-foundation, not just nationally: the breakdown is of THIS funder."""
+    conn = _conn()
+    mismatches = conn.execute("""
+        SELECT COUNT(*) FROM (
+          SELECT f.ein, f.nonchristian_dollars AS headline,
+                 (SELECT COALESCE(SUM(dollars),0) FROM sector_stats s
+                  WHERE s.ein=f.ein AND s.tier='all') AS decomposed
+          FROM foundations f WHERE f.nonchristian_dollars > 0)
+        WHERE ABS(headline - decomposed) > 1""").fetchone()[0]
+    conn.close()
+    assert mismatches == 0, (
+        f"{mismatches} foundations whose sector rows do not sum to their "
+        "non-Christian figure")
+
+
 def test_most_dollars_rest_on_irs_evidence_not_inference():
     """A breakdown mostly built from name guesses would not be worth showing."""
     conn = _conn()

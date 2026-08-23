@@ -331,26 +331,24 @@ def _sector_breakdown(conn, ein: str) -> list[dict]:
     """
     try:
         rows = conn.execute("""
-            SELECT s.sector, s.dollars, s.recipients, s.grants
+            SELECT s.sector, s.dollars, s.recipients, s.grants,
+                   s.d_high, s.d_medium, s.d_low, s.d_none
             FROM sector_stats s
             WHERE s.ein = ? AND s.tier = 'all'
             ORDER BY s.dollars DESC""", (ein,)).fetchall()
     except sqlite3.OperationalError:
         return []
-    if not rows:
-        return []
-    # Evidence mix per sector, so a category resting on name guesses can say
-    # so rather than looking as solid as one the IRS coded.
-    conf = {}
-    for sector, confidence, dollars in conn.execute("""
-            SELECT rs.sector, COALESCE(rs.confidence, 'none'), SUM(g.amount)
-            FROM grants g
-            JOIN recipient_sectors rs ON rs.entity_id = g.entity_id
-            WHERE g.funder_ein = ?
-            GROUP BY 1, 2""", (ein,)):
-        conf.setdefault(sector, {})[confidence] = dollars
-    return [{**dict(r), "confidence": conf.get(r["sector"], {})}
-            for r in rows]
+    # The evidence split is precomputed per (ein, sector). Deriving it here by
+    # joining grants cost 525ms on a foundation with 59k of them, on every
+    # panel open; this is a single indexed lookup.
+    out = []
+    for r in rows:
+        row = dict(r)
+        confidence = {k: row.pop(f"d_{k}")
+                      for k in ("high", "medium", "low", "none")}
+        out.append({**row,
+                    "confidence": {k: v for k, v in confidence.items() if v}})
+    return out
 
 
 @router.get("/foundations/{ein}")
@@ -664,7 +662,9 @@ def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
                 SELECT sector, SUM(dollars) AS dollars,
                        SUM(recipients) AS recipients,
                        SUM(grants) AS grants,
-                       COUNT(DISTINCT ein) AS funders
+                       COUNT(DISTINCT ein) AS funders,
+                       SUM(d_high) AS d_high, SUM(d_medium) AS d_medium,
+                       SUM(d_low) AS d_low, SUM(d_none) AS d_none
                 FROM sector_stats WHERE tier='all'
                 GROUP BY sector ORDER BY dollars DESC""").fetchall()
         except sqlite3.OperationalError:
@@ -674,32 +674,34 @@ def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
         if not sectors:
             raise HTTPException(503, "The sector index is empty.")
 
-        # Evidence mix nationally, so the page can state up front how much of
-        # what follows the IRS assigned and how much we inferred.
-        evidence = conn.execute("""
-            SELECT COALESCE(s.confidence,'none') AS confidence,
-                   SUM(g.amount) AS dollars
-            FROM grants g JOIN recipient_sectors s ON s.entity_id=g.entity_id
-            GROUP BY 1""").fetchall()
 
-        # Top funders per sector. One query, ranked in SQL, rather than a
-        # query per sector: 18 round trips for a page header is not worth it.
-        top = conn.execute(f"""
-            SELECT sector, ein, name, dollars FROM (
-              SELECT ss.sector, ss.ein, f.name, ss.dollars,
-                     ROW_NUMBER() OVER (PARTITION BY ss.sector
-                                        ORDER BY ss.dollars DESC) AS rn
-              FROM sector_stats ss JOIN foundations f ON f.ein=ss.ein
-              WHERE ss.tier='all' AND ss.dollars > 0
-            ) WHERE rn <= {limit_funders}""").fetchall()
-    by_sector: dict[str, list] = {}
-    for row in top:
-        by_sector.setdefault(row["sector"], []).append(
-            {"ein": row["ein"], "name": row["name"], "dollars": row["dollars"]})
+        # Top funders per sector, one indexed query each rather than a single
+        # ranked scan. The window-function form is tidier to read but has to
+        # sort all 403k rows: 637ms against 0ms for eighteen lookups that ride
+        # idx_ss_sector(sector, tier, dollars DESC) straight to their answer.
+        by_sector: dict[str, list] = {}
+        for row in sectors:
+            by_sector[row["sector"]] = [
+                {"ein": f["ein"], "name": f["name"], "dollars": f["dollars"]}
+                for f in conn.execute("""
+                    SELECT ss.ein, f.name, ss.dollars
+                    FROM sector_stats ss JOIN foundations f ON f.ein = ss.ein
+                    WHERE ss.sector = ? AND ss.tier = 'all' AND ss.dollars > 0
+                    ORDER BY ss.dollars DESC LIMIT ?""",
+                    (row["sector"], limit_funders))]
+    # Evidence mix nationally, summed from the same precomputed columns
+    # rather than rescanning 3M grant rows -- that measured 1.1s.
+    totals = {k: 0 for k in ("high", "medium", "low", "none")}
+    out = []
+    for r in sectors:
+        row = dict(r)
+        for k in totals:
+            totals[k] += row.pop(f"d_{k}") or 0
+        out.append({**row, "top_funders": by_sector.get(r["sector"], [])})
     return {
-        "sectors": [{**dict(r), "top_funders": by_sector.get(r["sector"], [])}
-                    for r in sectors],
-        "evidence": [dict(r) for r in evidence],
+        "sectors": out,
+        "evidence": [{"confidence": k, "dollars": v}
+                     for k, v in totals.items() if v],
     }
 
 

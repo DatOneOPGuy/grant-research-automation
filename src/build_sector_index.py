@@ -80,6 +80,15 @@ CREATE TABLE sector_stats (
     dollars    INTEGER NOT NULL,
     recipients INTEGER NOT NULL,
     grants     INTEGER NOT NULL,
+    -- Evidence split, carried here rather than derived at query time.
+    -- Deriving it meant joining grants to recipient_sectors per request,
+    -- which measured 525ms for Bank of America (59k grants) on every detail
+    -- panel open, and 1.1s for the national page's full-table scan. Four
+    -- integers per row removes both.
+    d_high     INTEGER NOT NULL DEFAULT 0,
+    d_medium   INTEGER NOT NULL DEFAULT 0,
+    d_low      INTEGER NOT NULL DEFAULT 0,
+    d_none     INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (ein, sector, tier)
 );
 """
@@ -193,19 +202,29 @@ def rollup(conn: sqlite3.Connection) -> int:
     tighter Christian figure, so the two tiers stay comparable.
     """
     conn.execute("""
-        INSERT INTO sector_stats(ein, sector, tier, dollars, recipients, grants)
+        INSERT INTO sector_stats(ein, sector, tier, dollars, recipients,
+                                 grants, d_high, d_medium, d_low, d_none)
         SELECT g.funder_ein, s.sector, 'all',
                CAST(SUM(g.amount) AS INTEGER),
-               COUNT(DISTINCT g.entity_id), COUNT(*)
+               COUNT(DISTINCT g.entity_id), COUNT(*),
+               CAST(SUM(CASE WHEN s.confidence='high'   THEN g.amount ELSE 0 END) AS INTEGER),
+               CAST(SUM(CASE WHEN s.confidence='medium' THEN g.amount ELSE 0 END) AS INTEGER),
+               CAST(SUM(CASE WHEN s.confidence='low'    THEN g.amount ELSE 0 END) AS INTEGER),
+               CAST(SUM(CASE WHEN s.confidence IS NULL  THEN g.amount ELSE 0 END) AS INTEGER)
         FROM grants g
         JOIN recipient_sectors s ON s.entity_id = g.entity_id
         GROUP BY g.funder_ein, s.sector
     """)
     conn.execute(f"""
-        INSERT INTO sector_stats(ein, sector, tier, dollars, recipients, grants)
+        INSERT INTO sector_stats(ein, sector, tier, dollars, recipients,
+                                 grants, d_high, d_medium, d_low, d_none)
         SELECT g.funder_ein, s.sector, 'authoritative',
                CAST(SUM(g.amount) AS INTEGER),
-               COUNT(DISTINCT g.entity_id), COUNT(*)
+               COUNT(DISTINCT g.entity_id), COUNT(*),
+               CAST(SUM(CASE WHEN s.confidence='high'   THEN g.amount ELSE 0 END) AS INTEGER),
+               CAST(SUM(CASE WHEN s.confidence='medium' THEN g.amount ELSE 0 END) AS INTEGER),
+               CAST(SUM(CASE WHEN s.confidence='low'    THEN g.amount ELSE 0 END) AS INTEGER),
+               CAST(SUM(CASE WHEN s.confidence IS NULL  THEN g.amount ELSE 0 END) AS INTEGER)
         FROM grants g
         JOIN recipient_sectors s ON s.entity_id = g.entity_id
         JOIN recipients r ON r.entity_id = g.entity_id
