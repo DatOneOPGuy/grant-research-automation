@@ -85,28 +85,27 @@ export default function SearchResults() {
       {rows.length > 0 && (
         <div className="bg-surface border border-line rounded-lg
           overflow-x-auto">
-          <table className="w-full text-sm table-fixed min-w-[1280px]">
-            {/* Nine columns, sized so nothing wraps into a tower. Application
-                status and the ProPublica link are deliberately absent: both
-                live in the detail panel one click away, and carrying them here
-                pushed the table past the viewport on a laptop. */}
+          <table className="w-full text-sm table-fixed min-w-[820px]">
+            {/* Sized to fit the content area rather than an ideal width.
+                With the sidebar open, a 1000px-wide browser leaves about
+                810px here, so anything wider scrolls the right-hand columns
+                out of sight -- which is how the links column disappeared.
+                Location moved into the Foundation cell and Paid moved to the
+                detail panel to buy the room. */}
             <colgroup>
-              <col className="w-[19%]" /><col className="w-[9%]" />
-              <col className="w-[15%]" /><col className="w-[14%]" />
-              <col className="w-[18%]" /><col className="w-[5%]" />
-              <col className="w-[7%]" /><col className="w-[7%]" />
+              <col className="w-[23%]" /><col className="w-[12%]" />
+              <col className="w-[18%]" /><col className="w-[21%]" />
+              <col className="w-[8%]" /><col className="w-[12%]" />
               <col className="w-[6%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
                 <th className="py-2 px-3 font-medium">Foundation</th>
-                <th className="px-3 font-medium">Location</th>
-                <th className="px-3 font-medium">Matched</th>
-                <th className="px-3 font-medium">Grantee</th>
-                <th className="px-3 font-medium">Mission</th>
+                <th className="px-2 font-medium">Matched</th>
+                <th className="px-2 font-medium">Grantee</th>
+                <th className="px-2 font-medium">Mission</th>
                 <th className="px-2 text-right font-medium">% Chr.</th>
-                <th className="px-3 text-right font-medium">Christian $</th>
-                <th className="px-3 text-right font-medium">Paid 23–24</th>
+                <th className="px-2 text-right font-medium">Christian $</th>
                 <th className="px-2" />
               </tr>
             </thead>
@@ -140,27 +139,27 @@ function Row({ r, onOpen }: {
 }) {
   return (
     <tr className="border-b border-line/60 hover:bg-canvas align-top">
-      <td className="py-2.5 px-3 font-medium cursor-pointer"
+      <td className="py-2.5 px-3 cursor-pointer"
         onClick={() => onOpen(r.ein)}>
-        <span className="line-clamp-2">{titleCase(r.name)}</span>
+        <div className="font-medium line-clamp-2 leading-snug">
+          {titleCase(r.name)}
+        </div>
+        {(r.city || r.state) && (
+          <div className="text-xs text-muted truncate mt-0.5">
+            {r.city && `${titleCase(r.city)}, `}{r.state}
+          </div>
+        )}
       </td>
-      {/* Wraps rather than nowrap: "Jacksonville Beach, FL" in a fixed
-          9% column was overflowing into the badges beside it. */}
-      <td className="px-3 text-muted text-xs">
-        <span className="line-clamp-2">
-          {r.city && `${titleCase(r.city)}, `}{r.state}
-        </span>
-      </td>
-      <td className="px-3">
+      <td className="px-2">
         <MatchCell matches={r.matches} />
       </td>
       {/* The two indirect routes, shown as text rather than left in a hover.
           A grantee name or a line of mission text is the thing a researcher
           is actually reading, so it belongs on the row. */}
-      <td className="px-3 text-xs">
+      <td className="px-2 text-xs">
         <TextMatch match={r.matches.find((m) => m.field === 'recipient')} />
       </td>
-      <td className="px-3 text-xs">
+      <td className="px-2 text-xs">
         <TextMatch match={r.matches.find((m) => m.field === 'mission')}
           showDetail />
       </td>
@@ -171,11 +170,14 @@ function Row({ r, onOpen }: {
           ? <span className="text-muted" title="Nothing could be classified">—</span>
           : `${Math.round(r.pct_christian)}%`}
       </td>
-      <td className="px-3 text-right tabular whitespace-nowrap">
+      <td className="px-2 text-right tabular whitespace-nowrap">
         {money(r.christian_dollars)}
-      </td>
-      <td className="px-3 text-right tabular whitespace-nowrap">
-        {money(r.paid_2324)}
+        {/* Paid is the denominator behind the percentage beside it, and it
+            is in the detail panel; the column cost more width than it
+            earned here. */}
+        <div className="text-[10px] text-muted font-normal">
+          of {money(r.paid_2324)}
+        </div>
       </td>
       <td className="px-2">
         <div className="flex items-center justify-end gap-0.5">
