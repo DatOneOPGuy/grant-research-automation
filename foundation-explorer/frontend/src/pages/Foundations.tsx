@@ -271,7 +271,7 @@ export default function Foundations() {
                         {r.city ? `${titleCase(r.city)}, ` : ''}{r.state}
                       </span>
                     </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
+                    <td className="px-2 py-2">
                       <PctChristian pct={r.pct_christian}
                         coverage={r.coverage_pct} />
                     </td>
@@ -396,7 +396,9 @@ function PctChristian({ pct, coverage }: {
       <div title="This foundation's filing did not attribute its giving to
         organizations we could classify, so no share can be computed.">
         <div className="text-lg text-line leading-none">—</div>
-        <div className="text-[11px] text-muted mt-1">no classifiable giving</div>
+        <div className="text-[11px] text-muted mt-1 leading-tight">
+          none classifiable
+        </div>
       </div>
     )
   }

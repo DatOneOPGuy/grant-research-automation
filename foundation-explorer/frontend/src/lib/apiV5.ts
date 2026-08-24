@@ -545,7 +545,11 @@ export const defaultV5Filters: V5Filters = {
   min_pct_foreign: '',
   min_foreign_christian: '',
   min_countries: '',
-  sort: 'pct_christian',
+  // Biggest Christian funders first. Sorting by percentage put tiny
+  // foundations that gave 100% of $5,000 above ones that gave $800M, which
+  // is the wrong first impression for a prospecting tool -- the absolute
+  // figure is what tells a fundraiser whether a funder is worth approaching.
+  sort: 'christian',
   order: 'desc',
 }
 
