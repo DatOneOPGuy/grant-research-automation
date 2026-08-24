@@ -142,7 +142,14 @@ def foundations(
     min_pct_foreign: float | None = None,
     min_foreign_christian: int | None = None,
     min_countries: int | None = None,
-    sort: str = "paid", order: str = Query("desc", pattern="^(asc|desc)$"),
+    # Must stay equal to defaultV5Filters.sort in the frontend's apiV5.ts.
+    # v5FilterParams omits sort from the query string when it matches the
+    # frontend default, so a disagreement here is silent: the client believes
+    # it asked for one ordering and the server applies another. That is
+    # exactly what happened when the frontend moved to 'christian' and this
+    # still said 'paid'. tests/test_sort_defaults.py pins the pair.
+    sort: str = "christian",
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, le=500), offset: int = 0,
 ):
     where, params = ["1=1"], []

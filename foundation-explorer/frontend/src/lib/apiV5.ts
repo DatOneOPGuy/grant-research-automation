@@ -896,7 +896,8 @@ async function staticFoundations(qs: string) {
   }
   listFilter('deadline_kind', (r) => r.deadline_kind)
 
-  const sortKey = p.get('sort') || 'pct_christian'
+  // Same default as the live API and defaultV5Filters; see v5.py.
+  const sortKey = p.get('sort') || 'christian'
   const desc = (p.get('order') || 'desc') === 'desc'
   const pctField = tier === 'authoritative' ? 'pct_christian_auth' : 'pct_christian'
   const value = (r: FoundationRowV5): number | string | null => {
