@@ -32,7 +32,16 @@ export function SavedProvider({ children }: { children: ReactNode }) {
     { ein: string; label: string | null; folderIds: string[] } | null>(null)
   const alive = useRef(true)
 
-  useEffect(() => () => { alive.current = false }, [])
+  // The setup half is not optional. StrictMode runs effects setup -> cleanup
+  // -> setup on mount in development, so an effect that only ever sets this
+  // to false leaves it false for the life of the app: reload() then returns
+  // before its setState and the list never updates, while mutate()'s finally
+  // skips setBusy(false) and every control stays disabled after the first
+  // action. Folders were being created server-side and simply never appearing.
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
 
   const reload = useCallback(async () => {
     try {
