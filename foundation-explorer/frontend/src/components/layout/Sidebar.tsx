@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   BarChart3, Bookmark, Building2, DollarSign, Home, PanelLeftClose,
-  Landmark, PanelLeftOpen, PieChart, ShieldCheck, Target, Users, BadgeInfo,
+  HelpCircle, Landmark, PanelLeftOpen, PieChart, ShieldCheck, Target,
+  Users, BadgeInfo,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchStatsV5 } from '../../lib/apiV5'
@@ -20,6 +21,7 @@ const NAV = [
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/non-christian', label: 'Non-Christian', icon: PieChart },
   { to: '/data-quality', label: 'Data Quality', icon: ShieldCheck },
+  { to: '/how-to', label: 'How to Filter', icon: HelpCircle },
   { to: '/trust', label: 'Trust & Data', icon: BadgeInfo },
 ]
 

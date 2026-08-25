@@ -11,6 +11,7 @@ import Saved from './pages/Saved'
 import SearchResults from './pages/SearchResults'
 import NonChristian from './pages/NonChristian'
 import Nonprofits from './pages/Nonprofits'
+import HowTo from './pages/HowTo'
 import Grants from './pages/Grants'
 import Recipients from './pages/Recipients'
 import Analytics from './pages/Analytics'
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
       { path: 'search', element: <SearchResults />, errorElement: <RouteError /> },
       { path: 'non-christian', element: <NonChristian />, errorElement: <RouteError /> },
       { path: 'nonprofits', element: <Nonprofits />, errorElement: <RouteError /> },
+      { path: 'how-to', element: <HowTo />, errorElement: <RouteError /> },
       { path: 'grants', element: <Grants />, errorElement: <RouteError /> },
       { path: 'recipients', element: <Recipients />, errorElement: <RouteError /> },
       { path: 'analytics', element: <Analytics />, errorElement: <RouteError /> },

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import {
   ASSET_BAND_LABELS, NTEE_MAJOR_LABELS, ORG_TYPE_LABELS,
-  REVENUE_BAND_LABELS, fetchNonprofits, traditionLabel,
+  REVENUE_BAND_LABELS, US_REGIONS, fetchNonprofits, traditionLabel,
 } from '../lib/apiV5'
 import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
 import { Skeleton } from '../components/ui/primitives'
@@ -248,8 +248,31 @@ export default function Nonprofits() {
               onToggle={(v) => toggle('tradition', v)} initial={6} />
           </Section>
 
-          <Section title="State" count={filters.state.length}
+          <Section title="Location" count={filters.state.length}
             defaultOpen={false}>
+            {/* Region chips select whole state sets in one click, the same
+                control the Foundations rail uses. Nobody picks twelve
+                Midwestern states one at a time. */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {US_REGIONS.map(([name, states]) => {
+                const allOn = states.every((x) => filters.state.includes(x))
+                return (
+                  <button key={name} title={states.join(', ')}
+                    onClick={() => setFilters((f) => ({
+                      ...f,
+                      state: allOn
+                        ? f.state.filter((x) => !states.includes(x))
+                        : [...new Set([...f.state, ...states])],
+                    }))}
+                    className={`text-[11px] rounded-full px-2 py-0.5 border
+                      transition-colors ${allOn
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-canvas text-muted border-line hover:border-primary/60'}`}>
+                    {name}
+                  </button>
+                )
+              })}
+            </div>
             <FacetGroup counts={data?.facets.state}
               selected={filters.state} label={(k) => k}
               onToggle={(v) => toggle('state', v)} initial={8} />
