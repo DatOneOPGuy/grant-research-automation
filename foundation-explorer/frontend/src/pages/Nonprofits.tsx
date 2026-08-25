@@ -12,7 +12,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
-  ChevronLeft, ChevronRight, ExternalLink, Globe, Loader2, Search, X,
+  ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Globe, Loader2,
+  Search, X,
 } from 'lucide-react'
 import {
   ASSET_BAND_LABELS, NTEE_MAJOR_LABELS, ORG_TYPE_LABELS,
@@ -155,7 +156,7 @@ export default function Nonprofits() {
       </div>
 
       <div className="flex gap-5 items-start">
-        <aside className="w-64 shrink-0 space-y-4">
+        <aside className="w-64 shrink-0 space-y-3">
           {active > 0 && (
             <button onClick={() => { setFilters(EMPTY); setDraft('') }}
               className="flex items-center gap-1 text-xs text-primary
@@ -207,43 +208,56 @@ export default function Nonprofits() {
             ))}
           </div>
 
-          <FacetGroup title="Organisation Type" counts={data?.facets.org_type}
-            selected={filters.org_type}
-            label={(k) => ORG_TYPE_LABELS[k] ?? k}
-            onToggle={(v) => toggle('org_type', v)} />
+          <Section title="Organisation Type" count={filters.org_type.length}>
+            <FacetGroup counts={data?.facets.org_type}
+              selected={filters.org_type}
+              label={(k) => ORG_TYPE_LABELS[k] ?? k}
+              onToggle={(v) => toggle('org_type', v)} />
+          </Section>
 
-          <FacetGroup title="Nonprofit Category"
-            counts={data?.facets.category}
-            selected={filters.category}
-            label={(k) => NTEE_MAJOR_LABELS[k] ?? k}
-            onToggle={(v) => toggle('category', v)} />
+          <Section title="Nonprofit Category" count={filters.category.length}>
+            <FacetGroup counts={data?.facets.category}
+              selected={filters.category}
+              label={(k) => NTEE_MAJOR_LABELS[k] ?? k}
+              onToggle={(v) => toggle('category', v)} />
+          </Section>
 
-          <FacetGroup title="Recent Annual Revenue"
-            counts={data?.facets.revenue_band}
-            selected={filters.revenue_band}
-            label={(k) => REVENUE_BAND_LABELS[Number(k)] ?? k}
-            sortKeys={(a, b) => Number(a) - Number(b)}
-            onToggle={(v) => toggle('revenue_band', v)} />
+          <Section title="Recent Annual Revenue"
+            count={filters.revenue_band.length}>
+            <FacetGroup counts={data?.facets.revenue_band}
+              selected={filters.revenue_band}
+              label={(k) => REVENUE_BAND_LABELS[Number(k)] ?? k}
+              sortKeys={(a, b) => Number(a) - Number(b)}
+              onToggle={(v) => toggle('revenue_band', v)} />
+          </Section>
 
-          <FacetGroup title="Total Assets" counts={data?.facets.asset_band}
-            selected={filters.asset_band}
-            label={(k) => ASSET_BAND_LABELS[Number(k)] ?? k}
-            sortKeys={(a, b) => Number(a) - Number(b)}
-            onToggle={(v) => toggle('asset_band', v)} />
+          <Section title="Total Assets" count={filters.asset_band.length}
+            defaultOpen={false}>
+            <FacetGroup counts={data?.facets.asset_band}
+              selected={filters.asset_band}
+              label={(k) => ASSET_BAND_LABELS[Number(k)] ?? k}
+              sortKeys={(a, b) => Number(a) - Number(b)}
+              onToggle={(v) => toggle('asset_band', v)} />
+          </Section>
 
-          <FacetGroup title="Faith" counts={data?.facets.tradition}
-            selected={filters.tradition}
-            label={(k) => traditionLabel(k)}
-            onToggle={(v) => toggle('tradition', v)} initial={6} />
+          <Section title="Faith" count={filters.tradition.length}
+            defaultOpen={false}>
+            <FacetGroup counts={data?.facets.tradition}
+              selected={filters.tradition}
+              label={(k) => traditionLabel(k)}
+              onToggle={(v) => toggle('tradition', v)} initial={6} />
+          </Section>
 
-          <FacetGroup title="State" counts={data?.facets.state}
-            selected={filters.state} label={(k) => k}
-            onToggle={(v) => toggle('state', v)} initial={8} />
+          <Section title="State" count={filters.state.length}
+            defaultOpen={false}>
+            <FacetGroup counts={data?.facets.state}
+              selected={filters.state} label={(k) => k}
+              onToggle={(v) => toggle('state', v)} initial={8} />
+          </Section>
 
-          <div>
-            <div className="text-xs font-medium text-ink mb-1.5">
-              IRS Ruling Year
-            </div>
+          <Section title="IRS Ruling Year" defaultOpen={false}
+            count={[filters.founded_after, filters.founded_before]
+              .filter((v) => v.trim()).length}>
             <div className="flex items-center gap-1.5">
               {(['founded_after', 'founded_before'] as const).map((key, i) => (
                 <input key={key} type="number" inputMode="numeric"
@@ -260,12 +274,10 @@ export default function Nonprofits() {
               When the IRS recognised the exemption, not necessarily when the
               organisation began.
             </div>
-          </div>
+          </Section>
 
-          <div>
-            <div className="text-xs font-medium text-ink mb-1.5">
-              Minimum Christian funders
-            </div>
+          <Section title="Minimum Christian funders" defaultOpen={false}
+            count={filters.min_christian_funders.trim() ? 1 : 0}>
             <input type="number" inputMode="numeric" placeholder="e.g. 3"
               aria-label="Minimum number of Christian funders"
               value={filters.min_christian_funders}
@@ -273,7 +285,7 @@ export default function Nonprofits() {
                 (f) => ({ ...f, min_christian_funders: e.target.value }))}
               className="w-full text-xs border border-line rounded px-2 py-1
                 bg-surface" />
-          </div>
+          </Section>
         </aside>
 
         <div className="flex-1 min-w-0">
@@ -411,12 +423,43 @@ export default function Nonprofits() {
   )
 }
 
+/** Collapsible section, matching the Foundations filter rail so the two
+ *  behave the same way. Sections with a selection stay open regardless of
+ *  their default -- collapsing a filter that is doing something hides the
+ *  reason the result set looks the way it does. */
+function Section({ title, count, defaultOpen = true, children }: {
+  title: string
+  count?: number
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const forced = (count ?? 0) > 0
+  const shown = open || forced
+  return (
+    <div className="border-b border-line pb-3">
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={shown}
+        className="flex items-center gap-1 w-full text-xs font-semibold
+          uppercase tracking-wide text-muted mb-2 hover:text-ink">
+        {shown ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        <span className="flex-1 text-left">{title}</span>
+        {forced && (
+          <span className="text-[10px] bg-primary text-white rounded-full
+            px-1.5 py-0.5 tabular normal-case">
+            {count}
+          </span>
+        )}
+      </button>
+      {shown && children}
+    </div>
+  )
+}
+
 /** A checkbox list with counts. Counts come from the API computed with every
  *  OTHER filter applied, so a number beside an unchecked box is what you would
  *  get by ticking it. */
-function FacetGroup({ title, counts, selected, label, onToggle, initial = 10,
+function FacetGroup({ counts, selected, label, onToggle, initial = 10,
   sortKeys }: {
-  title: string
   counts: Record<string, number> | undefined
   selected: string[]
   label: (key: string) => string
@@ -438,7 +481,6 @@ function FacetGroup({ title, counts, selected, label, onToggle, initial = 10,
 
   return (
     <div>
-      <div className="text-xs font-medium text-ink mb-1.5">{title}</div>
       <div className="space-y-1">
         {shown.map(([key, count]) => (
           <label key={key}
