@@ -46,3 +46,6 @@ foundation-explorer/frontend/public/demo/
 foundation-explorer/frontend/public/demo-v5/
 foundation-explorer/frontend/public/report/
 foundation-explorer/frontend/public/sample/
+
+# Generated outreach lists (regenerate with src/export_prospect_list.py)
+nonprofit_prospects*.csv
