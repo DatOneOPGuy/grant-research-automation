@@ -49,3 +49,6 @@ foundation-explorer/frontend/public/sample/
 
 # Generated outreach lists (regenerate with src/export_prospect_list.py)
 nonprofit_prospects*.csv
+
+# Local dev Postgres cluster
+.devdata/

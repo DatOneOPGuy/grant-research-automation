@@ -64,6 +64,12 @@ export function SavedProvider({ children }: { children: ReactNode }) {
     setBusy(true)
     setWriteError(null)
     try {
+      // If the very first load failed -- the API was up but its database was
+      // not, which is the usual local mishap -- the provider would otherwise
+      // stay wedged for the life of the tab, because the load only runs on
+      // mount. Retry it here so the next action recovers instead of the user
+      // having to know to reload.
+      if (loadError) await reload()
       const result = await action()
       await reload()
       return result
@@ -76,7 +82,7 @@ export function SavedProvider({ children }: { children: ReactNode }) {
     } finally {
       if (alive.current) setBusy(false)
     }
-  }, [reload])
+  }, [reload, loadError])
 
   const { folders, members } = state
   const saved = useMemo(() => Object.keys(members), [members])
