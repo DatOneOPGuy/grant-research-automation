@@ -8,6 +8,7 @@ floors; identity/classification status is first-class and never hidden.
 from __future__ import annotations
 
 import sqlite3
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
@@ -81,6 +82,19 @@ def deadline_mask_from(season: str | None, months: str | None,
                 break
             month = (month % 12) + 1
     return month_mask(wanted)
+
+
+# Whole-database aggregates that take no parameters. Each is one scan over
+# millions of rows for an answer of a few dozen bytes that is identical on
+# every request -- yearly-trends measured 3.5s for two rows.
+#
+# Caching in the process is safe here in a way it would not normally be: the
+# read model is opened read-only and is never written to in place. A refresh
+# builds a new file and swaps it, which restarts the service, so a cached
+# value cannot outlive the data it came from. The first caller after a deploy
+# pays the scan; nobody else does.
+def cached_aggregate(fn):
+    return lru_cache(maxsize=1)(fn)
 
 
 def connect() -> sqlite3.Connection:
@@ -481,6 +495,7 @@ def recipient_detail(entity_id: str):
 
 
 @router.get("/stats")
+@cached_aggregate
 def stats():
     with connect() as conn:
         row = conn.execute("""
@@ -544,11 +559,22 @@ def grants(
         where.append("r.tradition = ?")
         params.append(tradition)
     sql_where = " AND ".join(where)
+    # The count/sum only needs the joins when a filter reads through them.
+    # Unfiltered they cost 5.9s against 0.13s for the same answer: every
+    # funder_ein has a matching foundation row (verified: 0 orphans), so the
+    # inner join drops nothing, and the recipients join is a LEFT one.
+    needs_foundation = bool(foundation_state) or bool(q)
+    needs_recipient = bool(tradition)
+    joins = ""
+    if needs_foundation:
+        joins += " JOIN foundations f ON f.ein=g.funder_ein"
+    if needs_recipient:
+        joins += " LEFT JOIN recipients r ON r.entity_id=g.entity_id"
+
     with connect() as conn:
         agg = conn.execute(f"""
             SELECT COUNT(*) AS total, COALESCE(SUM(g.amount),0) AS total_dollars
-            FROM grants g JOIN foundations f ON f.ein=g.funder_ein
-            LEFT JOIN recipients r ON r.entity_id=g.entity_id
+            FROM grants g{joins}
             WHERE {sql_where}""", params).fetchone()  # noqa: S608
         rows = conn.execute(f"""
             SELECT COALESCE(r.display_name, g.recipient_name) AS grantee_name,
@@ -615,6 +641,7 @@ def recipients(
 
 
 @router.get("/recipients-stats")
+@cached_aggregate
 def recipients_stats():
     with connect() as conn:
         by_tradition = conn.execute("""
@@ -881,6 +908,7 @@ def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
 
 
 @router.get("/analytics/state-breakdown")
+@cached_aggregate
 def state_breakdown():
     with connect() as conn:
         rows = conn.execute("""
@@ -906,6 +934,7 @@ def top_funders(limit: int = Query(100, le=500), by: str = "christian"):
 
 
 @router.get("/analytics/yearly-trends")
+@cached_aggregate
 def yearly_trends():
     with connect() as conn:
         rows = conn.execute("""
@@ -921,6 +950,7 @@ def yearly_trends():
 
 
 @router.get("/analytics/data-quality")
+@cached_aggregate
 def data_quality():
     with connect() as conn:
         f = conn.execute("""
