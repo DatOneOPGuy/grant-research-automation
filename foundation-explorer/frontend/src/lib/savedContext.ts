@@ -28,8 +28,9 @@ export type SavedContextValue = {
   // refetched. They never reject: a failure lands in writeError instead, so
   // no call site has to remember a try/catch to avoid an unhandled rejection.
   addTo: (ein: string, folderId: string) => Promise<void>
-  removeFrom: (ein: string, folderId: string) => Promise<void>
-  removeAll: (ein: string) => Promise<void>
+  /** `label` is only used for the undo toast; removal works without it. */
+  removeFrom: (ein: string, folderId: string, label?: string) => Promise<void>
+  removeAll: (ein: string, label?: string) => Promise<void>
   /** Resolves to the folder, or null if the create failed. */
   createFolder: (name: string) => Promise<SavedFolder | null>
   renameFolder: (id: string, name: string) => Promise<void>

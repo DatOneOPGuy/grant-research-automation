@@ -1,10 +1,10 @@
 // The saved list itself. Row removal is folder-aware: inside a folder it
 // removes only that membership, in the All view it unsaves outright, and the
 // tooltip says which so the button is never ambiguous.
-import { FolderMinus, Trash2 } from 'lucide-react'
+import { ExternalLink, FolderMinus, Globe, Trash2 } from 'lucide-react'
 import type { FoundationRowV5 } from '../../lib/apiV5'
 import { useSavedFoundations } from '../../lib/savedContext'
-import { money, titleCase } from '../../lib/format'
+import { money, propublicaUrl, titleCase, websiteUrl } from '../../lib/format'
 import { Card, Skeleton, StatusPill } from '../ui/primitives'
 
 export default function SavedTable({
@@ -21,75 +21,124 @@ export default function SavedTable({
     folders, foldersFor, removeFrom, removeAll, busy,
   } = useSavedFoundations()
 
+  // The All view carries an extra Folders column, so the widths differ.
+  // Declared rather than left to the browser: auto-layout sized columns from
+  // whatever happened to be in them, so the same table changed shape between
+  // folders and left the money columns floating in the middle of the row.
+  const showFolders = folderId === null
+  const widths = showFolders
+    ? ['26%', '14%', '14%', '11%', '11%', '8%', '11%', '5%']
+    : ['30%', '16%', '12%', '12%', '9%', '14%', '7%']
+  const columnCount = widths.length
+
   return (
     <Card>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed min-w-[720px]">
+          <colgroup>
+            {widths.map((w, i) => (
+              <col key={i} style={{ width: w }} />
+            ))}
+          </colgroup>
           <thead>
             <tr className="text-left text-xs text-muted border-b border-line">
-              <th className="py-2">Foundation</th>
-              <th>Location</th>
-              {folderId === null && <th>Folders</th>}
-              <th className="text-right">Christian</th>
-              <th className="text-right">Paid</th>
-              <th className="text-right">Coverage</th>
-              <th>Applications</th>
-              <th />
+              <th className="py-2 px-3 font-medium">Foundation</th>
+              <th className="px-3 font-medium">Location</th>
+              {showFolders && <th className="px-3 font-medium">Folders</th>}
+              <th className="px-3 font-medium text-right">Christian</th>
+              <th className="px-3 font-medium text-right">Paid</th>
+              <th className="px-3 font-medium text-right">Coverage</th>
+              <th className="px-3 font-medium">Applications</th>
+              <th className="px-2" />
             </tr>
           </thead>
           <tbody>
-            {rows.map((f) => (
-              <tr key={f.ein} className="border-b border-line/60 hover:bg-canvas">
-                <td className="py-2 pr-3 font-medium cursor-pointer"
-                  onClick={() => onOpen(f.ein)}>
-                  {titleCase(f.name)}
-                </td>
-                <td className="pr-3 text-muted whitespace-nowrap">
-                  {f.city && `${titleCase(f.city)}, `}{f.state}
-                </td>
-                {folderId === null && (
-                  <td className="pr-3 text-muted text-xs max-w-40 truncate"
-                    title={foldersFor(f.ein)
-                      .map((id) => folders.find((x) => x.id === id)?.name)
-                      .filter(Boolean).join(', ')}>
-                    {foldersFor(f.ein)
-                      .map((id) => folders.find((x) => x.id === id)?.name)
-                      .filter(Boolean).join(', ')}
+            {rows.map((f) => {
+              const folderNames = foldersFor(f.ein)
+                .map((id) => folders.find((x) => x.id === id)?.name)
+                .filter(Boolean).join(', ')
+              const site = websiteUrl(f.website)
+              return (
+                <tr key={f.ein}
+                  className="border-b border-line/60 last:border-0
+                    hover:bg-canvas align-top">
+                  <td className="py-2.5 px-3 font-medium cursor-pointer"
+                    onClick={() => onOpen(f.ein)}>
+                    <span className="line-clamp-2 leading-snug">
+                      {titleCase(f.name)}
+                    </span>
                   </td>
-                )}
-                <td className="text-right tabular pr-3">
-                  {money(f.christian_dollars)}
-                </td>
-                <td className="text-right tabular pr-3">{money(f.paid_2324)}</td>
-                <td className="text-right tabular pr-3">
-                  {Math.round(f.coverage_pct)}%
-                </td>
-                <td className="pr-3">
-                  <StatusPill status={f.application_status} />
-                </td>
-                <td>
-                  <button
-                    onClick={() => void (folderId
-                      ? removeFrom(f.ein, folderId) : removeAll(f.ein))}
-                    disabled={busy}
-                    title={folderId
-                      ? 'Remove from this folder'
-                      : 'Remove from Saved entirely'}
-                    aria-label={folderId
-                      ? 'Remove from this folder'
-                      : 'Remove from Saved'}
-                    className="p-1 text-muted hover:text-scoremid
-                      disabled:opacity-40">
-                    {folderId
-                      ? <FolderMinus size={14} /> : <Trash2 size={14} />}
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  <td className="py-2.5 px-3 text-muted text-xs">
+                    <span className="line-clamp-2">
+                      {f.city && `${titleCase(f.city)}, `}{f.state}
+                    </span>
+                  </td>
+                  {showFolders && (
+                    <td className="py-2.5 px-3 text-muted text-xs"
+                      title={folderNames}>
+                      <span className="line-clamp-2">{folderNames}</span>
+                    </td>
+                  )}
+                  <td className="py-2.5 px-3 text-right tabular
+                    whitespace-nowrap">
+                    {money(f.christian_dollars)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right tabular
+                    whitespace-nowrap">
+                    {money(f.paid_2324)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right tabular
+                    whitespace-nowrap">
+                    {Math.round(f.coverage_pct)}%
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <StatusPill status={f.application_status} />
+                  </td>
+                  <td className="py-2.5 px-2">
+                    <div className="flex items-center justify-end gap-0.5">
+                      {site ? (
+                        <a href={site} target="_blank" rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title={f.website ?? undefined} aria-label="Website"
+                          className="p-1 text-muted hover:text-primary shrink-0">
+                          <Globe size={13} />
+                        </a>
+                      ) : (
+                        <a href={propublicaUrl(f.ein)}
+                          target="_blank" rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="No website on file — open on ProPublica"
+                          aria-label="Open on ProPublica"
+                          className="p-1 text-muted/60 hover:text-primary
+                            shrink-0">
+                          <ExternalLink size={13} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => void (folderId
+                          ? removeFrom(f.ein, folderId, titleCase(f.name))
+                          : removeAll(f.ein, titleCase(f.name)))}
+                        disabled={busy}
+                        title={folderId
+                          ? 'Remove from this folder'
+                          : 'Remove from Saved entirely'}
+                        aria-label={folderId
+                          ? 'Remove from this folder'
+                          : 'Remove from Saved'}
+                        className="p-1 text-muted hover:text-scoremid
+                          disabled:opacity-40 shrink-0">
+                        {folderId
+                          ? <FolderMinus size={14} /> : <Trash2 size={14} />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
             {loading && Array.from({ length: expected - rows.length })
               .map((_, i) => (
                 <tr key={`s${i}`}>
-                  <td colSpan={folderId === null ? 8 : 7} className="py-2">
+                  <td colSpan={columnCount} className="py-2 px-3">
                     <Skeleton className="h-6" />
                   </td>
                 </tr>

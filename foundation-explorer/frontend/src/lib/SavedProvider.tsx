@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
+import { AlertTriangle, Undo2, X } from 'lucide-react'
 import { SavedContext } from './savedContext'
 import { ApiSavedStore, SavedApiError } from './apiSavedStore'
 import { STATIC_MODE } from './apiV5'
@@ -25,6 +25,11 @@ export function SavedProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [writeError, setWriteError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // What was just removed, and from where, so it can be put back. Captured
+  // before the removal rather than reconstructed after, because by the time
+  // the write lands the membership it needs is already gone.
+  const [undo, setUndo] = useState<
+    { ein: string; label: string | null; folderIds: string[] } | null>(null)
   const alive = useRef(true)
 
   useEffect(() => () => { alive.current = false }, [])
@@ -93,13 +98,23 @@ export function SavedProvider({ children }: { children: ReactNode }) {
     reload,
 
     addTo: async (ein: string, folderId: string) => {
+      setUndo(null)
       await mutate(() => store.addTo(ein, folderId))
     },
-    removeFrom: async (ein: string, folderId: string) => {
-      await mutate(() => store.removeFrom(ein, folderId))
+    removeFrom: async (ein: string, folderId: string, label?: string) => {
+      const restore = [folderId]
+      const ok = await mutate(() => store.removeFrom(ein, folderId))
+      if (ok !== null) {
+        setUndo({ ein, label: label || null, folderIds: restore })
+      }
     },
-    removeAll: async (ein: string) => {
-      await mutate(() => store.removeAll(ein))
+    removeAll: async (ein: string, label?: string) => {
+      // Every folder it belonged to, read before the write.
+      const restore = members[ein] ? [...members[ein]] : []
+      const ok = await mutate(() => store.removeAll(ein))
+      if (ok !== null) {
+        setUndo({ ein, label: label || null, folderIds: restore })
+      }
     },
     createFolder: (name: string): Promise<SavedFolder | null> =>
       mutate(() => store.createFolder(name)),
@@ -112,12 +127,30 @@ export function SavedProvider({ children }: { children: ReactNode }) {
   }), [folders, members, saved, loading, loadError, writeError, busy,
        mutate, reload])
 
+  const runUndo = useCallback(async () => {
+    if (!undo) return
+    const { ein, folderIds } = undo
+    setUndo(null)
+    // Restoring a multi-folder foundation is several writes; the refetch
+    // inside mutate() makes each one visible, so a partial failure leaves
+    // the list showing exactly what was actually put back.
+    for (const folderId of folderIds) {
+      await mutate(() => store.addTo(ein, folderId))
+    }
+  }, [undo, mutate])
+
   return (
     <SavedContext.Provider value={value}>
       {children}
       {writeError && (
         <WriteErrorBanner message={writeError}
           onDismiss={() => setWriteError(null)} />
+      )}
+      {undo && !writeError && (
+        <UndoToast label={undo.label}
+          folderCount={undo.folderIds.length}
+          onUndo={() => void runUndo()}
+          onDismiss={() => setUndo(null)} />
       )}
     </SavedContext.Provider>
   )
@@ -148,6 +181,64 @@ function WriteErrorBanner({ message, onDismiss }: {
       </div>
       <button onClick={onDismiss} aria-label="Dismiss"
         className="p-0.5 rounded hover:bg-amber-100 shrink-0">
+        <X size={14} />
+      </button>
+    </div>
+  )
+}
+
+/** Undo for a removal.
+ *
+ *  Saved folders are shared, so a removal is not just this person's mistake
+ *  to live with -- it takes the row out of a list a colleague may be working
+ *  from. A confirm dialog on every removal would be worse: it slows down the
+ *  common case to guard the rare one. This does the reverse, and restores the
+ *  full membership rather than just the folder that was on screen.
+ *
+ *  It expires. Undo that lingers becomes a stale button that reinstates
+ *  something the user removed twenty minutes and several decisions ago.
+ */
+function UndoToast({ label, folderCount, onUndo, onDismiss }: {
+  label: string | null
+  folderCount: number
+  onUndo: () => void
+  onDismiss: () => void
+}) {
+  const SECONDS = 12
+  const [left, setLeft] = useState(SECONDS)
+
+  useEffect(() => {
+    const tick = setInterval(() => setLeft((n) => n - 1), 1000)
+    const done = setTimeout(onDismiss, SECONDS * 1000)
+    return () => { clearInterval(tick); clearTimeout(done) }
+    // Deliberately not re-armed on every render: the countdown belongs to
+    // this toast, and restarting it would make it never expire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div role="status"
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] max-w-md
+        flex items-center gap-3 rounded-lg border border-line bg-ink
+        px-4 py-2.5 text-sm text-white shadow-lg">
+      <span className="min-w-0 truncate">
+        {label
+          ? <>Removed <span className="font-medium">{label}</span></>
+          : <>Removed from {folderCount === 1 ? 'that folder' : 'Saved'}</>}
+        {label && folderCount > 1 && (
+          <span className="text-white/70"> from {folderCount} folders</span>
+        )}
+      </span>
+      <button onClick={onUndo}
+        className="flex items-center gap-1 rounded px-2 py-1 font-medium
+          text-accent hover:bg-white/10 shrink-0">
+        <Undo2 size={14} /> Undo
+      </button>
+      <span className="text-white/40 tabular text-xs w-4 text-right shrink-0">
+        {Math.max(0, left)}
+      </span>
+      <button onClick={onDismiss} aria-label="Dismiss"
+        className="p-0.5 rounded text-white/60 hover:text-white shrink-0">
         <X size={14} />
       </button>
     </div>
