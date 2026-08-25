@@ -657,6 +657,95 @@ def countries(christian_only: bool = False):
     return [dict(r) for r in rows]
 
 
+@router.get("/nonprofits")
+def nonprofits(
+    q: str | None = None,
+    # NTEE major groups, comma separated single letters: "B,X,P".
+    category: str | None = None,
+    # Revenue band indexes into sector_taxonomy.REVENUE_BANDS: "5,6,7".
+    revenue_band: str | None = None,
+    state: str | None = None,
+    min_revenue: int | None = None,
+    # Organisations already funded by majority-Christian foundations.
+    christian_funded: bool = False,
+    sort: str = Query("revenue", pattern="^(revenue|christian|name)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
+    limit: int = Query(50, le=200),
+    offset: int = 0,
+):
+    """Browse 501(c)(3) public charities -- the grant-seeking side.
+
+    Everything else in this product looks at grantmakers. This looks at the
+    organisations that approach them, which is the population our own
+    prospecting and outreach works from.
+    """
+    # Each filter is kept separately so a facet can be recomputed with every
+    # OTHER filter applied but not its own. A facet that includes its own
+    # filter collapses to the one value already chosen, which makes the rail
+    # useless for switching -- selecting "Religion-related" would leave
+    # "Religion-related" as the only category on offer.
+    clauses: dict[str, tuple[str, list]] = {}
+    if q:
+        clauses["q"] = ("name LIKE ?", [f"%{q}%"])
+    for key, column, raw in (("category", "ntee_major", category),
+                             ("revenue_band", "revenue_band", revenue_band),
+                             ("state", "state", state)):
+        if not raw:
+            continue
+        values = [v.strip().upper() for v in raw.split(",") if v.strip()]
+        if values:
+            clauses[key] = (f"{column} IN ({','.join('?' for _ in values)})",
+                            values)
+    if min_revenue is not None:
+        clauses["min_revenue"] = ("revenue >= ?", [min_revenue])
+    if christian_funded:
+        clauses["christian_funded"] = ("christian_dollars > 0", [])
+
+    def build(exclude: str | None = None) -> tuple[str, list]:
+        parts, values = ["1=1"], []
+        for key, (sql, args) in clauses.items():
+            if key == exclude:
+                continue
+            parts.append(sql)
+            values += args
+        return " AND ".join(parts), values
+
+    clause, params = build()
+    column = {"revenue": "revenue", "christian": "christian_dollars",
+              "name": "name"}[sort]
+    direction = "ASC" if order == "asc" else "DESC"
+
+    with connect() as conn:
+        try:
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM nonprofits WHERE {clause}",
+                params).fetchone()[0]
+        except sqlite3.OperationalError:
+            raise HTTPException(
+                503, "The nonprofit index has not been built for this read "
+                     "model. Run: python3 -m src.build_nonprofit_index"
+            ) from None
+        rows = conn.execute(
+            f"SELECT * FROM nonprofits WHERE {clause} "
+            f"ORDER BY {column} {direction} LIMIT ? OFFSET ?",
+            [*params, limit, offset]).fetchall()
+
+        # Facets cost three grouped scans, and paging cannot change them, so
+        # they are computed for the first page only and reused client-side.
+        facets: dict[str, dict] = {}
+        if offset == 0:
+            for key, col, extra in (
+                ("category", "ntee_major", "AND ntee_major IS NOT NULL"),
+                ("revenue_band", "revenue_band", ""),
+                ("state", "state", "AND state IS NOT NULL"),
+            ):
+                facet_clause, facet_params = build(exclude=key)
+                facets[key] = dict(conn.execute(
+                    f"SELECT {col}, COUNT(*) FROM nonprofits "
+                    f"WHERE {facet_clause} {extra} GROUP BY 1", facet_params))
+    return {"total": total, "rows": [dict(r) for r in rows], "facets": facets}
+
+
 @router.get("/analytics/non-christian")
 def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
     """National view of the non-Christian bucket, by cause area.

@@ -193,3 +193,75 @@ def is_regranting(sector: str | None) -> bool:
 
 def label(sector: str) -> str:
     return SECTORS.get(sector, sector)
+
+
+# --- NTEE major groups, verbatim -------------------------------------------
+#
+# The sector map above regroups these into cause areas a fundraiser thinks in.
+# This is the IRS's own top level, unedited, because the nonprofit browser
+# mirrors the vocabulary people already meet on ProPublica and in the BMF --
+# renaming the categories there would make two sources look like they
+# disagree when they do not.
+
+NTEE_MAJOR_LABELS: dict[str, str] = {
+    "A": "Arts, Culture and Humanities",
+    "B": "Educational Institutions and Related Activities",
+    "C": "Environmental Quality, Protection and Beautification",
+    "D": "Animal-Related",
+    "E": "Health — General and Rehabilitative",
+    "F": "Mental Health, Crisis Intervention",
+    "G": "Diseases, Disorders, Medical Disciplines",
+    "H": "Medical Research",
+    "I": "Crime, Legal-Related",
+    "J": "Employment, Job-Related",
+    "K": "Food, Agriculture and Nutrition",
+    "L": "Housing, Shelter",
+    "M": "Public Safety, Disaster Preparedness and Relief",
+    "N": "Recreation, Sports, Leisure, Athletics",
+    "O": "Youth Development",
+    "P": "Human Services — Multipurpose and Other",
+    "Q": "International, Foreign Affairs and National Security",
+    "R": "Civil Rights, Social Action, Advocacy",
+    "S": "Community Improvement, Capacity Building",
+    "T": "Philanthropy, Voluntarism and Grantmaking Foundations",
+    "U": "Science and Technology Research Institutes, Services",
+    "V": "Social Science Research Institutes, Services",
+    "W": "Public, Society Benefit — Multipurpose and Other",
+    "X": "Religion-Related, Spiritual Development",
+    "Y": "Mutual/Membership Benefit Organizations, Other",
+    "Z": "Unknown",
+}
+
+
+def ntee_major(code: str | None) -> str | None:
+    """The single-letter NTEE major group, or None if there is no usable code."""
+    letter = (code or "").strip().upper()[:1]
+    return letter if letter in NTEE_MAJOR_LABELS else None
+
+
+# Revenue bands, matching the boundaries ProPublica's browser uses so a number
+# seen there and a number seen here fall in the same bucket. Stored as an
+# integer on each row rather than computed per query, so the filter is an
+# index lookup instead of a range scan over 1.5M rows.
+REVENUE_BANDS: list[tuple[int, int | None, str]] = [
+    (0, 25_000, "Up to $25k"),
+    (25_000, 50_000, "$25k to $50k"),
+    (50_000, 100_000, "$50k to $100k"),
+    (100_000, 250_000, "$100k to $250k"),
+    (250_000, 500_000, "$250k to $500k"),
+    (500_000, 2_000_000, "$500k to $2M"),
+    (2_000_000, 5_000_000, "$2M to $5M"),
+    (5_000_000, 15_000_000, "$5M to $15M"),
+    (15_000_000, 50_000_000, "$15M to $50M"),
+    (50_000_000, 200_000_000, "$50M to $200M"),
+    (200_000_000, None, "$200M and above"),
+]
+
+
+def revenue_band(amount: int | float | None) -> int:
+    """Index into REVENUE_BANDS. Missing or negative revenue lands in band 0."""
+    value = amount or 0
+    for i, (lo, hi, _) in enumerate(REVENUE_BANDS):
+        if value >= lo and (hi is None or value < hi):
+            return i
+    return 0

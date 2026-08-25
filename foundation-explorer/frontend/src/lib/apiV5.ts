@@ -165,6 +165,83 @@ export function fetchNonChristianOverview(): Promise<NonChristianOverview> {
   return getV5<NonChristianOverview>('/api/v5/analytics/non-christian')
 }
 
+// --- nonprofits (the grant-seeking side) -------------------------------------
+
+export type Nonprofit = {
+  ein: string
+  name: string
+  city: string | null
+  state: string | null
+  ntee_code: string | null
+  ntee_major: string | null
+  revenue: number
+  revenue_band: number
+  assets: number
+  tradition: string | null
+  website: string | null
+  mission: string | null
+  christian_dollars: number
+  christian_funders: number
+}
+
+export type NonprofitFacets = {
+  category: Record<string, number>
+  revenue_band: Record<string, number>
+  state: Record<string, number>
+}
+
+export type NonprofitResponse = {
+  total: number
+  rows: Nonprofit[]
+  facets: NonprofitFacets
+}
+
+export function fetchNonprofits(qs: string, limit = 50, offset = 0):
+    Promise<NonprofitResponse> {
+  const sep = qs ? '&' : ''
+  return getV5(`/api/v5/nonprofits?${qs}${sep}limit=${limit}&offset=${offset}`)
+}
+
+// Must stay in step with NTEE_MAJOR_LABELS in src/sector_taxonomy.py. These
+// are the IRS's own category names, not our cause-area regrouping -- the
+// browser deliberately speaks the same vocabulary as the BMF and ProPublica.
+export const NTEE_MAJOR_LABELS: Record<string, string> = {
+  A: 'Arts, Culture and Humanities',
+  B: 'Educational Institutions and Related Activities',
+  C: 'Environmental Quality, Protection and Beautification',
+  D: 'Animal-Related',
+  E: 'Health — General and Rehabilitative',
+  F: 'Mental Health, Crisis Intervention',
+  G: 'Diseases, Disorders, Medical Disciplines',
+  H: 'Medical Research',
+  I: 'Crime, Legal-Related',
+  J: 'Employment, Job-Related',
+  K: 'Food, Agriculture and Nutrition',
+  L: 'Housing, Shelter',
+  M: 'Public Safety, Disaster Preparedness and Relief',
+  N: 'Recreation, Sports, Leisure, Athletics',
+  O: 'Youth Development',
+  P: 'Human Services — Multipurpose and Other',
+  Q: 'International, Foreign Affairs and National Security',
+  R: 'Civil Rights, Social Action, Advocacy',
+  S: 'Community Improvement, Capacity Building',
+  T: 'Philanthropy, Voluntarism and Grantmaking Foundations',
+  U: 'Science and Technology Research Institutes, Services',
+  V: 'Social Science Research Institutes, Services',
+  W: 'Public, Society Benefit — Multipurpose and Other',
+  X: 'Religion-Related, Spiritual Development',
+  Y: 'Mutual/Membership Benefit Organizations, Other',
+  Z: 'Unknown',
+}
+
+// Index-aligned with REVENUE_BANDS in src/sector_taxonomy.py. The boundaries
+// match ProPublica's so a figure seen there falls in the same bucket here.
+export const REVENUE_BAND_LABELS = [
+  'Up to $25k', '$25k to $50k', '$50k to $100k', '$100k to $250k',
+  '$250k to $500k', '$500k to $2M', '$2M to $5M', '$5M to $15M',
+  '$15M to $50M', '$50M to $200M', '$200M and above',
+]
+
 export function sectorLabel(s: string): string {
   return SECTOR_LABELS[s] || s
 }
