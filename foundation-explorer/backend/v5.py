@@ -662,13 +662,28 @@ def nonprofits(
     q: str | None = None,
     # NTEE major groups, comma separated single letters: "B,X,P".
     category: str | None = None,
-    # Revenue band indexes into sector_taxonomy.REVENUE_BANDS: "5,6,7".
+    # Index into sector_taxonomy.REVENUE_BANDS / ASSET_BANDS: "5,6,7".
     revenue_band: str | None = None,
+    asset_band: str | None = None,
     state: str | None = None,
+    # church | school | hospital | public | supporting | government | other
+    org_type: str | None = None,
+    # The organisation's own faith classification, where we have one.
+    tradition: str | None = None,
     min_revenue: int | None = None,
+    max_revenue: int | None = None,
+    founded_after: int | None = None,
+    founded_before: int | None = None,
     # Organisations already funded by majority-Christian foundations.
     christian_funded: bool = False,
-    sort: str = Query("revenue", pattern="^(revenue|christian|name)$"),
+    min_christian_funders: int | None = None,
+    # Has ever received a grant from any foundation we track.
+    foundation_funded: bool = False,
+    has_website: bool = False,
+    has_mission: bool = False,
+    in_group: bool = False,
+    sort: str = Query("revenue",
+                      pattern="^(revenue|christian|received|assets|name|founded)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, le=200),
     offset: int = 0,
@@ -687,19 +702,40 @@ def nonprofits(
     clauses: dict[str, tuple[str, list]] = {}
     if q:
         clauses["q"] = ("name LIKE ?", [f"%{q}%"])
-    for key, column, raw in (("category", "ntee_major", category),
-                             ("revenue_band", "revenue_band", revenue_band),
-                             ("state", "state", state)):
+    for key, column, raw, upper in (
+        ("category", "ntee_major", category, True),
+        ("revenue_band", "revenue_band", revenue_band, True),
+        ("asset_band", "asset_band", asset_band, True),
+        ("state", "state", state, True),
+        ("org_type", "org_type", org_type, False),
+        ("tradition", "tradition", tradition, False),
+    ):
         if not raw:
             continue
-        values = [v.strip().upper() for v in raw.split(",") if v.strip()]
+        values = [v.strip().upper() if upper else v.strip()
+                  for v in raw.split(",") if v.strip()]
         if values:
             clauses[key] = (f"{column} IN ({','.join('?' for _ in values)})",
                             values)
-    if min_revenue is not None:
-        clauses["min_revenue"] = ("revenue >= ?", [min_revenue])
-    if christian_funded:
-        clauses["christian_funded"] = ("christian_dollars > 0", [])
+    for key, sql, value in (
+        ("min_revenue", "revenue >= ?", min_revenue),
+        ("max_revenue", "revenue <= ?", max_revenue),
+        ("founded_after", "ruling_year >= ?", founded_after),
+        ("founded_before", "ruling_year <= ?", founded_before),
+        ("min_christian_funders", "christian_funders >= ?",
+         min_christian_funders),
+    ):
+        if value is not None:
+            clauses[key] = (sql, [value])
+    for key, sql, flag in (
+        ("christian_funded", "christian_dollars > 0", christian_funded),
+        ("foundation_funded", "total_received > 0", foundation_funded),
+        ("has_website", "website IS NOT NULL", has_website),
+        ("has_mission", "mission IS NOT NULL AND mission != ''", has_mission),
+        ("in_group", "in_group = 1", in_group),
+    ):
+        if flag:
+            clauses[key] = (sql, [])
 
     def build(exclude: str | None = None) -> tuple[str, list]:
         parts, values = ["1=1"], []
@@ -712,7 +748,8 @@ def nonprofits(
 
     clause, params = build()
     column = {"revenue": "revenue", "christian": "christian_dollars",
-              "name": "name"}[sort]
+              "received": "total_received", "assets": "assets",
+              "name": "name", "founded": "ruling_year"}[sort]
     direction = "ASC" if order == "asc" else "DESC"
 
     with connect() as conn:
@@ -730,19 +767,61 @@ def nonprofits(
             f"ORDER BY {column} {direction} LIMIT ? OFFSET ?",
             [*params, limit, offset]).fetchall()
 
-        # Facets cost three grouped scans, and paging cannot change them, so
-        # they are computed for the first page only and reused client-side.
+        # Facets are grouped by the clause they need rather than queried one
+        # by one. A facet only needs its own clause when its own filter is
+        # active -- excluding an inactive filter is a no-op -- so with nothing
+        # or one thing selected, most facets share the base clause and can be
+        # counted in a single pass instead of six. Six separate scans over
+        # 1.5M rows measured 4s on a common query; this is one plus one per
+        # active filter.
+        #
+        # Paging cannot change any of them, so they are computed for the first
+        # page only.
         facets: dict[str, dict] = {}
         if offset == 0:
-            for key, col, extra in (
-                ("category", "ntee_major", "AND ntee_major IS NOT NULL"),
-                ("revenue_band", "revenue_band", ""),
-                ("state", "state", "AND state IS NOT NULL"),
-            ):
-                facet_clause, facet_params = build(exclude=key)
-                facets[key] = dict(conn.execute(
-                    f"SELECT {col}, COUNT(*) FROM nonprofits "
-                    f"WHERE {facet_clause} {extra} GROUP BY 1", facet_params))
+            columns = {
+                "category": ("ntee_major", True),
+                "revenue_band": ("revenue_band", False),
+                "asset_band": ("asset_band", False),
+                "state": ("state", True),
+                "org_type": ("org_type", False),
+                "tradition": ("tradition", True),
+            }
+            if not clauses:
+                # Nothing selected: every facet groups the whole table, which
+                # SQLite answers straight from each column's index. Six
+                # indexed scans beat one 1.5M-row pass through Python here --
+                # 240ms against 1.4s.
+                for key, (col, skip_null) in columns.items():
+                    extra = f"AND {col} IS NOT NULL" if skip_null else ""
+                    facets[key] = dict(conn.execute(
+                        f"SELECT {col}, COUNT(*) FROM nonprofits "
+                        f"WHERE 1=1 {extra} GROUP BY 1"))
+            else:
+                # Something is selected, so the indexes no longer cover the
+                # predicate and each grouped scan degenerates into a table
+                # lookup per row -- six of those measured 4s. One pass over
+                # the matched rows, counting in Python, is far cheaper, and
+                # facets sharing a clause share the pass.
+                groups: dict[str, list[str]] = {}
+                for key in columns:
+                    # An inactive filter is a no-op to exclude, so those
+                    # facets all key to the base clause and travel together.
+                    groups.setdefault(key if key in clauses else "",
+                                      []).append(key)
+
+                for marker, keys in groups.items():
+                    facet_clause, facet_params = build(exclude=marker or None)
+                    selected = ", ".join(columns[k][0] for k in keys)
+                    counts: dict[str, dict] = {k: {} for k in keys}
+                    for row in conn.execute(
+                            f"SELECT {selected} FROM nonprofits "
+                            f"WHERE {facet_clause}", facet_params):
+                        for key, value in zip(keys, row, strict=True):
+                            if value is None and columns[key][1]:
+                                continue
+                            counts[key][value] = counts[key].get(value, 0) + 1
+                    facets.update(counts)
     return {"total": total, "rows": [dict(r) for r in rows], "facets": facets}
 
 

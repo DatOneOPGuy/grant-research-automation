@@ -34,7 +34,12 @@ import sys
 import time
 from pathlib import Path
 
-from src.sector_taxonomy import ntee_major, revenue_band
+from src.sector_taxonomy import (
+    asset_band,
+    ntee_major,
+    org_type,
+    revenue_band,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "data" / "explorer_v5.db"
@@ -57,16 +62,29 @@ CREATE TABLE nonprofits (
     state          TEXT,
     ntee_code      TEXT,
     ntee_major     TEXT,
+    zip            TEXT,
     revenue        INTEGER NOT NULL DEFAULT 0,
     revenue_band   INTEGER NOT NULL DEFAULT 0,
     assets         INTEGER NOT NULL DEFAULT 0,
+    asset_band     INTEGER NOT NULL DEFAULT 0,
+    -- What KIND of charity: a church behaves nothing like a hospital when
+    -- you approach it, and foundation_code carries that distinction.
+    org_type       TEXT NOT NULL DEFAULT 'other',
+    ruling_year    INTEGER,
+    -- Part of a denominational or parent group exemption.
+    in_group       INTEGER NOT NULL DEFAULT 0,
     -- Enrichment from our own data, absent for organisations we have never
     -- seen receive a grant.
     tradition      TEXT,
     website        TEXT,
     mission        TEXT,
     christian_dollars INTEGER NOT NULL DEFAULT 0,
-    christian_funders INTEGER NOT NULL DEFAULT 0
+    christian_funders INTEGER NOT NULL DEFAULT 0,
+    -- All foundation money we can see, not only the Christian slice. An
+    -- organisation already raising from foundations is a different prospect
+    -- from one that has never done it.
+    total_received INTEGER NOT NULL DEFAULT 0,
+    total_funders  INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -77,6 +95,11 @@ CREATE INDEX idx_np_state ON nonprofits(state, revenue DESC);
 CREATE INDEX idx_np_revenue ON nonprofits(revenue DESC);
 CREATE INDEX idx_np_christian ON nonprofits(christian_dollars DESC);
 CREATE INDEX idx_np_name ON nonprofits(name);
+CREATE INDEX idx_np_type ON nonprofits(org_type, revenue DESC);
+CREATE INDEX idx_np_assets ON nonprofits(asset_band, revenue DESC);
+CREATE INDEX idx_np_tradition ON nonprofits(tradition, revenue DESC);
+CREATE INDEX idx_np_year ON nonprofits(ruling_year);
+CREATE INDEX idx_np_received ON nonprofits(total_received DESC);
 
 -- Partial indexes over the 47k organisations that have taken money from a
 -- majority-Christian funder. Without them the "already Christian-funded"
@@ -92,8 +115,9 @@ CREATE INDEX idx_np_chr_state ON nonprofits(state)
 """
 
 SOURCE = f"""
-SELECT ein, organization_name, city, state, ntee_code,
-       income_amount, revenue_amount, asset_amount
+SELECT ein, organization_name, city, state, zip, ntee_code,
+       income_amount, revenue_amount, asset_amount,
+       foundation_code, ruling_date, group_exemption_number
 FROM bmf_organizations
 WHERE status_code = '01'
   AND subsection_code = '03'
@@ -106,7 +130,9 @@ SELECT rc.ein,
        rc.website,
        SUBSTR(COALESCE(rc.mission_text, ''), 1, 400) AS mission,
        COALESCE(cf.dollars, 0) AS dollars,
-       COALESCE(cf.funders, 0) AS funders
+       COALESCE(cf.funders, 0) AS funders,
+       COALESCE(af.dollars, 0) AS all_dollars,
+       COALESCE(af.funders, 0) AS all_funders
 FROM recipients rc
 LEFT JOIN (
     SELECT g.entity_id,
@@ -117,6 +143,11 @@ LEFT JOIN (
     WHERE f.pct_christian >= {CHRISTIAN_FUNDER_PCT}
     GROUP BY g.entity_id
 ) cf ON cf.entity_id = rc.entity_id
+LEFT JOIN (
+    SELECT entity_id, SUM(amount) AS dollars,
+           COUNT(DISTINCT funder_ein) AS funders
+    FROM grants GROUP BY entity_id
+) af ON af.entity_id = rc.entity_id
 WHERE rc.ein IS NOT NULL AND rc.ein != ''
 """
 
@@ -145,11 +176,13 @@ def load_enrichment(conn: sqlite3.Connection) -> dict[str, tuple]:
     that is the row a reader would care about.
     """
     best: dict[str, tuple] = {}
-    for ein, tradition, website, mission, dollars, funders in conn.execute(ENRICH):
+    for (ein, tradition, website, mission, dollars, funders,
+         all_dollars, all_funders) in conn.execute(ENRICH):
         current = best.get(ein)
-        if current is None or (dollars or 0) > current[3]:
+        if current is None or (all_dollars or 0) > current[5]:
             best[ein] = (tradition, clean_website(website), mission or None,
-                         int(dollars or 0), int(funders or 0))
+                         int(dollars or 0), int(funders or 0),
+                         int(all_dollars or 0), int(all_funders or 0))
     return best
 
 
@@ -198,23 +231,31 @@ def main() -> int:
         if not chunk:
             break
         batch = []
-        for (ein, name, city, state, ntee, income, revenue,
-             assets) in chunk:
+        for (ein, name, city, state, zipcode, ntee, income, revenue,
+             assets, fcode, ruling, group) in chunk:
             # income_amount is gross receipts and is populated far more often
             # than revenue_amount; prefer the specific figure where it exists.
             amount = int(revenue or income or 0)
-            extra = enrichment.get(ein, (None, None, None, 0, 0))
+            asset_value = int(assets or 0)
+            year = (ruling or "")[:4]
+            extra = enrichment.get(ein, (None, None, None, 0, 0, 0, 0))
             batch.append((
                 ein, (name or "").strip(), (city or "").strip() or None,
-                (state or "").strip() or None, ntee or None, ntee_major(ntee),
-                amount, revenue_band(amount), int(assets or 0),
+                (state or "").strip() or None, (zipcode or "")[:5] or None,
+                ntee or None, ntee_major(ntee),
+                amount, revenue_band(amount), asset_value,
+                asset_band(asset_value), org_type(fcode),
+                int(year) if year.isdigit() else None,
+                1 if (group or "").strip() not in ("", "0", "0000") else 0,
                 *extra,
             ))
         conn.executemany(
-            "INSERT OR REPLACE INTO nonprofits (ein, name, city, state, "
-            "ntee_code, ntee_major, revenue, revenue_band, assets, tradition, "
-            "website, mission, christian_dollars, christian_funders) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+            "INSERT OR REPLACE INTO nonprofits (ein, name, city, state, zip, "
+            "ntee_code, ntee_major, revenue, revenue_band, assets, "
+            "asset_band, org_type, ruling_year, in_group, tradition, "
+            "website, mission, christian_dollars, christian_funders, "
+            "total_received, total_funders) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
         total += len(batch)
     bmf.close()
     conn.commit()

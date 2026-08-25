@@ -172,23 +172,50 @@ export type Nonprofit = {
   name: string
   city: string | null
   state: string | null
+  zip: string | null
   ntee_code: string | null
   ntee_major: string | null
   revenue: number
   revenue_band: number
   assets: number
+  asset_band: number
+  org_type: string
+  ruling_year: number | null
+  in_group: number
   tradition: string | null
   website: string | null
   mission: string | null
   christian_dollars: number
   christian_funders: number
+  total_received: number
+  total_funders: number
 }
 
 export type NonprofitFacets = {
   category: Record<string, number>
   revenue_band: Record<string, number>
+  asset_band: Record<string, number>
   state: Record<string, number>
+  org_type: Record<string, number>
+  tradition: Record<string, number>
 }
+
+// Must stay in step with ORG_TYPES in src/sector_taxonomy.py.
+export const ORG_TYPE_LABELS: Record<string, string> = {
+  church: 'Church or religious association',
+  school: 'School or educational institution',
+  hospital: 'Hospital or medical research',
+  public: 'Publicly supported charity',
+  supporting: 'Supporting organisation',
+  government: 'Governmental unit',
+  other: 'Other',
+}
+
+// Index-aligned with ASSET_BANDS in src/sector_taxonomy.py.
+export const ASSET_BAND_LABELS = [
+  'No assets reported', 'Under $100k', '$100k to $1M', '$1M to $10M',
+  '$10M to $100M', '$100M and above',
+]
 
 export type NonprofitResponse = {
   total: number

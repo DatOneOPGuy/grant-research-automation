@@ -265,3 +265,62 @@ def revenue_band(amount: int | float | None) -> int:
         if value >= lo and (hi is None or value < hi):
             return i
     return 0
+
+
+# --- public charity type ----------------------------------------------------
+#
+# IRS foundation_code, for organisations that are not private foundations.
+# The distinction a fundraiser cares about is what KIND of charity this is --
+# a church behaves nothing like a hospital when you approach it -- and the
+# code carries that, so it is worth surfacing as a filter rather than leaving
+# buried in an unexplained number.
+
+ORG_TYPES: dict[str, str] = {
+    "church": "Church or religious association",
+    "school": "School or educational institution",
+    "hospital": "Hospital or medical research",
+    "public": "Publicly supported charity",
+    "supporting": "Supporting organisation",
+    "government": "Governmental unit",
+    "other": "Other",
+}
+
+_FOUNDATION_CODE_TYPE: dict[str, str] = {
+    "10": "church",       # 170(b)(1)(A)(i)
+    "11": "school",       # 170(b)(1)(A)(ii)
+    "12": "hospital",     # 170(b)(1)(A)(iii)
+    "13": "supporting",   # supporting a governmental unit
+    "14": "government",   # 170(c)(1)
+    "15": "public",       # 170(b)(1)(A)(vi) publicly supported
+    "16": "public",       # 509(a)(2)
+    "17": "supporting",   # 509(a)(3)
+    "18": "other",        # 509(a)(4) public safety
+    "21": "supporting",   # 509(a)(3) type I
+    "22": "supporting",   # type II
+    "23": "supporting",   # type III functionally integrated
+    "24": "supporting",   # type III non-functionally integrated
+}
+
+
+def org_type(foundation_code: str | None) -> str:
+    return _FOUNDATION_CODE_TYPE.get((foundation_code or "").strip(), "other")
+
+
+# Asset bands, coarser than the revenue bands because assets are far more
+# skewed -- two thirds of these organisations report none at all.
+ASSET_BANDS: list[tuple[int, int | None, str]] = [
+    (0, 1, "No assets reported"),
+    (1, 100_000, "Under $100k"),
+    (100_000, 1_000_000, "$100k to $1M"),
+    (1_000_000, 10_000_000, "$1M to $10M"),
+    (10_000_000, 100_000_000, "$10M to $100M"),
+    (100_000_000, None, "$100M and above"),
+]
+
+
+def asset_band(amount: int | float | None) -> int:
+    value = amount or 0
+    for i, (lo, hi, _) in enumerate(ASSET_BANDS):
+        if value >= lo and (hi is None or value < hi):
+            return i
+    return 0

@@ -15,7 +15,8 @@ import {
   ChevronLeft, ChevronRight, ExternalLink, Globe, Loader2, Search, X,
 } from 'lucide-react'
 import {
-  NTEE_MAJOR_LABELS, REVENUE_BAND_LABELS, fetchNonprofits,
+  ASSET_BAND_LABELS, NTEE_MAJOR_LABELS, ORG_TYPE_LABELS,
+  REVENUE_BAND_LABELS, fetchNonprofits, traditionLabel,
 } from '../lib/apiV5'
 import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
 import { Skeleton } from '../components/ui/primitives'
@@ -26,33 +27,54 @@ type Filters = {
   q: string
   category: string[]
   revenue_band: string[]
+  asset_band: string[]
   state: string[]
+  org_type: string[]
+  tradition: string[]
   christian_funded: boolean
+  foundation_funded: boolean
+  has_website: boolean
+  has_mission: boolean
+  in_group: boolean
+  min_christian_funders: string
+  founded_after: string
+  founded_before: string
+  sort: string
 }
 
+const LIST_KEYS = ['category', 'revenue_band', 'asset_band', 'state',
+  'org_type', 'tradition'] as const
+const FLAG_KEYS = ['christian_funded', 'foundation_funded', 'has_website',
+  'has_mission', 'in_group'] as const
+const NUM_KEYS = ['min_christian_funders', 'founded_after',
+  'founded_before'] as const
+
 const EMPTY: Filters = {
-  q: '', category: [], revenue_band: [], state: [], christian_funded: false,
+  q: '', category: [], revenue_band: [], asset_band: [], state: [],
+  org_type: [], tradition: [],
+  christian_funded: false, foundation_funded: false, has_website: false,
+  has_mission: false, in_group: false,
+  min_christian_funders: '', founded_after: '', founded_before: '',
+  sort: 'revenue',
 }
 
 function toParams(f: Filters): URLSearchParams {
   const p = new URLSearchParams()
   if (f.q.trim()) p.set('q', f.q.trim())
-  for (const key of ['category', 'revenue_band', 'state'] as const) {
-    if (f[key].length) p.set(key, f[key].join(','))
-  }
-  if (f.christian_funded) p.set('christian_funded', 'true')
+  for (const key of LIST_KEYS) if (f[key].length) p.set(key, f[key].join(','))
+  for (const key of FLAG_KEYS) if (f[key]) p.set(key, 'true')
+  for (const key of NUM_KEYS) if (f[key].trim()) p.set(key, f[key].trim())
+  if (f.sort !== 'revenue') p.set('sort', f.sort)
   return p
 }
 
 function fromParams(sp: URLSearchParams): Filters {
   const list = (k: string) => (sp.get(k) || '').split(',').filter(Boolean)
-  return {
-    q: sp.get('q') || '',
-    category: list('category'),
-    revenue_band: list('revenue_band'),
-    state: list('state'),
-    christian_funded: sp.get('christian_funded') === 'true',
-  }
+  const out = { ...EMPTY, q: sp.get('q') || '', sort: sp.get('sort') || 'revenue' }
+  for (const key of LIST_KEYS) out[key] = list(key)
+  for (const key of FLAG_KEYS) out[key] = sp.get(key) === 'true'
+  for (const key of NUM_KEYS) out[key] = sp.get(key) || ''
+  return out
 }
 
 export default function Nonprofits() {
@@ -81,10 +103,11 @@ export default function Nonprofits() {
 
   const total = data?.total ?? 0
   const pages = Math.ceil(total / PAGE_SIZE)
-  const active = filters.category.length + filters.revenue_band.length
-    + filters.state.length + (filters.christian_funded ? 1 : 0)
+  const active = LIST_KEYS.reduce((n, k) => n + filters[k].length, 0)
+    + FLAG_KEYS.filter((k) => filters[k]).length
+    + NUM_KEYS.filter((k) => filters[k].trim()).length
 
-  const toggle = (key: 'category' | 'revenue_band' | 'state', value: string) =>
+  const toggle = (key: (typeof LIST_KEYS)[number], value: string) =>
     setFilters((f) => ({
       ...f,
       [key]: f[key].includes(value)
@@ -106,7 +129,20 @@ export default function Nonprofits() {
             {isFetching && <Loader2 size={14} className="animate-spin" />}
           </div>
         </div>
-        <div className="relative shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <select value={filters.sort} aria-label="Sort by"
+            onChange={(e) => setFilters(
+              (f) => ({ ...f, sort: e.target.value }))}
+            className="text-sm border border-line rounded-md bg-surface
+              px-2 py-1.5">
+            <option value="revenue">Largest revenue</option>
+            <option value="assets">Largest assets</option>
+            <option value="christian">Most Christian funding</option>
+            <option value="received">Most foundation funding</option>
+            <option value="founded">Newest ruling year</option>
+            <option value="name">Name</option>
+          </select>
+        <div className="relative">
           <Search size={15}
             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
           <input value={draft} onChange={(e) => setDraft(e.target.value)}
@@ -114,6 +150,7 @@ export default function Nonprofits() {
             className="w-72 text-sm border border-line rounded-md bg-surface
               pl-8 pr-3 py-1.5 placeholder:text-muted/70 focus:outline-none
               focus:border-primary/40" />
+        </div>
         </div>
       </div>
 
@@ -147,6 +184,34 @@ export default function Nonprofits() {
             </span>
           </label>
 
+          <div className="space-y-1.5">
+            {([
+              ['foundation_funded', 'Receives foundation grants',
+               'Has taken money from any foundation we track.'],
+              ['has_website', 'Has a website', null],
+              ['has_mission', 'Has a mission statement on file', null],
+              ['in_group', 'Part of a denominational group',
+               'Covered by a parent organisation\u2019s group exemption.'],
+            ] as const).map(([key, label, hint]) => (
+              <label key={key}
+                className="flex items-start gap-2 text-xs cursor-pointer
+                  text-muted hover:text-ink">
+                <input type="checkbox" checked={filters[key]}
+                  onChange={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}
+                  className="mt-0.5 shrink-0" />
+                <span className="leading-snug">
+                  {label}
+                  {hint && <span className="block text-muted/70">{hint}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <FacetGroup title="Organisation Type" counts={data?.facets.org_type}
+            selected={filters.org_type}
+            label={(k) => ORG_TYPE_LABELS[k] ?? k}
+            onToggle={(v) => toggle('org_type', v)} />
+
           <FacetGroup title="Nonprofit Category"
             counts={data?.facets.category}
             selected={filters.category}
@@ -160,9 +225,55 @@ export default function Nonprofits() {
             sortKeys={(a, b) => Number(a) - Number(b)}
             onToggle={(v) => toggle('revenue_band', v)} />
 
+          <FacetGroup title="Total Assets" counts={data?.facets.asset_band}
+            selected={filters.asset_band}
+            label={(k) => ASSET_BAND_LABELS[Number(k)] ?? k}
+            sortKeys={(a, b) => Number(a) - Number(b)}
+            onToggle={(v) => toggle('asset_band', v)} />
+
+          <FacetGroup title="Faith" counts={data?.facets.tradition}
+            selected={filters.tradition}
+            label={(k) => traditionLabel(k)}
+            onToggle={(v) => toggle('tradition', v)} initial={6} />
+
           <FacetGroup title="State" counts={data?.facets.state}
             selected={filters.state} label={(k) => k}
             onToggle={(v) => toggle('state', v)} initial={8} />
+
+          <div>
+            <div className="text-xs font-medium text-ink mb-1.5">
+              IRS Ruling Year
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(['founded_after', 'founded_before'] as const).map((key, i) => (
+                <input key={key} type="number" inputMode="numeric"
+                  placeholder={i === 0 ? 'From' : 'To'}
+                  aria-label={i === 0 ? 'Ruling year from' : 'Ruling year to'}
+                  value={filters[key]}
+                  onChange={(e) => setFilters(
+                    (f) => ({ ...f, [key]: e.target.value }))}
+                  className="w-full min-w-0 text-xs border border-line rounded
+                    px-2 py-1 bg-surface" />
+              ))}
+            </div>
+            <div className="text-[10px] text-muted mt-1">
+              When the IRS recognised the exemption, not necessarily when the
+              organisation began.
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-medium text-ink mb-1.5">
+              Minimum Christian funders
+            </div>
+            <input type="number" inputMode="numeric" placeholder="e.g. 3"
+              aria-label="Minimum number of Christian funders"
+              value={filters.min_christian_funders}
+              onChange={(e) => setFilters(
+                (f) => ({ ...f, min_christian_funders: e.target.value }))}
+              className="w-full text-xs border border-line rounded px-2 py-1
+                bg-surface" />
+          </div>
         </aside>
 
         <div className="flex-1 min-w-0">
@@ -170,9 +281,9 @@ export default function Nonprofits() {
             overflow-x-auto">
             <table className="w-full text-sm table-fixed min-w-[820px]">
               <colgroup>
-                <col className="w-[34%]" /><col className="w-[26%]" />
-                <col className="w-[13%]" /><col className="w-[17%]" />
-                <col className="w-[10%]" />
+                <col className="w-[30%]" /><col className="w-[22%]" />
+                <col className="w-[12%]" /><col className="w-[13%]" />
+                <col className="w-[15%]" /><col className="w-[8%]" />
               </colgroup>
               <thead>
                 <tr className="text-left text-xs text-muted border-b
@@ -181,7 +292,10 @@ export default function Nonprofits() {
                   <th className="px-2 font-medium">Category</th>
                   <th className="px-2 text-right font-medium">Revenue</th>
                   <th className="px-2 text-right font-medium">
-                    Christian funding
+                    All foundation $
+                  </th>
+                  <th className="px-2 text-right font-medium">
+                    Christian $
                   </th>
                   <th className="px-2" />
                 </tr>
@@ -197,6 +311,11 @@ export default function Nonprofits() {
                       </div>
                       <div className="text-xs text-muted truncate mt-0.5">
                         {r.city && `${titleCase(r.city)}, `}{r.state}
+                        {r.ruling_year && ` · ${r.ruling_year}`}
+                      </div>
+                      <div className="text-[10px] text-muted/80 truncate">
+                        {ORG_TYPE_LABELS[r.org_type] ?? r.org_type}
+                        {r.tradition && ` · ${traditionLabel(r.tradition)}`}
                       </div>
                     </td>
                     <td className="px-2 text-xs text-muted">
@@ -208,6 +327,22 @@ export default function Nonprofits() {
                     </td>
                     <td className="px-2 text-right tabular whitespace-nowrap">
                       {money(r.revenue)}
+                      {r.assets > 0 && (
+                        <div className="text-[10px] text-muted font-normal">
+                          {money(r.assets)} assets
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 text-right tabular whitespace-nowrap">
+                      {r.total_received > 0 ? (
+                        <>
+                          {money(r.total_received)}
+                          <div className="text-[10px] text-muted font-normal">
+                            {r.total_funders} funder
+                            {r.total_funders === 1 ? '' : 's'}
+                          </div>
+                        </>
+                      ) : <span className="text-muted/50">—</span>}
                     </td>
                     <td className="px-2 text-right tabular whitespace-nowrap">
                       {r.christian_dollars > 0 ? (
@@ -241,7 +376,7 @@ export default function Nonprofits() {
                   </tr>
                 ))}
                 {!data && Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i}><td colSpan={5} className="py-2 px-3">
+                  <tr key={i}><td colSpan={6} className="py-2 px-3">
                     <Skeleton className="h-8" />
                   </td></tr>
                 ))}
