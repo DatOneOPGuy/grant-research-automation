@@ -419,6 +419,10 @@ def build_rollups(out: sqlite3.Connection) -> None:
     # Index the receipt table before any GROUP BY / correlated pass over it.
     out.execute("CREATE INDEX idx_g_funder ON grants(funder_ein, tax_year)")
     out.execute("CREATE INDEX idx_g_entity ON grants(entity_id)")
+    # The grants explorer pages by amount. Without this every page sorts all
+    # 3M rows: the endpoint measured 11.5s and dropped to 53ms once it
+    # existed, so losing it in a rebuild would look like the page breaking.
+    out.execute("CREATE INDEX idx_g_amount ON grants(amount DESC)")
     out.execute("""
         INSERT INTO frs
         SELECT funder_ein, entity_id, SUM(amount), COUNT(*), MAX(tax_year)

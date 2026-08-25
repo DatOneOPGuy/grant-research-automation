@@ -465,15 +465,21 @@ read `recipient_sectors` and `sector_stats`, built by
 `src/build_sector_index.py`. Same rule as the search index: rebuild the read
 model and they vanish.
 
-**This one cannot be built on the droplet as things stand** — it needs
-`data/bmf_registry.db` (852 MB), which is excluded from the code rsync and is
-not on the box. So build both indexes locally, in this order, then ship the
-finished database:
+**Neither this nor the nonprofit index can be built on the droplet** — both
+need `data/bmf_registry.db` (852 MB), which is excluded from the code rsync
+and is not on the box. So build all three locally, in this order, then ship
+the finished database:
 
 ```bash
 python3 -m src.build_search_index      # ~17 s, 1.33 GB -> 1.85 GB
-python3 -m src.build_sector_index      # ~16 s, -> 1.93 GB, needs bmf_registry.db
+python3 -m src.build_sector_index      # ~16 s, -> 1.93 GB, needs the BMF
+python3 -m src.build_nonprofit_index   # ~17 s, -> 2.39 GB, needs the BMF
 ```
+
+Order matters for the second two: the sector index reads `recipients`, and
+the nonprofit index reads the grant data both of the others leave alone, so
+running them out of order is harmless — but running the pipeline rebuild
+after any of them silently drops all three.
 
 Both refuse to run while anything else holds the database open, and both
 checkpoint and drop the WAL before exiting.
@@ -491,11 +497,19 @@ rsync -av --inplace --progress data/explorer_v5.db \
 `--inplace` is safe here only because `.new` is a scratch copy nothing is
 reading. Never point it at the live file.
 
-Then verify with an actual query, not just health:
+Then verify with actual queries, not just health. Health touches none of
+these tables and will report `ok` against a database missing all three:
 
 ```bash
-curl -s 'localhost:8000/api/v5/analytics/non-christian' | head -c 200
+curl -s -o /dev/null -w 'search        %{http_code}\n' 'localhost:8000/api/v5/search?q=youth'
+curl -s -o /dev/null -w 'non-christian %{http_code}\n' 'localhost:8000/api/v5/analytics/non-christian'
+curl -s -o /dev/null -w 'nonprofits    %{http_code}\n' 'localhost:8000/api/v5/nonprofits?limit=5'
 ```
+
+All three answer **503 with an instruction naming the missing builder** when
+their tables are absent, rather than 500 — so a deploy that forgets one
+degrades to a broken page rather than a broken API. That is verified, not
+assumed.
 
 Note the SQLite hazards documented for `grants_v2.db` apply here too — never
 move a `.db` without its `-wal`/`-shm` sidecars if the source was checkpointed
