@@ -52,3 +52,6 @@ nonprofit_prospects*.csv
 
 # Local dev Postgres cluster
 .devdata/
+
+# Postgres dumps: contain real user emails, and this repo is public
+*.sql.gz
