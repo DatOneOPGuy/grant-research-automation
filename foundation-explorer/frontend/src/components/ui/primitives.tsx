@@ -22,7 +22,12 @@ export function Badge({ children, className = '' }: {
   children: ReactNode; className?: string
 }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${className}`}>
+    // whitespace-nowrap because a pill is a label, not prose. Without it a
+    // two-word status like "Invite only" wraps inside the pill in a narrow
+    // column, which makes that one pill taller than every other pill in the
+    // table and reads as a misalignment rather than as wrapped text.
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full
+      px-2.5 py-0.5 text-xs font-medium ${className}`}>
       {children}
     </span>
   )

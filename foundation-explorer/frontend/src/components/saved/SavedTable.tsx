@@ -27,14 +27,14 @@ export default function SavedTable({
   // folders and left the money columns floating in the middle of the row.
   const showFolders = folderId === null
   const widths = showFolders
-    ? ['26%', '14%', '14%', '11%', '11%', '8%', '11%', '5%']
+    ? ['24%', '13%', '12%', '11%', '11%', '8%', '15%', '6%']
     : ['30%', '16%', '12%', '12%', '9%', '14%', '7%']
   const columnCount = widths.length
 
   return (
     <Card>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm table-fixed min-w-[720px]">
+        <table className="w-full text-sm table-fixed min-w-[820px]">
           <colgroup>
             {widths.map((w, i) => (
               <col key={i} style={{ width: w }} />

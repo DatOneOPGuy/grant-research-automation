@@ -203,8 +203,8 @@ export default function Foundations() {
                 <col className="w-[11%]" />
                 <col className="w-[14%]" />
                 <col className="w-[13%]" />
-                <col className="w-[11%]" />
                 <col className="w-[12%]" />
+                <col className="w-[11%]" />
                 <col className="w-[9%]" />
               </colgroup>
               <thead>
