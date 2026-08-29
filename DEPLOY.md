@@ -365,13 +365,53 @@ rather than a migration.
 
 ### Backups
 
-Unlike `explorer_v5.db`, this cannot be regenerated:
+Unlike `explorer_v5.db`, this cannot be regenerated. A saved folder is
+something a person decided; there is no second copy of it anywhere.
 
-```bash
-ssh fcf 'sudo -u postgres pg_dump fcf | gzip' > fcf-$(date +%F).sql.gz
+**Automated daily**, by systemd timer, at 03:20 UTC:
+
+```
+/etc/systemd/system/fcf-backup.timer     schedule, Persistent=true
+/etc/systemd/system/fcf-backup.service   runs the script below
+/opt/fcf/scripts/backup-accounts.sh      dump, verify, prune
+/var/backups/fcf/                        700, dumps are 600
 ```
 
-Small enough to take before any deploy that includes a migration.
+Kept 30 days. `Persistent=true` means a missed run (droplet down at 03:20)
+happens at next boot rather than being skipped.
+
+The script refuses to leave a file behind unless it is a valid gzip *and*
+contains a `COPY public.users` block. A dump that restores cleanly into an
+empty database is worse than no dump, because it looks like a backup.
+
+```bash
+systemctl list-timers fcf-backup          # when it next runs
+journalctl -u fcf-backup -n 20            # what happened last time
+/opt/fcf/scripts/backup-accounts.sh       # run one now
+```
+
+**Restoring**, verified end to end on 2026-08-29 — restore into a scratch
+database first, never straight over the live one:
+
+```bash
+LATEST=$(ssh fcf 'ls -t /var/backups/fcf/accounts-*.sql.gz | head -1')
+ssh fcf "sudo -u postgres createdb fcf_restoretest \
+         && zcat $LATEST | sudo -u postgres psql -d fcf_restoretest"
+# check it, then swap:
+ssh fcf 'systemctl stop fcf \
+         && sudo -u postgres psql -c "ALTER DATABASE fcf RENAME TO fcf_old" \
+         && sudo -u postgres psql -c "ALTER DATABASE fcf_restoretest RENAME TO fcf" \
+         && systemctl start fcf'
+```
+
+**These backups live on the same droplet as the database.** They protect
+against a bad migration, a mistaken delete, or a dropped table -- not against
+losing the droplet. Pulling a copy off the box is the obvious next step and is
+not yet automated:
+
+```bash
+rsync -av fcf:/var/backups/fcf/ ./backups/
+```
 
 ### Health
 
