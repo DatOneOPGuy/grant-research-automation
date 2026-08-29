@@ -50,7 +50,12 @@ US_STATES = (
     "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC",
     "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT",
     "VT", "VA", "WA", "WV", "WI", "WY", "DC", "PR", "VI", "GU", "AS",
-    "MP"
+    "MP",
+    # Military postal codes -- Armed Forces Americas, Europe and Pacific.
+    # US personnel at US addresses, so they belong in the US view. Without
+    # them $1.63M appeared in neither the state list nor the International
+    # tab, because nothing flags them as foreign either.
+    "AA", "AE", "AP",
 )
 US_STATES_SQL = "(" + ",".join("'" + s + "'" for s in US_STATES) + ")"
 

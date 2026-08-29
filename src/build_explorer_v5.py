@@ -450,7 +450,9 @@ def build_rollups(out: sqlite3.Connection) -> None:
             'IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT',
             'NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI',
             'SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR',
-            'VI','GU','AS','MP')
+            'VI','GU','AS','MP',
+            -- Armed Forces Americas/Europe/Pacific: US personnel, US addresses.
+            'AA','AE','AP')
         GROUP BY 1, 2
     """)
     out.commit()
