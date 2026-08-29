@@ -485,6 +485,57 @@ def foundation_detail(ein: str):
             "top_foreign": [dict(r) for r in top_foreign]}
 
 
+@router.get("/foundations/{ein}/recipients")
+def foundation_recipients(
+    ein: str,
+    q: str | None = None,
+    limit: int = Query(500, ge=1, le=2000),
+):
+    """Every organisation this foundation paid, optionally filtered by name.
+
+    Separate from the detail endpoint, which returns only the top 500 by
+    dollars. Filtering that list in the browser would search 500 of Lilly
+    Endowment's 2,072 recipients and report "no match" for the other 1,572 --
+    a false negative on the one question this table answers, and the kind a
+    user has no way to detect.
+
+    Matches the recipient's display name, its raw filing name, and its EIN,
+    because a researcher may be working from any of the three.
+    """
+    where = ["frs.ein = ?"]
+    params: list = [ein]
+    if q and q.strip():
+        term = q.strip()
+        digits = "".join(c for c in term if c.isdigit())
+        if len(digits) == 9 and not any(c.isalpha() for c in term):
+            where.append("r.ein = ?")
+            params.append(digits)
+        else:
+            where.append("(COALESCE(r.display_name, r.name) LIKE ? ESCAPE '\\'"
+                         " OR r.name LIKE ? ESCAPE '\\')")
+            # Escape the LIKE wildcards so a name containing % or _ is
+            # searched for literally rather than matching everything.
+            safe = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            params += [f"%{safe}%", f"%{safe}%"]
+    with connect() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) FROM frs WHERE ein=?", (ein,)).fetchone()[0]
+        rows = conn.execute(f"""
+            SELECT r.entity_id, COALESCE(r.display_name, r.name) AS name,
+                   r.ein AS recipient_ein,
+                   r.identity_status, r.tradition, r.method, r.confidence,
+                   r.reason,
+                   r.is_daf, (r.mission_text IS NOT NULL
+                              AND r.mission_text != '') AS has_mission,
+                   frs.dollars, frs.grants, frs.last_year
+            FROM frs JOIN recipients r ON r.entity_id=frs.entity_id
+            WHERE {' AND '.join(where)}
+            ORDER BY frs.dollars DESC LIMIT ?""",
+            (*params, limit)).fetchall()
+    return {"total": total, "matched": len(rows),
+            "rows": [dict(r) for r in rows]}
+
+
 @router.get("/foundations/{ein}/grants")
 def foundation_grants(ein: str, limit: int = Query(200, le=1000), offset: int = 0):
     with connect() as conn:

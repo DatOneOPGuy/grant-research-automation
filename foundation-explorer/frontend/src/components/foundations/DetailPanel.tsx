@@ -188,7 +188,8 @@ export default function DetailPanel({ ein, onClose }: Props) {
             <>
               {active === 'Overview' && <OverviewTab data={data} />}
               {active === 'Recipients' && (
-                <RecipientsTab recipients={data.recipients} />
+                <RecipientsTab ein={ein} recipients={data.recipients}
+                  total={f?.recipient_count ?? data.recipients.length} />
               )}
               {active === 'Grants' && <GrantsTab ein={ein} />}
               {active === 'International' && <InternationalTab data={data} />}

@@ -161,6 +161,26 @@ export type NonChristianOverview = {
   evidence: { confidence: string; dollars: number }[]
 }
 
+export type FoundationRecipientsPage = {
+  /** Every recipient this foundation has, not just the ones returned. */
+  total: number
+  matched: number
+  rows: FoundationRecipientV5[]
+}
+
+/** Search a single foundation's recipients server-side.
+ *
+ *  The detail endpoint returns only the top 500 by dollars, so filtering that
+ *  list in the browser would search 500 of Lilly Endowment's 2,072 and answer
+ *  "no match" for the rest. */
+export function fetchFoundationRecipients(
+  ein: string, q: string, limit = 500,
+): Promise<FoundationRecipientsPage> {
+  const p = new URLSearchParams({ limit: String(limit) })
+  if (q.trim()) p.set('q', q.trim())
+  return getV5(`/api/v5/foundations/${ein}/recipients?${p}`)
+}
+
 export function fetchNonChristianOverview(): Promise<NonChristianOverview> {
   return getV5<NonChristianOverview>('/api/v5/analytics/non-christian')
 }
