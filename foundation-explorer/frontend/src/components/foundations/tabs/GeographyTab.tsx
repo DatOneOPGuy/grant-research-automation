@@ -28,7 +28,13 @@ export default function GeographyTab({ data }: { data: FoundationDetailV5 }) {
       <div className="space-y-1.5 max-w-xl">
         {states.map((s) => (
           <div key={s.state} className="flex items-center gap-3 text-sm">
-            <span className="w-8 text-muted tabular shrink-0">
+            {/* truncate: this is a flex item so w-8 was already honoured,
+                but without it a long value wrapped to two lines inside that
+                32px box and printed across the bar -- which is how "BRITISH
+                COLUMBIA" and "ARUSHA" looked. The API now returns US states
+                only, so this is the second line of defence, not the fix. */}
+            <span title={s.state || undefined}
+              className="block w-8 truncate text-muted tabular shrink-0">
               {s.state || '—'}
             </span>
             <div className="flex-1 h-3 bg-line/40 rounded overflow-hidden">

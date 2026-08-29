@@ -38,6 +38,22 @@ NULLS_LAST = {"pct_christian", "pct_foreign"}
 # Must stay identical to FOREIGN_SQL in src/build_explorer_v5.py, or a
 # foundation's per-grant international list would disagree with the
 # foreign_dollars total shown above it.
+# The 50 states, DC and the inhabited territories. recipient_states is built
+# from whatever string the filing put in the state field, and filings are full
+# of foreign regions -- ARUSHA, HERTFORDSHIRE, ONTARIO, KIGALI. 4,005 of its
+# 4,061 distinct values are not US states, carrying $5.58B, and they were being
+# listed and counted under a heading that says "US recipients by state".
+# International giving has its own tab; this list is what makes the US one true.
+US_STATES = (
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI",
+    "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI",
+    "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC",
+    "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT",
+    "VT", "VA", "WA", "WV", "WI", "WY", "DC", "PR", "VI", "GU", "AS",
+    "MP"
+)
+US_STATES_SQL = "(" + ",".join("'" + s + "'" for s in US_STATES) + ")"
+
 FOREIGN_GRANT_SQL = (
     "(g.is_foreign=1 OR (COALESCE(g.recipient_country,'') != '' "
     "AND g.recipient_country NOT IN "
@@ -395,6 +411,7 @@ def foundation_detail(ein: str):
             (ein,)).fetchall()
         states = conn.execute(
             "SELECT state, dollars FROM recipient_states WHERE ein=? "
+            f"AND state IN {US_STATES_SQL} "
             "ORDER BY dollars DESC", (ein,)).fetchall()
         countries = conn.execute(
             "SELECT country_code, country_name, dollars, grants, "

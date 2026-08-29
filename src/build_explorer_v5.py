@@ -441,7 +441,17 @@ def build_rollups(out: sqlite3.Connection) -> None:
     out.execute("""
         INSERT INTO recipient_states
         SELECT funder_ein, recipient_state, SUM(amount) FROM grants
-        WHERE recipient_state != '' GROUP BY 1, 2
+        -- US states, DC and territories only. The field carries whatever the
+        -- filing typed, which includes foreign regions (ARUSHA, ONTARIO,
+        -- KIGALI); listing those under "US recipients by state" is simply
+        -- false, and international giving is reported on its own tab.
+        WHERE recipient_state IN (
+            'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
+            'IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT',
+            'NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI',
+            'SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR',
+            'VI','GU','AS','MP')
+        GROUP BY 1, 2
     """)
     out.commit()
 

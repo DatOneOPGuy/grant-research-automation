@@ -236,7 +236,7 @@ function UndoToast({ label, folderCount, onUndo, onDismiss }: {
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] max-w-md
         flex items-center gap-3 rounded-lg border border-line bg-ink
         px-4 py-2.5 text-sm text-white shadow-lg">
-      <span className="min-w-0 truncate">
+      <span className="block min-w-0 truncate">
         {label
           ? <>Removed <span className="font-medium">{label}</span></>
           : <>Removed from {folderCount === 1 ? 'that folder' : 'Saved'}</>}

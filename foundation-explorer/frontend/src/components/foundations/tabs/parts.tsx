@@ -44,7 +44,11 @@ export function BarRow({ label, dollars, christian = 0, max, sub, title }: {
   const pct = (n: number) => `${Math.max((n / max) * 100, 0)}%`
   return (
     <div className="flex items-center gap-3 text-sm" title={title}>
-      <span className="w-36 truncate text-muted shrink-0">{label}</span>
+      {/* title so a clipped label is still readable on hover. The truncate
+          itself already worked here -- flex items are blockified, so the width
+          and overflow apply to a <span> like this one. */}
+      <span title={label}
+        className="block w-36 truncate text-muted shrink-0">{label}</span>
       <div className="flex-1 h-3 bg-line/40 rounded overflow-hidden">
         <div className="h-full flex">
           <div className="h-full bg-primary/80" style={{ width: pct(christian) }} />
