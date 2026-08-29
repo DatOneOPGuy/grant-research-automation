@@ -3,7 +3,7 @@
 // it; unchecking the last one unsaves the foundation entirely.
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bookmark, Check, FolderPlus, Plus } from 'lucide-react'
+import { Bookmark, Check, FolderPlus, Plus, Search } from 'lucide-react'
 import { useSavedFoundations } from '../../lib/savedContext'
 
 type Props = {
@@ -14,7 +14,12 @@ type Props = {
   align?: 'left' | 'right'
 }
 
-const MENU_WIDTH = 232
+const MENU_WIDTH = 248
+// Roughly how tall the menu wants to be with a full list. Used only to decide
+// whether it fits below the trigger; the real height is set by max-h below.
+const MENU_MAX_HEIGHT = 420
+// Above this many folders, scrolling to find one is slower than typing it.
+const FILTER_THRESHOLD = 8
 
 export default function SaveMenu({ ein, align = 'right' }: Props) {
   const {
@@ -23,12 +28,27 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
+  const [query, setQuery] = useState('')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [pos, setPos] = useState<
+    { top: number; left: number; flipped: boolean } | null>(null)
 
   const saved = isSaved(ein)
   const mine = foldersFor(ein)
+
+  // Folders this foundation is already in sort to the top, so what is
+  // currently checked is never hidden below the fold -- otherwise the one
+  // piece of state the menu exists to show is the easiest thing to miss.
+  const q = query.trim().toLowerCase()
+  const visible = folders
+    .filter((f) => !q || f.name.toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => {
+      const inA = mine.includes(a.id) ? 0 : 1
+      const inB = mine.includes(b.id) ? 0 : 1
+      return inA - inB || a.name.localeCompare(b.name)
+    })
 
   const place = () => {
     const r = triggerRef.current?.getBoundingClientRect()
@@ -36,11 +56,20 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
     const left = align === 'right'
       ? Math.max(8, r.right - MENU_WIDTH)
       : Math.min(window.innerWidth - MENU_WIDTH - 8, r.left)
-    setPos({ top: r.bottom + 6, left })
+    // Open upward when there is not room below. The menu is taller now, and
+    // a bookmark on one of the last rows of a long table would otherwise put
+    // its folder list off the bottom of the window.
+    const below = window.innerHeight - r.bottom
+    const flipped = below < MENU_MAX_HEIGHT && r.top > below
+    setPos({
+      top: flipped ? Math.max(8, r.top - 6) : r.bottom + 6,
+      left,
+      flipped,
+    })
   }
 
   useEffect(() => {
-    if (!open) return
+    if (!open) { setQuery(''); setCreating(false); return }
     place()
     const close = (e: MouseEvent) => {
       if (menuRef.current?.contains(e.target as Node)) return
@@ -97,13 +126,46 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
       </button>
 
       {open && pos && createPortal(
-        <div ref={menuRef} onClick={stop} style={{ ...pos, width: MENU_WIDTH }}
+        <div ref={menuRef} onClick={stop}
+          style={{
+            left: pos.left, width: MENU_WIDTH,
+            ...(pos.flipped
+              ? { bottom: window.innerHeight - pos.top }
+              : { top: pos.top }),
+          }}
           className="fixed z-50 bg-surface border border-line rounded-lg
             shadow-xl py-1 text-sm">
-          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide
-            text-muted">
-            Save to folder
+          <div className="px-3 py-1.5 flex items-center justify-between
+            text-[11px] uppercase tracking-wide text-muted">
+            <span>Save to folder</span>
+            {folders.length > 0 && (
+              <span className="tabular normal-case">
+                {mine.length}/{folders.length}
+              </span>
+            )}
           </div>
+
+          {folders.length > FILTER_THRESHOLD && (
+            <div className="px-2 pb-1">
+              <div className="relative">
+                <Search size={12}
+                  className="absolute left-2 top-1/2 -translate-y-1/2
+                    text-muted pointer-events-none" />
+                <input autoFocus value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      if (query) { setQuery(''); e.stopPropagation() }
+                    }
+                  }}
+                  placeholder={`Filter ${folders.length} folders…`}
+                  aria-label="Filter folders"
+                  className="w-full border border-line rounded pl-6 pr-2 py-1
+                    text-xs placeholder:text-muted/70 focus:outline-none
+                    focus:border-primary/40" />
+              </div>
+            </div>
+          )}
 
           {folders.length === 0 && !creating && (
             <div className="px-3 py-2 text-xs text-muted">
@@ -111,8 +173,17 @@ export default function SaveMenu({ ein, align = 'right' }: Props) {
             </div>
           )}
 
-          <div className="max-h-56 overflow-y-auto">
-            {folders.map((f) => {
+          {/* scrollbar-gutter keeps the track visible on macOS, where an
+              overlay scrollbar fades out and makes a scrollable list look
+              like a list that simply ends. */}
+          <div className="max-h-72 overflow-y-auto"
+            style={{ scrollbarGutter: 'stable', scrollbarWidth: 'thin' }}>
+            {visible.length === 0 && q && (
+              <div className="px-3 py-2 text-xs text-muted">
+                No folder matches “{query}”.
+              </div>
+            )}
+            {visible.map((f) => {
               const on = mine.includes(f.id)
               return (
                 <button key={f.id}
