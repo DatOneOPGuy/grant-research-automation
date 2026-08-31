@@ -312,14 +312,7 @@ export default function FilterPanel({ filters, onChange }: Props) {
             onChange={(v) => set({ has_contact: v })} />
         </div>
       </Section>
-      <Section title="Denomination">
-        {/* The old heading said "Recipient Faith", which was clearer about
-            whose faith this is. Renaming it lost that, so it is said here:
-            these match on where the money went, not on how the foundation
-            describes itself. */}
-        <div className="text-[11px] text-muted mb-1.5 leading-snug">
-          Who the foundation gives to, not its own affiliation.
-        </div>
+      <Section title="Recipient Faith">
         <Check label={<span className="font-medium">Any Christian</span>}
           checked={filters.tradition.includes(ANY_CHRISTIAN)}
           onChange={toggleAnyChristian} />

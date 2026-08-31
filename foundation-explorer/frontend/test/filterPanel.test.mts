@@ -43,8 +43,8 @@ const order = [...panel.matchAll(/<Section title="([^"]+)"/g)].map((m) => m[1])
 const advIdx = panel.indexOf('<Advanced filters=')
 const primary = [...panel.matchAll(/<Section title="([^"]+)"/g)]
   .filter((m) => m.index! < advIdx).map((m) => m[1])
-ok('Geography, Reachability and Denomination come first',
-   JSON.stringify(primary) === JSON.stringify(['Geography', 'Reachability', 'Denomination']))
+ok('Geography, Reachability and Recipient Faith come first',
+   JSON.stringify(primary) === JSON.stringify(['Geography', 'Reachability', 'Recipient Faith']))
 ok('Giving, Foundation and Data Quality are inside Advanced',
    ['Giving', 'Foundation', 'Data Quality'].every((t) => order.indexOf(t) >= 0
      && panel.indexOf(`<Section title="${t}"`) > advIdx))
