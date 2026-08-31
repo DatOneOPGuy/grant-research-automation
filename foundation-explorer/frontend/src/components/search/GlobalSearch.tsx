@@ -145,7 +145,7 @@ export default function GlobalSearch({ onOpen }: {
     <div ref={boxRef} className="relative w-full max-w-2xl">
       <div className="relative">
         <Search size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-honey-600
             pointer-events-none" />
         <input
           ref={inputRef}
@@ -155,10 +155,10 @@ export default function GlobalSearch({ onOpen }: {
           onKeyDown={onKeyDown}
           placeholder="Search foundations, grantees, missions, grant purposes…"
           aria-label="Search"
-          className="w-full rounded-lg border border-line bg-surface pl-9 pr-16
-            py-2 text-sm placeholder:text-muted/70
-            focus:outline-none focus:ring-2 focus:ring-primary/20
-            focus:border-primary/40" />
+          className="w-full rounded-lg border border-honey-300/70 bg-surface
+            pl-9 pr-16 py-2 text-sm placeholder:text-muted/70 shadow-sm
+            focus:outline-none focus:ring-2 focus:ring-honey-400/40
+            focus:border-honey-500" />
         <div className="absolute right-2.5 top-1/2 -translate-y-1/2
           flex items-center gap-1.5">
           {loading && <Loader2 size={14} className="animate-spin text-muted" />}
@@ -169,8 +169,8 @@ export default function GlobalSearch({ onOpen }: {
               <X size={14} />
             </button>
           ) : (
-            <kbd className="hidden sm:inline text-[10px] text-muted border
-              border-line rounded px-1 py-0.5">/</kbd>
+            <kbd className="hidden sm:inline text-[10px] text-honey-800
+              bg-honey-100 border border-honey-200 rounded px-1 py-0.5">/</kbd>
           )}
         </div>
       </div>

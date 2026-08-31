@@ -98,7 +98,7 @@ export default function RecentlyViewed({ onOpen }: {
         <Clock size={15} />
         Recent
         {entries.length > 0 && (
-          <span className="text-xs bg-primary/10 text-primary rounded-full
+          <span className="text-xs bg-honey-200 text-honey-800 rounded-full
             px-1.5 py-0.5 font-medium tabular">
             {entries.length}
           </span>

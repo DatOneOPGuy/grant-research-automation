@@ -13,20 +13,31 @@ export default function App() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 min-w-0 px-4 lg:px-6 py-6">
-        {/* Capped and centred: past ~1800px the table stops gaining useful
-            information and just spreads the eye across dead space. */}
-        <div className="mx-auto w-full max-w-[1800px]">
+      <main className="flex-1 min-w-0">
         {/* Search sits above every page rather than on one of them: the thing
             a user wants to find is rarely on the page they happen to be on.
-            Not rendered in the demo build, which has no API to query. */}
+            Not rendered in the demo build, which has no API to query.
+
+            The honey band runs the full width of the main column while its
+            contents stay on the same 1800px measure as the page below, so the
+            search box lines up with the table rather than floating over it.
+            It is a background only -- nothing inside it is honey-on-honey,
+            since #E0AC69 behind body text does not clear contrast. */}
         {!STATIC_MODE && (
-          <div className="mb-5">
-            <GlobalSearch onOpen={setSelected} />
+          <div className="border-b border-honey-200/70 bg-gradient-to-b
+            from-honey-100 to-honey-50 px-4 lg:px-6 py-4">
+            <div className="mx-auto w-full max-w-[1800px]">
+              <GlobalSearch onOpen={setSelected} />
+            </div>
           </div>
         )}
-        {STATIC_MODE && <SampleBanner />}
-        <Outlet />
+        {/* Capped and centred: past ~1800px the table stops gaining useful
+            information and just spreads the eye across dead space. */}
+        <div className="px-4 lg:px-6 py-6">
+          <div className="mx-auto w-full max-w-[1800px]">
+            {STATIC_MODE && <SampleBanner />}
+            <Outlet />
+          </div>
         </div>
       </main>
       {selected && (

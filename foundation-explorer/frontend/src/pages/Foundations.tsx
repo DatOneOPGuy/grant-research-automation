@@ -134,7 +134,8 @@ export default function Foundations() {
     <div>
       <div className="flex items-end justify-between mb-5">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-primary">
+          <h1 className="font-display text-3xl font-semibold text-primary
+            inline-block border-b-2 border-honey-400 pb-1">
             Foundations
           </h1>
           <div className="text-sm text-muted mt-1 flex items-center gap-2">
@@ -210,7 +211,8 @@ export default function Foundations() {
                 <col className="w-[9%]" />
               </colgroup>
               <thead>
-                <tr className="text-left text-xs text-muted border-b border-line bg-canvas">
+                <tr className="text-left text-xs text-muted border-b-2
+                  border-honey-300 bg-honey-50/60">
                   {COLUMNS.map((c) => (
                     <th key={c.key}
                       className={`px-2 py-2.5 font-medium align-bottom ${
