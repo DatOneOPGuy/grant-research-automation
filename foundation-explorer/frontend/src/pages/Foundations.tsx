@@ -9,7 +9,9 @@ import {
   defaultV5Filters, fetchFoundationsV5,
   v5FilterParams, v5FiltersFromParams, type V5Filters,
 } from '../lib/apiV5'
-import { money, num, propublicaUrl, titleCase, websiteUrl } from '../lib/format'
+import {
+  money, moneyFloor, num, propublicaUrl, titleCase, websiteUrl,
+} from '../lib/format'
 import SaveMenu from '../components/foundations/SaveMenu'
 import { Skeleton, StatusPill } from '../components/ui/primitives'
 import FilterPanel from '../components/foundations/FilterPanel'
@@ -292,7 +294,7 @@ export default function Foundations() {
                     <td className="px-2 tabular whitespace-nowrap">
                       <div className="font-medium">{money(r.paid_2324)}</div>
                       <div className="text-[11px] text-muted">
-                        {money(r.median_grant)} median
+                        {moneyFloor(r.median_grant)} median
                       </div>
                     </td>
                     <td className="px-2 whitespace-nowrap">

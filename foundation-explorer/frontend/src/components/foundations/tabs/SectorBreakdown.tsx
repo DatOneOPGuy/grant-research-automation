@@ -55,12 +55,28 @@ export default function SectorBreakdown({ sectors }: {
           {shown.map((s) => {
             const note = strength(s.confidence)
             return (
-              <BarRow key={s.sector} label={sectorLabel(s.sector)}
+              // The org count goes in the narrow numeric column; the evidence
+              // note goes on the label, where there is room, and on the row
+              // title. Joining the two put "37 orgs · partly inferred" into
+              // 64px, where it wrapped to three lines.
+              <BarRow key={s.sector}
+                label={note
+                  ? `${sectorLabel(s.sector)} *`
+                  : sectorLabel(s.sector)}
+                title={note
+                  ? `${sectorLabel(s.sector)} — ${note} from the recipient's `
+                    + 'name rather than an IRS code'
+                  : undefined}
                 dollars={s.dollars} max={max}
-                sub={[`${s.recipients.toLocaleString()} orgs`, note]
-                  .filter(Boolean).join(' · ')} />
+                sub={`${s.recipients.toLocaleString()} orgs`} />
             )
           })}
+          {shown.some((s) => strength(s.confidence)) && (
+            <div className="text-[11px] text-muted pt-1">
+              * sector inferred from the recipient’s name for part of these
+              dollars, not assigned by the IRS.
+            </div>
+          )}
           {causes.length > 6 && (
             <button onClick={() => setOpen((o) => !o)}
               className="flex items-center gap-1 text-xs text-primary

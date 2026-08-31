@@ -7,6 +7,28 @@ export function money(n: number | null | undefined): string {
   return `$${Math.round(n).toLocaleString()}`
 }
 
+/** Like money(), but truncated rather than rounded.
+ *
+ *  money() rounds half-up, so a $499,600 median prints as "$500k" and a
+ *  $8.17B one as "$8.2B". For a figure a fundraiser sizes an ask against,
+ *  reading high is the wrong direction to be wrong in: better to understate
+ *  the typical grant than to have someone pitch above it. Every digit shown
+ *  here is one the foundation actually reached.
+ */
+export function moneyFloor(n: number | null | undefined): string {
+  if (n === null || n === undefined) return '—'
+  const floorTo = (value: number, unit: number, dp: number) => {
+    const scaled = value / unit
+    const factor = 10 ** dp
+    return (Math.floor(scaled * factor) / factor).toFixed(dp)
+  }
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000_000) return `$${floorTo(n, 1_000_000_000, 1)}B`
+  if (abs >= 1_000_000) return `$${floorTo(n, 1_000_000, 1)}M`
+  if (abs >= 10_000) return `$${floorTo(n, 1_000, 0)}k`
+  return `$${Math.floor(n).toLocaleString()}`
+}
+
 export function moneyFull(n: number | null | undefined): string {
   if (n === null || n === undefined) return '—'
   return `$${Math.round(n).toLocaleString()}`

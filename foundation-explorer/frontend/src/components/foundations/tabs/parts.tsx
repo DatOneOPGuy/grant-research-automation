@@ -59,8 +59,13 @@ export function BarRow({ label, dollars, christian = 0, max, sub, title }: {
       <span className="w-20 text-right tabular font-medium shrink-0">
         {money(dollars)}
       </span>
+      {/* nowrap on the sub column: it is a fixed 64px numeric slot, and a
+          value long enough to wrap makes its row two or three lines tall
+          while every other row stays one -- which reads as that row being
+          indented rather than as text having wrapped. */}
       {sub !== undefined && (
-        <span className="w-16 text-right text-[11px] text-muted shrink-0 tabular">
+        <span className="w-16 text-right text-[11px] text-muted shrink-0
+          tabular whitespace-nowrap">
           {sub}
         </span>
       )}
