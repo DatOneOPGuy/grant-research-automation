@@ -112,6 +112,16 @@ export type FoundationDetailV5 = {
   /** Cause-area breakdown of the non-Christian bucket. Empty when the read
    *  model was built without src/build_sector_index.py. */
   sectors: SectorStat[]
+  /** Which of the curated international ministries this funder gave to.
+   *  The evidence behind the International filter -- a prospect you can
+   *  justify rather than one the tool merely asserts. Empty when the read
+   *  model was built without src/build_benchmark_index.py. */
+  benchmarks: BenchmarkHit[]
+}
+
+export type BenchmarkHit = {
+  slug: string; name: string; category: string
+  dollars: number; grants: number
 }
 
 export type SectorStat = {
@@ -179,6 +189,30 @@ export function fetchFoundationRecipients(
   const p = new URLSearchParams({ limit: String(limit) })
   if (q.trim()) p.set('q', q.trim())
   return getV5(`/api/v5/foundations/${ein}/recipients?${p}`)
+}
+
+export type BenchmarkOrg = {
+  slug: string; name: string; category: string
+  dollars: number; funders: number; name_count: number
+}
+
+/** The curated international-ministry list.
+ *
+ *  Fixed vocabulary maintained in src/international_orgs.py and rebuilt into
+ *  the read model, so it is fetched rather than duplicated here -- unlike the
+ *  Census regions, this list is expected to grow. */
+export function fetchBenchmarkOrgs(): Promise<{ rows: BenchmarkOrg[] }> {
+  return getV5('/api/v5/benchmark-orgs')
+}
+
+export const BENCHMARK_CATEGORIES: Record<string, string> = {
+  evangelism: 'Evangelism & discipleship',
+  translation: 'Bible translation & distribution',
+  relief: 'Relief & development',
+  child: 'Child sponsorship & family',
+  medical: 'Medical & water',
+  persecuted: 'Persecuted church',
+  sending: 'Mission sending agencies',
 }
 
 export type CountyOption = {
@@ -628,6 +662,9 @@ export type V5Filters = {
   gives_to_state: string[]
   gives_to_region: string[]
   gives_to_county: string[]
+  // International prospecting by peer -- see src/international_orgs.py.
+  benchmark: string[]
+  min_benchmarks: string
   application_status: string[]
   has_website: boolean
   has_email: boolean
@@ -675,6 +712,8 @@ export const defaultV5Filters: V5Filters = {
   gives_to_state: [],
   gives_to_region: [],
   gives_to_county: [],
+  benchmark: [],
+  min_benchmarks: '',
   application_status: [],
   has_website: false,
   has_email: false,
@@ -716,14 +755,14 @@ export const defaultV5Filters: V5Filters = {
 }
 
 const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
-  'gives_to_region', 'gives_to_county',
+  'gives_to_region', 'gives_to_county', 'benchmark',
   'application_status', 'coverage_band', 'deadline_season', 'deadline_months',
   'deadline_kind', 'country'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',
   'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
   'min_assets', 'max_assets', 'min_revenue', 'min_coverage',
   'min_christian', 'min_pct_christian', 'deadline_from_month',
-  'deadline_to_month', 'min_foreign', 'min_pct_foreign',
+  'deadline_to_month', 'min_benchmarks', 'min_foreign', 'min_pct_foreign',
   'min_foreign_christian', 'min_countries'] as const
 const BOOL_KEYS = ['has_website', 'has_email', 'has_contact',
   'exclude_testamentary', 'exclude_micro', 'include_inactive',

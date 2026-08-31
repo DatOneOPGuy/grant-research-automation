@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Info, Sparkles } from 'lucide-react'
 import {
   ANY_CHRISTIAN, APPLICATION_STATUSES, CENSUS_DIVISIONS, CENSUS_REGIONS,
+  BENCHMARK_CATEGORIES, fetchBenchmarkOrgs, type BenchmarkOrg,
   CHRISTIAN_TRADITIONS, COVERAGE_BANDS, fetchCounties,
   DEADLINE_KINDS, DEADLINE_QUARTERS, DEADLINE_SEASONS, MISSION_REGIONS,
   MONTH_NAMES,
@@ -177,6 +178,101 @@ function CountyPicker({ filters, onChange }: {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Prospecting by peer, which is the only reliable way to find funders of
+ *  overseas work in this data.
+ *
+ *  The obvious filter -- "International" under Giving -- keys off a foreign
+ *  mailing address on the 990-PF, and essentially no US ministry has one.
+ *  Wycliffe files from Orlando, Samaritan's Purse from Boone. Around 90% of
+ *  the foundations funding their work are invisible to it. So this asks the
+ *  question that actually separates them: which of the major international
+ *  ministries has this foundation already funded, and how many of them. */
+function InternationalFilter({ filters, set }: {
+  filters: V5Filters; set: (patch: Partial<V5Filters>) => void
+}) {
+  const { data } = useQuery({
+    queryKey: ['benchmarkOrgs'], queryFn: fetchBenchmarkOrgs,
+    staleTime: Infinity,
+  })
+  const [showAll, setShowAll] = useState(false)
+
+  const toggle = (slug: string) => set({
+    benchmark: filters.benchmark.includes(slug)
+      ? filters.benchmark.filter((b) => b !== slug)
+      : [...filters.benchmark, slug],
+  })
+
+  const byCategory: Record<string, BenchmarkOrg[]> = {}
+  for (const org of data?.rows ?? []) {
+    (byCategory[org.category] ??= []).push(org)
+  }
+
+  return (
+    <div>
+      <div className="text-xs text-muted mb-1">Commitment</div>
+      {([
+        ['', 'Any'],
+        ['2', 'Funds 2+ of these ministries'],
+        ['3', 'Funds 3+ — an established programme'],
+        ['5', 'Funds 5+ — a major international funder'],
+      ] as const).map(([v, label]) => (
+        <label key={v || 'any'}
+          className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+          <input type="radio" name="minbench" className="accent-primary"
+            checked={filters.min_benchmarks === v}
+            onChange={() => set({ min_benchmarks: v })} />
+          {label}
+        </label>
+      ))}
+
+      <div className="mt-2 pt-2 border-t border-line/60">
+        <div className="text-xs text-muted mb-1">
+          Gave to specific ministries
+          {filters.benchmark.length > 0 && (
+            <button onClick={() => set({ benchmark: [] })}
+              className="ml-2 text-primary hover:underline">clear</button>
+          )}
+        </div>
+        {!data && <div className="text-xs text-muted py-1">Loading…</div>}
+        {Object.entries(BENCHMARK_CATEGORIES).map(([key, label]) => {
+          const orgs = byCategory[key]
+          if (!orgs?.length) return null
+          // Long tail hidden by default: the list is 41 ministries and the
+          // rail is 240px. The count on the toggle keeps that visible.
+          const shown = showAll ? orgs : orgs.slice(0, 3)
+          return (
+            <div key={key} className="mt-1.5">
+              <div className="text-[11px] uppercase tracking-wide
+                text-honey-800">{label}</div>
+              {shown.map((o) => (
+                <Check key={o.slug}
+                  label={
+                    <span className="flex items-baseline gap-1 min-w-0">
+                      <span className="truncate">{o.name}</span>
+                      <span className="text-[10px] text-muted tabular shrink-0">
+                        {o.funders.toLocaleString()}
+                      </span>
+                    </span>
+                  }
+                  checked={filters.benchmark.includes(o.slug)}
+                  onChange={() => toggle(o.slug)} />
+              ))}
+            </div>
+          )
+        })}
+        {(data?.rows.length ?? 0) > 0 && (
+          <button onClick={() => setShowAll((v) => !v)}
+            className="text-xs text-primary hover:underline mt-1.5">
+            {showAll
+              ? 'Show fewer'
+              : `Show all ${data?.rows.length} ministries`}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -504,6 +600,10 @@ export default function FilterPanel({ filters, onChange }: Props) {
         <NumInput value={filters.min_tradition_recipients}
           onChange={(v) => set({ min_tradition_recipients: v })}
           placeholder="e.g. 3" />
+      </Section>
+
+      <Section title="International" defaultOpen={false}>
+        <InternationalFilter filters={filters} set={set} />
       </Section>
 
       <Advanced filters={filters}>

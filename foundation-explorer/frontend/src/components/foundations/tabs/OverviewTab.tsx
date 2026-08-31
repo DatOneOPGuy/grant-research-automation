@@ -6,6 +6,7 @@ import {
 import { money } from '../../../lib/format'
 import { BarRow, Empty, SectionTitle, Stat } from './parts'
 import SectorBreakdown from './SectorBreakdown'
+import BenchmarkHits from './BenchmarkHits'
 
 export default function OverviewTab({ data }: { data: FoundationDetailV5 }) {
   const f = data.foundation
@@ -58,6 +59,10 @@ export default function OverviewTab({ data }: { data: FoundationDetailV5 }) {
       {/* Sits directly under the faith mix: the question it answers is the
           one the faith mix provokes. */}
       <SectorBreakdown sectors={data.sectors ?? []} />
+
+      {/* Renders nothing when there are no hits, so it costs no space on the
+          domestic funders that are most of the database. */}
+      <BenchmarkHits hits={data.benchmarks ?? []} />
 
       <div>
         <SectionTitle note="What a realistic ask looks like. The tallest bar is

@@ -43,8 +43,15 @@ const order = [...panel.matchAll(/<Section title="([^"]+)"/g)].map((m) => m[1])
 const advIdx = panel.indexOf('<Advanced filters=')
 const primary = [...panel.matchAll(/<Section title="([^"]+)"/g)]
   .filter((m) => m.index! < advIdx).map((m) => m[1])
-ok('Geography, Reachability and Recipient Faith come first',
-   JSON.stringify(primary) === JSON.stringify(['Geography', 'Reachability', 'Recipient Faith']))
+// International is primary despite being a later addition: the client's
+// fundraiser says over half their clients are international work, and it is
+// where they spend most of their time. It opens collapsed, so it costs no
+// vertical space until it is wanted.
+ok('Geography, Reachability, Recipient Faith and International come first',
+   JSON.stringify(primary) === JSON.stringify(
+     ['Geography', 'Reachability', 'Recipient Faith', 'International']))
+ok('International is collapsed by default, so it costs no space unused',
+   /<Section title="International" defaultOpen=\{false\}>/.test(panel))
 ok('Giving, Foundation and Data Quality are inside Advanced',
    ['Giving', 'Foundation', 'Data Quality'].every((t) => order.indexOf(t) >= 0
      && panel.indexOf(`<Section title="${t}"`) > advIdx))

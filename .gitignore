@@ -58,3 +58,6 @@ nonprofit_prospects*.csv
 
 # Census crosswalk source files (regenerable, ~5 MB)
 data/census/
+
+# Audit output from src/build_benchmark_index --review (regenerable)
+data/benchmark_review.csv

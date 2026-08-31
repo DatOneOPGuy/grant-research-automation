@@ -72,6 +72,17 @@ export function buildChips(
     id: 'gtr', label: `Region: ${f.gives_to_region.join(', ')}`,
     onRemove: () => set({ gives_to_region: [] }),
   })
+  if (f.benchmark.length) chips.push({
+    id: 'bench',
+    label: `Funds: ${f.benchmark.length === 1
+      ? f.benchmark[0].replace(/-/g, ' ')
+      : `${f.benchmark.length} ministries`}`,
+    onRemove: () => set({ benchmark: [] }),
+  })
+  if (f.min_benchmarks) chips.push({
+    id: 'minbench', label: `Funds ${f.min_benchmarks}+ intl ministries`,
+    onRemove: () => set({ min_benchmarks: '' }),
+  })
   if (f.gives_to_county.length) chips.push({
     id: 'gtc',
     label: `County: ${f.gives_to_county

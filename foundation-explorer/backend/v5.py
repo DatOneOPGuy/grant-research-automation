@@ -158,6 +158,8 @@ def foundations(
     # src/build_geo_index.py.
     gives_to_region: str | None = None,
     gives_to_county: str | None = None,
+    benchmark: str | None = None,
+    min_benchmarks: int | None = None,
     application_status: str | None = None,
     has_website: bool = False, has_email: bool = False,
     has_contact: bool = False,
@@ -258,6 +260,27 @@ def foundations(
             where.append(
                 "EXISTS (SELECT 1 FROM foundation_counties fc "
                 f"WHERE fc.ein=f.ein AND ({' OR '.join(clauses)}))")
+    # International prospecting by peer. The "international" filters below
+    # key off a foreign mailing address, which almost no US-based ministry
+    # has -- Wycliffe is in Orlando, Samaritan's Purse in Boone -- so around
+    # 90% of the funders of overseas work are invisible to them. These two
+    # ask the useful question instead: who funds the major international
+    # ministries. See src/international_orgs.py.
+    if benchmark:
+        slugs = [b.strip() for b in benchmark.split(",") if b.strip()]
+        if slugs:
+            marks = ",".join("?" for _ in slugs)
+            where.append(
+                "EXISTS (SELECT 1 FROM benchmark_hits bh "
+                f"WHERE bh.ein=f.ein AND bh.slug IN ({marks}))")
+            params += slugs
+    if min_benchmarks:
+        # Distinct ministries, not grants. One is a data point; several is a
+        # deliberate international programme, which is the real signal.
+        where.append(
+            "(SELECT COUNT(DISTINCT bh.slug) FROM benchmark_hits bh "
+            "WHERE bh.ein=f.ein) >= ?")
+        params.append(min_benchmarks)
     if gives_to_state:
         codes = [s.strip().upper() for s in gives_to_state.split(",") if s.strip()]
         placeholders = ",".join("?" for _ in codes)
@@ -505,6 +528,10 @@ def foundation_detail(ein: str):
                    COUNT(DISTINCT entity_id) AS recipients
             FROM grants WHERE funder_ein=? GROUP BY 1 ORDER BY 1""",
             (ein,)).fetchall()
+        benchmarks = conn.execute("""
+            SELECT bh.slug, bo.name, bo.category, bh.dollars, bh.grants
+            FROM benchmark_hits bh JOIN benchmark_orgs bo ON bo.slug=bh.slug
+            WHERE bh.ein=? ORDER BY bh.dollars DESC""", (ein,)).fetchall()
         top_foreign = conn.execute(f"""
             SELECT COALESCE(r.display_name, g.recipient_name) AS name,
                    g.country_name, g.recipient_country, g.recipient_city,
@@ -518,6 +545,7 @@ def foundation_detail(ein: str):
             "traditions": [dict(r) for r in traditions],
             "sectors": sectors,
             "counties": [dict(r) for r in counties_rows],
+            "benchmarks": [dict(r) for r in benchmarks],
             "recipients": [dict(r) for r in recipients],
             "states": [dict(r) for r in states],
             "countries": [dict(r) for r in countries],
@@ -1101,6 +1129,22 @@ def counties(state: str | None = None, q: str | None = None,
             ORDER BY dollars DESC LIMIT ?"""  # noqa: S608
     with connect() as conn:
         rows = conn.execute(sql, (*params, limit)).fetchall()
+    return {"rows": [dict(r) for r in rows]}
+
+
+@router.get("/benchmark-orgs")
+@cached_aggregate
+def benchmark_orgs():
+    """The curated international-ministry list, for the filter picker.
+
+    Grouped by category so a fundraiser can pick the peers that look like
+    their own client rather than working the whole list. funders is how many
+    foundations gave to each, which is what makes one a useful seed.
+    """
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT slug, name, category, dollars, funders, name_count
+            FROM benchmark_orgs ORDER BY funders DESC""").fetchall()
     return {"rows": [dict(r) for r in rows]}
 
 
