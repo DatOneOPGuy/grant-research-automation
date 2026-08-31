@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Info, Sparkles } from 'lucide-react'
 import {
@@ -26,6 +26,61 @@ function Section({ title, children, defaultOpen = true }: {
         {title}
       </button>
       {open && children}
+    </div>
+  )
+}
+
+// Filters that live under "Advanced". Everything a fundraiser reaches for
+// first -- where a funder gives, whether they can be approached, and what
+// they fund -- stays above this line; these are the ones you go looking for
+// once you already have a shortlist.
+const ADVANCED_KEYS: (keyof V5Filters)[] = [
+  'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
+  'active_year', 'recipient_search',
+  'min_assets', 'max_assets', 'min_revenue', 'exclude_testamentary',
+  'exclude_micro', 'include_inactive', 'daf', 'min_christian',
+  'min_pct_christian', 'deadline_season', 'deadline_months', 'deadline_kind',
+  'deadline_from_month', 'deadline_to_month',
+  'coverage_band', 'min_coverage',
+]
+
+function countAdvanced(filters: V5Filters): number {
+  return ADVANCED_KEYS.filter((k) =>
+    JSON.stringify(filters[k]) !== JSON.stringify(defaultV5Filters[k])).length
+}
+
+/** Collapsed by default, but never silently: the toggle carries a count, so a
+ *  filter set in here cannot quietly narrow the results with no sign of it.
+ *  Opens automatically when something inside it is already active, which is
+ *  what happens when a preset or a shared URL sets one. */
+function Advanced({ filters, children }: {
+  filters: V5Filters; children: ReactNode
+}) {
+  const active = countAdvanced(filters)
+  const [open, setOpen] = useState(active > 0)
+  const wasActive = useRef(active)
+  useEffect(() => {
+    // Open if something in here became active while it was shut.
+    if (active > wasActive.current && !open) setOpen(true)
+    wasActive.current = active
+  }, [active, open])
+
+  return (
+    <div className="mt-1">
+      <button onClick={() => setOpen(!open)} aria-expanded={open}
+        className="flex items-center gap-1.5 w-full text-xs font-semibold
+          uppercase tracking-wide text-muted mb-2 hover:text-ink">
+        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        Advanced filters
+        {active > 0 && (
+          <span className="ml-auto normal-case tracking-normal text-[11px]
+            bg-primary text-white rounded-full px-1.5 py-0.5 font-medium
+            tabular">
+            {active}
+          </span>
+        )}
+      </button>
+      {open && <div>{children}</div>}
     </div>
   )
 }
@@ -179,84 +234,7 @@ export default function FilterPanel({ filters, onChange }: Props) {
         </div>
       </div>
 
-      <Section title="Recipient Faith">
-        <Check label={<span className="font-medium">Any Christian</span>}
-          checked={filters.tradition.includes(ANY_CHRISTIAN)}
-          onChange={toggleAnyChristian} />
-        <div className="pl-4 border-l border-line/60 ml-1.5">
-          {CHRISTIAN_TRADITIONS.map(([k, label]) => (
-            <Check key={k} label={label}
-              checked={filters.tradition.includes(k)}
-              onChange={() => toggleChristian(k)} />
-          ))}
-        </div>
-        <div className="mt-1.5">
-          {OTHER_TRADITIONS.map(([k, label]) => (
-            <Check key={k} label={label}
-              checked={filters.tradition.includes(k)}
-              onChange={() => toggleIn('tradition', k)} />
-          ))}
-        </div>
-        <div className="mt-2 pt-2 border-t border-line/60">
-          <div className="text-xs text-muted mb-1">Evidence tier</div>
-          {([
-            ['any', 'All evidence'],
-            ['authoritative', 'High-confidence only (NTEE / church-code / GEN / human)'],
-            ['mission', 'Mission-text classified (from the org’s own 990)'],
-          ] as const).map(([v, label]) => (
-            <label key={v}
-              className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
-              <input type="radio" name="tier" className="accent-primary"
-                checked={filters.tier === v}
-                onChange={() => set({ tier: v })} />
-              {label}
-            </label>
-          ))}
-        </div>
-        <div className="text-xs text-muted mb-1 mt-2">
-          Min $ to selected tradition
-        </div>
-        <NumInput value={filters.min_tradition_dollars}
-          onChange={(v) => set({ min_tradition_dollars: v })}
-          placeholder="e.g. 100000" />
-        <div className="text-xs text-muted mb-1 mt-2">
-          Min # recipients of tradition
-        </div>
-        <NumInput value={filters.min_tradition_recipients}
-          onChange={(v) => set({ min_tradition_recipients: v })}
-          placeholder="e.g. 3" />
-      </Section>
-
-      <Section title="Giving">
-        <Range label="Total paid (2023–24)"
-          lo={filters.min_paid} hi={filters.max_paid}
-          onLo={(v) => set({ min_paid: v })}
-          onHi={(v) => set({ max_paid: v })} />
-        <Range label="Median grant"
-          lo={filters.min_median} hi={filters.max_median}
-          onLo={(v) => set({ min_median: v })}
-          onHi={(v) => set({ max_median: v })} />
-        <div className="text-xs text-muted mb-1">Min grant count</div>
-        <NumInput value={filters.min_grants}
-          onChange={(v) => set({ min_grants: v })} placeholder="e.g. 10" />
-        <div className="text-xs text-muted mb-1 mt-2">Active in year</div>
-        <select className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
-          value={filters.active_year}
-          onChange={(e) => set({ active_year: e.target.value })}>
-          <option value="">Either year</option>
-          <option value="2023">2023</option>
-          <option value="2024">2024</option>
-        </select>
-        <div className="text-xs text-muted mb-1 mt-2">
-          Gave to a recipient named…
-        </div>
-        <input placeholder="e.g. Young Life"
-          className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
-          value={filters.recipient_search}
-          onChange={(e) => set({ recipient_search: e.target.value })} />
-      </Section>
-
-      <Section title="Geography" defaultOpen={false}>
+      <Section title="Geography">
         <div className="text-xs text-muted mb-1">Foundation located in</div>
         <StateMultiSelect values={filters.state}
           onSet={(next) => set({ state: next })} />
@@ -318,8 +296,7 @@ export default function FilterPanel({ filters, onChange }: Props) {
             onChange={(v) => set({ min_countries: v })} placeholder="e.g. 3" />
         </div>
       </Section>
-
-      <Section title="Reachability" defaultOpen={false}>
+      <Section title="Reachability">
         <div className="text-xs text-muted mb-1">Application status</div>
         {APPLICATION_STATUSES.map((s) => (
           <Check key={s} label={s}
@@ -335,7 +312,90 @@ export default function FilterPanel({ filters, onChange }: Props) {
             onChange={(v) => set({ has_contact: v })} />
         </div>
       </Section>
+      <Section title="Denomination">
+        {/* The old heading said "Recipient Faith", which was clearer about
+            whose faith this is. Renaming it lost that, so it is said here:
+            these match on where the money went, not on how the foundation
+            describes itself. */}
+        <div className="text-[11px] text-muted mb-1.5 leading-snug">
+          Who the foundation gives to, not its own affiliation.
+        </div>
+        <Check label={<span className="font-medium">Any Christian</span>}
+          checked={filters.tradition.includes(ANY_CHRISTIAN)}
+          onChange={toggleAnyChristian} />
+        <div className="pl-4 border-l border-line/60 ml-1.5">
+          {CHRISTIAN_TRADITIONS.map(([k, label]) => (
+            <Check key={k} label={label}
+              checked={filters.tradition.includes(k)}
+              onChange={() => toggleChristian(k)} />
+          ))}
+        </div>
+        <div className="mt-1.5">
+          {OTHER_TRADITIONS.map(([k, label]) => (
+            <Check key={k} label={label}
+              checked={filters.tradition.includes(k)}
+              onChange={() => toggleIn('tradition', k)} />
+          ))}
+        </div>
+        <div className="mt-2 pt-2 border-t border-line/60">
+          <div className="text-xs text-muted mb-1">Evidence tier</div>
+          {([
+            ['any', 'All evidence'],
+            ['authoritative', 'High-confidence only (NTEE / church-code / GEN / human)'],
+            ['mission', 'Mission-text classified (from the org’s own 990)'],
+          ] as const).map(([v, label]) => (
+            <label key={v}
+              className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
+              <input type="radio" name="tier" className="accent-primary"
+                checked={filters.tier === v}
+                onChange={() => set({ tier: v })} />
+              {label}
+            </label>
+          ))}
+        </div>
+        <div className="text-xs text-muted mb-1 mt-2">
+          Min $ to selected tradition
+        </div>
+        <NumInput value={filters.min_tradition_dollars}
+          onChange={(v) => set({ min_tradition_dollars: v })}
+          placeholder="e.g. 100000" />
+        <div className="text-xs text-muted mb-1 mt-2">
+          Min # recipients of tradition
+        </div>
+        <NumInput value={filters.min_tradition_recipients}
+          onChange={(v) => set({ min_tradition_recipients: v })}
+          placeholder="e.g. 3" />
+      </Section>
 
+      <Advanced filters={filters}>
+      <Section title="Giving" defaultOpen={false}>
+        <Range label="Total paid (2023–24)"
+          lo={filters.min_paid} hi={filters.max_paid}
+          onLo={(v) => set({ min_paid: v })}
+          onHi={(v) => set({ max_paid: v })} />
+        <Range label="Median grant"
+          lo={filters.min_median} hi={filters.max_median}
+          onLo={(v) => set({ min_median: v })}
+          onHi={(v) => set({ max_median: v })} />
+        <div className="text-xs text-muted mb-1">Min grant count</div>
+        <NumInput value={filters.min_grants}
+          onChange={(v) => set({ min_grants: v })} placeholder="e.g. 10" />
+        <div className="text-xs text-muted mb-1 mt-2">Active in year</div>
+        <select className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
+          value={filters.active_year}
+          onChange={(e) => set({ active_year: e.target.value })}>
+          <option value="">Either year</option>
+          <option value="2023">2023</option>
+          <option value="2024">2024</option>
+        </select>
+        <div className="text-xs text-muted mb-1 mt-2">
+          Gave to a recipient named…
+        </div>
+        <input placeholder="e.g. Young Life"
+          className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
+          value={filters.recipient_search}
+          onChange={(e) => set({ recipient_search: e.target.value })} />
+      </Section>
       <Section title="Foundation" defaultOpen={false}>
         <Range label="Total assets"
           lo={filters.min_assets} hi={filters.max_assets}
@@ -447,7 +507,6 @@ export default function FilterPanel({ filters, onChange }: Props) {
           </label>
         ))}
       </Section>
-
       <Section title="Data Quality" defaultOpen={false}>
         <div className="flex items-center gap-1 text-xs text-muted mb-1">
           Coverage band
@@ -469,6 +528,12 @@ export default function FilterPanel({ filters, onChange }: Props) {
           onChange={(e) => set({
             min_coverage: e.target.value === '0' ? '' : e.target.value })} />
       </Section>
+      </Advanced>
+
+
+
+
+
     </div>
   )
 }
