@@ -2,9 +2,11 @@
 
     python3 -m src.build_geo_index
 
-Adds one table, foundation_counties, mirroring recipient_states one level
-down. Regions need no table -- they are a mapping over the state code and live
-in src/geo_regions.py.
+Adds two tables. foundation_counties mirrors recipient_states one level down:
+where a funder's money went. recipient_counties answers the other question --
+where a recipient IS -- which has to be derived, because the recipients table
+carries no address at all. Regions need no table; they are a mapping over the
+state code and live in backend/regions.py.
 
 Counties are matched from the city on the filing against two Census files:
 places (32,188 of them) and county subdivisions, which is where the townships
@@ -12,9 +14,10 @@ that New Jersey and Pennsylvania file against live. Places win ties, since a
 filing naming "Princeton" means the town far more often than the township
 surrounding it.
 
-91.3% of US grant dollars match. The remainder is filings that wrote
-"VARIOUS", "NA" or "See Attached" in the city field; those are left unplaced
-rather than guessed at, and a county filter simply will not return them.
+88.8% of US grant dollars and 91.2% of recipients match. The remainder is
+filings that wrote "VARIOUS", "NA" or "See Attached" in the city field; those
+are left unplaced rather than guessed at, and a county filter simply will not
+return them.
 """
 
 from __future__ import annotations
@@ -29,7 +32,12 @@ import time
 import urllib.request
 from pathlib import Path
 
-from src.geo_regions import is_placeholder, place_keys
+from src.geo_regions import (
+    is_placeholder,
+    place_alias,
+    place_key,
+    place_keys,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "data" / "explorer_v5.db"
@@ -69,6 +77,33 @@ DROP INDEX IF EXISTS idx_county_lookup;
 CREATE INDEX idx_county_ein ON foundation_counties(ein, dollars DESC);
 CREATE INDEX idx_county_lookup
     ON foundation_counties(state, county, dollars DESC);
+"""
+
+# Where a recipient IS, as opposed to where a funder gives. The recipients
+# table carries no address at all -- location exists only per grant, on
+# grants.recipient_city/state -- so it has to be derived.
+#
+# One row per recipient, not one per place. An organisation has an address;
+# the several cities that show up for 12% of them are the same org written
+# from different filings, or an org that moved, not an org in two places. The
+# dominant place by dollars wins, and place_count records how many were seen
+# so a caller can tell a clean match from a contested one.
+RECIPIENT_SCHEMA = """
+DROP TABLE IF EXISTS recipient_counties;
+CREATE TABLE recipient_counties (
+    entity_id   TEXT PRIMARY KEY,
+    state       TEXT NOT NULL,
+    county      TEXT NOT NULL,
+    city        TEXT NOT NULL,
+    dollars     INTEGER NOT NULL,
+    place_count INTEGER NOT NULL
+);
+"""
+RECIPIENT_INDEXES = """
+DROP INDEX IF EXISTS idx_rc_lookup;
+DROP INDEX IF EXISTS idx_rc_state;
+CREATE INDEX idx_rc_lookup ON recipient_counties(state, county);
+CREATE INDEX idx_rc_state ON recipient_counties(state);
 """
 
 
@@ -115,9 +150,9 @@ def primary_county(place: str, counties: str | None) -> str | None:
     parts = [c.strip() for c in re.split(r"~~~|,", counties or "") if c.strip()]
     if not parts:
         return None
-    place_key = " ".join(sorted(place_keys(place))[:1])
+    key = place_key(place)
     for candidate in parts:
-        if place_key and place_key in " ".join(place_keys(candidate)):
+        if key and key in place_key(candidate):
             return candidate
     return parts[0]
 
@@ -133,8 +168,14 @@ def build_crosswalk() -> dict[tuple[str, str], str]:
             county = primary_county(row["PLACENAME"], row["COUNTIES"])
             if not county:
                 continue
-            for key in place_keys(row["PLACENAME"]):
-                votes[(row["STATE"], key)][county] += 2
+            name = row["PLACENAME"]
+            key = place_key(name)
+            if not key:
+                continue
+            votes[(row["STATE"], key)][county] += 8
+            alias = place_alias(name)
+            if alias:
+                votes[(row["STATE"], alias)][county] += 2
 
     with fetch("cousub2020.txt", SOURCES["cousub2020.txt"]).open(
             encoding="latin-1") as fh:
@@ -142,8 +183,14 @@ def build_crosswalk() -> dict[tuple[str, str], str]:
             county = (row["COUNTYNAME"] or "").strip()
             if not county or row["CLASSFP"] in STATISTICAL_CLASSES:
                 continue
-            for key in place_keys(row["COUSUBNAME"]):
-                votes[(row["STATE"], key)][county] += 1
+            name = row["COUSUBNAME"]
+            key = place_key(name)
+            if not key:
+                continue
+            votes[(row["STATE"], key)][county] += 4
+            alias = place_alias(name)
+            if alias:
+                votes[(row["STATE"], alias)][county] += 1
 
     return {k: v.most_common(1)[0][0] for k, v in votes.items()}
 
@@ -156,6 +203,57 @@ def county_of(crosswalk, city: str | None, state: str | None) -> str | None:
         if found:
             return found
     return None
+
+
+def build_recipient_counties(conn, crosswalk) -> None:
+    """Give every recipient one location, derived from its own grants."""
+    conn.executescript(RECIPIENT_SCHEMA)
+
+    rows = conn.execute("""
+        SELECT entity_id, recipient_state, recipient_city, SUM(amount) dollars
+        FROM grants
+        WHERE entity_id IS NOT NULL
+          AND COALESCE(recipient_state,'') != ''
+          AND COALESCE(recipient_city,'') != ''
+        GROUP BY entity_id, recipient_state, recipient_city
+        ORDER BY entity_id
+    """)
+
+    # best[entity_id] = (dollars, state, county, city); seen counts the
+    # distinct places, including ones no county could be found for -- a
+    # recipient split between two cities is contested whether or not both
+    # cities resolved.
+    best: dict[str, tuple[int, str, str, str]] = {}
+    seen: collections.Counter = collections.Counter()
+    while True:
+        chunk = rows.fetchmany(50_000)
+        if not chunk:
+            break
+        for entity_id, state, city, dollars in chunk:
+            seen[entity_id] += 1
+            county = county_of(crosswalk, city, state)
+            if county is None:
+                continue
+            amount = int(dollars or 0)
+            current = best.get(entity_id)
+            if current is None or amount > current[0]:
+                best[entity_id] = (amount, state.upper(), county, city)
+
+    conn.executemany(
+        "INSERT INTO recipient_counties"
+        "(entity_id, state, county, city, dollars, place_count) "
+        "VALUES (?,?,?,?,?,?)",
+        [(eid, s, c, city, d, seen[eid])
+         for eid, (d, s, c, city) in best.items()])
+    conn.executescript(RECIPIENT_INDEXES)
+    conn.commit()
+
+    total = conn.execute(
+        "SELECT COUNT(*) FROM recipients WHERE total_received > 0").fetchone()[0]
+    contested = sum(1 for eid in best if seen[eid] > 1)
+    log(f"recipients placed in a county: {len(best):,} of {total:,} "
+        f"({100*len(best)/total:.1f}%); {contested:,} had more than one "
+        f"place on file and took the one with the most dollars")
 
 
 def main() -> int:
@@ -223,6 +321,8 @@ def main() -> int:
         f"({100*placed/total:.1f}%); ${unplaced/1e9:.2f}B had no usable city")
     log(f"distinct counties: "
         f"{len({(s, c) for _, s, c in agg}):,}")
+
+    build_recipient_counties(conn, crosswalk)
 
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.execute("PRAGMA journal_mode=DELETE")

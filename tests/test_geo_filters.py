@@ -22,7 +22,7 @@ DB = ROOT / "data" / "explorer_v5.db"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(BACKEND))
 regions = pytest.importorskip("regions")
-from src.geo_regions import is_placeholder, place_keys  # noqa: E402
+from src.geo_regions import is_placeholder, place_alias, place_key, place_keys  # noqa: E402
 
 # --- regions ----------------------------------------------------------------
 
@@ -67,10 +67,39 @@ def test_place_keys_reach_census_spellings():
     metropolitan government (balance)". They have to meet."""
     assert "nashville" in place_keys("Nashville-Davidson metropolitan "
                                      "government (balance)")
-    assert "indianapolis" in place_keys("Indianapolis city (balance)")
-    assert place_keys("Dover city") == place_keys("DOVER")
-    assert place_keys("FT MITCHELL") == place_keys("Fort Mitchell city")
-    assert place_keys("ST LOUIS") == place_keys("Saint Louis city")
+    assert "louisville" in place_keys("Louisville/Jefferson County metro "
+                                      "government (balance)")
+    assert place_key("Indianapolis city (balance)") == "indianapolis"
+    assert place_key("Dover city") == place_key("DOVER")
+    assert place_key("FT MITCHELL") == place_key("Fort Mitchell city")
+    assert place_key("ST LOUIS") == place_key("Saint Louis city")
+
+
+@pytest.mark.parametrize("name", [
+    "San Francisco city", "New York city", "Los Angeles city",
+    "Fort Worth city", "Saint Paul city", "Kansas City city",
+])
+def test_multi_word_names_have_no_bare_first_word_alias(name):
+    """The bug this exists to prevent.
+
+    place_keys used to append the first word of any multi-word name, so every
+    "San ..." city in California shared the key "san" and every "New ..." the
+    key "new". One place won that vote and captured the rest, which is how a
+    filter for Los Angeles County came back full of San Francisco
+    organisations. Only hyphenated and slashed names get an alias now.
+    """
+    assert place_alias(name) == "", f"{name} should not have an alias"
+    assert place_keys(name) == [place_key(name)]
+
+
+def test_place_keys_are_ordered_exact_name_first():
+    """county_of takes the first key that resolves, so the exact name has to
+    come before the looser alias. This was a set, and set order is arbitrary
+    -- the alias sometimes won by accident."""
+    keys = place_keys("Nashville-Davidson metropolitan government (balance)")
+    assert isinstance(keys, list)
+    assert keys[0] == "nashville davidson"
+    assert keys[1] == "nashville"
 
 
 @pytest.mark.parametrize("value", [
@@ -149,3 +178,48 @@ def test_county_dollars_do_not_exceed_state_dollars():
         WHERE s IS NOT NULL AND c > s + 1""").fetchone()[0]
     conn.close()
     assert bad == 0, f"{bad} (funder, state) pairs have counties exceeding the state"
+
+
+def test_distinct_cities_do_not_collapse_into_one_county():
+    """Places that merely share a first word must land separately."""
+    conn = _conn()
+    got = {}
+    for city in ("SAN FRANCISCO", "SAN LUIS OBISPO", "SAN DIEGO"):
+        row = conn.execute(
+            "SELECT county FROM recipient_counties WHERE UPPER(city)=? "
+            "AND state='CA' GROUP BY county ORDER BY COUNT(*) DESC LIMIT 1",
+            (city,)).fetchone()
+        if row:
+            got[city] = row["county"]
+    conn.close()
+    assert len(set(got.values())) == len(got), f"collapsed together: {got}"
+    assert got.get("SAN FRANCISCO") == "San Francisco County"
+
+
+def test_recipient_locations_agree_with_their_city():
+    """Spot-check consolidated governments, where city name != county name."""
+    conn = _conn()
+    for city, state, county in (
+        ("NASHVILLE", "TN", "Davidson County"),
+        ("LOUISVILLE", "KY", "Jefferson County"),
+        ("BROOKLYN", "NY", "Kings County"),
+        ("PASADENA", "CA", "Los Angeles County"),
+    ):
+        row = conn.execute(
+            "SELECT county FROM recipient_counties WHERE UPPER(city)=? "
+            "AND state=? GROUP BY county ORDER BY COUNT(*) DESC LIMIT 1",
+            (city, state)).fetchone()
+        assert row, f"{city} placed nowhere"
+        assert row["county"] == county, f"{city} -> {row['county']}"
+    conn.close()
+
+
+def test_every_recipient_has_exactly_one_location():
+    """An organisation has an address. Two rows would double-count it in any
+    county filter."""
+    conn = _conn()
+    dupes = conn.execute(
+        "SELECT COUNT(*) FROM (SELECT entity_id FROM recipient_counties "
+        "GROUP BY entity_id HAVING COUNT(*) > 1)").fetchone()[0]
+    conn.close()
+    assert dupes == 0

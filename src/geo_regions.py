@@ -31,23 +31,47 @@ _PARENS = re.compile(r"\([^)]*\)")
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 
 
-def place_keys(name: str | None) -> set[str]:
-    """Every spelling of a place worth trying, so both sides can meet.
-
-    Returns more than one key on purpose. "Nashville-Davidson metropolitan
-    government (balance)" and "NASHVILLE" have to reach each other, and the
-    only way is to also index the leading word.
-    """
-    text = _PARENS.sub(" ", (name or "").lower())
-    words = [w for w in _NON_ALNUM.sub(" ", text).split()
+def _normalise(text: str) -> str:
+    words = [w for w in _NON_ALNUM.sub(" ", text.lower()).split()
              if w not in PLACE_WORDS]
-    words = [ABBREVIATIONS.get(w, w) for w in words]
-    if not words:
-        return set()
-    keys = {" ".join(words)}
-    if len(words) > 1:
-        keys.add(words[0])
-    return keys
+    return " ".join(ABBREVIATIONS.get(w, w) for w in words)
+
+
+def place_key(name: str | None) -> str:
+    """The one canonical spelling of a place name."""
+    return _normalise(_PARENS.sub(" ", name or ""))
+
+
+def place_alias(name: str | None) -> str:
+    """A secondary spelling for consolidated city-county governments.
+
+    Census writes Nashville as "Nashville-Davidson metropolitan government
+    (balance)" and Louisville as "Louisville/Jefferson County metro
+    government"; filings write "NASHVILLE". The part before the hyphen or
+    slash is what a person would call the place.
+
+    This used to be the first WORD of any multi-word name, which was a
+    serious error: it gave every "San ..." city in California the shared key
+    "san" and every "New ..." the key "new". Whichever place won that vote
+    captured all of them, so a filter for Los Angeles County returned
+    organisations in San Francisco. Only names that actually contain a hyphen
+    or slash get an alias now, and aliases are outvoted by real names.
+    """
+    text = _PARENS.sub(" ", name or "")
+    head = re.split(r"[-/]", text, maxsplit=1)[0]
+    alias = _normalise(head)
+    return alias if alias and alias != place_key(name) else ""
+
+
+def place_keys(name: str | None) -> list[str]:
+    """Canonical name first, then any alias.
+
+    Ordered, not a set. county_of tries these in turn and takes the first
+    that resolves, so the exact name has to be tried before the looser
+    alias -- iterating a set here meant the alias sometimes won by accident.
+    """
+    keys = [k for k in (place_key(name), place_alias(name)) if k]
+    return list(dict.fromkeys(keys))
 
 
 # Values filings use to mean "not stated". Matching these to a real place

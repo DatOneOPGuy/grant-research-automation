@@ -182,15 +182,25 @@ export function fetchFoundationRecipients(
 }
 
 export type CountyOption = {
-  state: string; county: string; dollars: number; funders: number
+  state: string; county: string; dollars: number
+  funders?: number      // scope=funders
+  recipients?: number   // scope=recipients
 }
 
-/** Counties present in the data, biggest first, for the filter picker. */
-export function fetchCounties(q: string, state: string[] = [], limit = 60):
-Promise<{ rows: CountyOption[] }> {
+/** Counties present in the data, biggest first, for the filter pickers.
+ *
+ *  Two scopes because the two pages ask different questions: 'funders' ranks
+ *  by money sent INTO a county, 'recipients' by how many organisations are
+ *  located there. A county can take a lot of money through few organisations,
+ *  so one shared list would be wrong on one of the two pages. */
+export function fetchCounties(
+  q: string, state: string[] = [], limit = 60,
+  scope: 'funders' | 'recipients' = 'funders',
+): Promise<{ rows: CountyOption[] }> {
   const p = new URLSearchParams({ limit: String(limit) })
   if (q.trim()) p.set('q', q.trim())
   if (state.length) p.set('state', state.join(','))
+  if (scope !== 'funders') p.set('scope', scope)
   return getV5(`/api/v5/counties?${p}`)
 }
 
@@ -846,6 +856,15 @@ export type RecipientRowV5 = {
   total_received: number
   funder_count: number
   has_mission: boolean
+  // Derived location: the recipients table carries no address, so this comes
+  // from the place its own grants put it in. Null for the ~9% whose grants
+  // never carried a usable city.
+  state: string | null
+  county: string | null
+  city: string | null
+  // How many distinct places were seen on its grants. >1 means the location
+  // is the dominant one by dollars, not the only one on file.
+  place_count: number | null
 }
 
 export function fetchRecipientsV5(qs: string): Promise<{

@@ -713,10 +713,32 @@ def recipients(
     identity_status: str | None = None,
     method: str | None = None,
     min_received: int | None = None,
+    state: str | None = None,
+    county: str | None = None,
     page: int = 1,
     page_size: int = Query(50, le=200),
 ):
     where, params = ["r.total_received > 0"], []
+    # Recipient location is derived, not filed: the recipients table has no
+    # address, so recipient_counties carries the place its own grants put it
+    # in. 92.8% of recipients resolve; the rest had no usable city on any
+    # grant and a location filter will not return them.
+    if state:
+        codes = [c.strip().upper() for c in state.split(",") if c.strip()]
+        if codes:
+            placeholders = ",".join("?" for _ in codes)
+            where.append(f"rc.state IN ({placeholders})")
+            params += codes
+    if county:
+        # "CA|Los Angeles County", matching the foundations filter's format.
+        pairs = [c.split("|", 1) for c in county.split(",") if "|" in c]
+        if not pairs:
+            raise HTTPException(400, "county must be STATE|County Name")
+        clauses = " OR ".join(
+            "(rc.state = ? AND rc.county = ?)" for _ in pairs)
+        where.append(f"({clauses})")
+        for st, name in pairs:
+            params += [st.strip().upper(), name.strip()]
     if q:
         where.append("r.name LIKE ?")
         params.append(f"%{q}%")
@@ -738,18 +760,22 @@ def recipients(
         where.append("r.total_received >= ?")
         params.append(min_received)
     sql_where = " AND ".join(where)
+    # LEFT JOIN so the location columns can be shown on every row, while the
+    # WHERE above is what actually restricts when a filter is set.
+    join = ("LEFT JOIN recipient_counties rc ON rc.entity_id = r.entity_id")
     with connect() as conn:
         total = conn.execute(
-            f"SELECT COUNT(*) FROM recipients r WHERE {sql_where}",  # noqa: S608
+            f"SELECT COUNT(*) FROM recipients r {join} WHERE {sql_where}",  # noqa: S608
             params).fetchone()[0]
         rows = conn.execute(f"""
             SELECT r.entity_id, COALESCE(r.display_name, r.name) AS name,
                    r.ein, r.identity_status, r.tradition, r.method,
                    r.confidence, r.reason, r.is_daf, r.total_received,
-                   r.funder_count,
+                   r.funder_count, rc.state, rc.county, rc.city,
+                   rc.place_count,
                    (r.mission_text IS NOT NULL AND r.mission_text != '')
                        AS has_mission
-            FROM recipients r WHERE {sql_where}
+            FROM recipients r {join} WHERE {sql_where}
             ORDER BY r.total_received DESC LIMIT ? OFFSET ?""",  # noqa: S608
             [*params, page_size, (page - 1) * page_size]).fetchall()
     return {"total": total, "rows": [dict(r) for r in rows]}
@@ -1024,30 +1050,57 @@ def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
 
 @router.get("/counties")
 def counties(state: str | None = None, q: str | None = None,
+             scope: str = "funders",
              limit: int = Query(200, ge=1, le=2000)):
-    """Counties that appear in the data, for the filter picker.
+    """Counties that appear in the data, for the filter pickers.
 
-    Ordered by dollars received, so the ones a user is likely to want are at
-    the top of the list rather than alphabetically adrift among 3,948.
+    Two scopes, because the two pages ask different questions. "funders"
+    counts money sent INTO a county and drives the foundations filter; and
+    "recipients" counts organisations located IN one and drives the
+    recipients filter. They rank differently -- a county can receive a great
+    deal of money through very few organisations -- so a shared list would be
+    wrong on one page or the other.
+
+    Ordered by size, so the counties a user is likely to want are at the top
+    rather than alphabetically adrift among 3,163.
     """
+    if scope not in ("funders", "recipients"):
+        raise HTTPException(400, "scope must be 'funders' or 'recipients'")
+    # Column prefix, so the same predicates work against either table. Built
+    # in rather than patched into the finished SQL by string replacement --
+    # that breaks the moment a condition mentions another column.
+    p = "rc." if scope == "recipients" else ""
     where, params = ["1=1"], []
     if state:
         codes = [c.strip().upper() for c in state.split(",") if c.strip()]
         if codes:
-            where.append(f"state IN ({','.join('?' for _ in codes)})")
+            where.append(f"{p}state IN ({','.join('?' for _ in codes)})")
             params += codes
     if q and q.strip():
-        where.append("county LIKE ? ESCAPE '\\'")
+        where.append(f"{p}county LIKE ? ESCAPE '\\'")
         params.append("%" + q.strip().replace("%", "\\%")
                       .replace("_", "\\_") + "%")
-    with connect() as conn:
-        rows = conn.execute(f"""
+    sql_where = " AND ".join(where)
+
+    if scope == "recipients":
+        sql = f"""
+            SELECT rc.state, rc.county, COUNT(*) AS recipients,
+                   COALESCE(SUM(r.total_received), 0) AS dollars
+            FROM recipient_counties rc
+            JOIN recipients r ON r.entity_id = rc.entity_id
+            WHERE {sql_where}
+            GROUP BY rc.state, rc.county
+            ORDER BY recipients DESC LIMIT ?"""  # noqa: S608
+    else:
+        sql = f"""
             SELECT state, county, SUM(dollars) AS dollars,
                    COUNT(DISTINCT ein) AS funders
             FROM foundation_counties
-            WHERE {' AND '.join(where)}
+            WHERE {sql_where}
             GROUP BY state, county
-            ORDER BY dollars DESC LIMIT ?""", (*params, limit)).fetchall()
+            ORDER BY dollars DESC LIMIT ?"""  # noqa: S608
+    with connect() as conn:
+        rows = conn.execute(sql, (*params, limit)).fetchall()
     return {"rows": [dict(r) for r in rows]}
 
 

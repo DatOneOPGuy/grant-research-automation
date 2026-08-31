@@ -7,6 +7,7 @@ import {
 } from '../lib/apiV5'
 import { money, moneyFull, num, titleCase } from '../lib/format'
 import { Card, CardTitle, Skeleton } from '../components/ui/primitives'
+import CountyFilter from '../components/recipients/CountyFilter'
 import { IdentityChip, TraditionChip } from '../components/foundations/V5Chips'
 
 const PAGE_SIZE = 50
@@ -22,6 +23,7 @@ export default function Recipients() {
   const [tradition, setTradition] = useState('')
   const [identity, setIdentity] = useState('')
   const [minReceived, setMinReceived] = useState('')
+  const [counties, setCounties] = useState<string[]>([])
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
 
@@ -36,10 +38,11 @@ export default function Recipients() {
     if (tradition) p.set('tradition', tradition)
     if (identity) p.set('identity_status', identity)
     if (minReceived) p.set('min_received', minReceived)
+    if (counties.length) p.set('county', counties.join(','))
     p.set('page', String(page))
     p.set('page_size', String(PAGE_SIZE))
     return p.toString()
-  }, [debounced, tradition, identity, minReceived, page])
+  }, [debounced, tradition, identity, minReceived, counties, page])
 
   const { data, isFetching } = useQuery({
     queryKey: ['v5recipients', qs],
@@ -124,9 +127,11 @@ export default function Recipients() {
               className="mt-1 border border-line rounded px-2 py-1.5 text-sm
                 w-32" />
           </label>
+          <CountyFilter value={counties}
+            onChange={(next) => { setCounties(next); setPage(1) }} />
           <button onClick={() => {
             setQ(''); setTradition(''); setIdentity(''); setMinReceived('')
-            setPage(1)
+            setCounties([]); setPage(1)
           }} className="text-sm text-primary hover:underline pb-1.5">
             Reset
           </button>
@@ -144,6 +149,7 @@ export default function Recipients() {
             <thead>
               <tr className="text-left text-xs text-muted border-b border-line">
                 <th className="py-2">Recipient</th>
+                <th>Location</th>
                 <th>Classification</th>
                 <th>Method</th>
                 <th className="text-right">Received</th>
@@ -151,7 +157,7 @@ export default function Recipients() {
               </tr>
             </thead>
             <tbody>
-              {!data && <tr><td colSpan={5} className="py-6">
+              {!data && <tr><td colSpan={6} className="py-6">
                 <Skeleton className="h-40" /></td></tr>}
               {data?.rows.map((r: RecipientRowV5) => (
                 <Fragment key={r.entity_id}>
@@ -164,6 +170,28 @@ export default function Recipients() {
                       {r.identity_status !== 'matched_bmf' && (
                         <span className="ml-1.5">
                           <IdentityChip status={r.identity_status} /></span>
+                      )}
+                    </td>
+                    <td className="pr-3 text-xs whitespace-nowrap">
+                      {r.county ? (
+                        <>
+                          <div className="text-ink">
+                            {titleCase(r.city || '')}, {r.state}
+                          </div>
+                          <div className="text-muted"
+                            title={r.place_count && r.place_count > 1
+                              ? `${r.place_count} different places appear on `
+                                + 'this organisation\u2019s grants; this is '
+                                + 'the one with the most dollars.'
+                              : undefined}>
+                            {r.county.replace(/ County$/, '')}
+                            {r.place_count != null && r.place_count > 1 && ' *'}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-muted"
+                          title="No usable city appeared on any of this
+                            organisation's grants.">—</span>
                       )}
                     </td>
                     <td className="pr-3">
@@ -186,7 +214,7 @@ export default function Recipients() {
                   </tr>
                   {expanded === r.entity_id && (
                     <tr className="border-b border-line/60 bg-canvas/50">
-                      <td colSpan={5} className="py-3 px-3">
+                      <td colSpan={6} className="py-3 px-3">
                         {r.reason && (
                           <div className="text-xs text-muted mb-2">
                             <span className="font-medium text-ink">
@@ -220,7 +248,7 @@ export default function Recipients() {
                 </Fragment>
               ))}
               {data?.rows.length === 0 && (
-                <tr><td colSpan={5} className="py-6 text-center text-muted">
+                <tr><td colSpan={6} className="py-6 text-center text-muted">
                   No recipients match these filters.
                 </td></tr>
               )}
