@@ -19,7 +19,8 @@ function Section({ title, children, defaultOpen = true }: {
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border-b border-line pb-3 mb-3">
+    <div className="border-b border-line pb-3 mb-3
+      last:border-b-0 last:pb-0 last:mb-0">
       <button onClick={() => setOpen(!open)}
         className="flex items-center gap-1 w-full text-xs font-semibold uppercase tracking-wide text-muted mb-2">
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
@@ -66,7 +67,7 @@ function Advanced({ filters, children }: {
   }, [active, open])
 
   return (
-    <div className="mt-1">
+    <div className="mt-4">
       <button onClick={() => setOpen(!open)} aria-expanded={open}
         className="flex items-center gap-1.5 w-full text-xs font-semibold
           uppercase tracking-wide text-muted mb-2 hover:text-ink">
@@ -80,7 +81,14 @@ function Advanced({ filters, children }: {
           </span>
         )}
       </button>
-      {open && <div>{children}</div>}
+      {/* Indented behind a rule so the three sections inside read as
+          belonging to this group rather than as three more siblings of it --
+          they are the same visual weight as the primary sections otherwise.
+          mt-2 because the first child's heading sat directly against this
+          one. */}
+      {open && (
+        <div className="mt-2 pl-3 border-l border-line/60">{children}</div>
+      )}
     </div>
   )
 }
