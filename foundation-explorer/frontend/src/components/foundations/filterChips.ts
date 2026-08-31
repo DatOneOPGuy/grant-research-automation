@@ -68,6 +68,17 @@ export function buildChips(
     id: 'st', label: `Located in: ${statesLabel(f.state)}`,
     onRemove: () => set({ state: [] }),
   })
+  if (f.gives_to_region.length) chips.push({
+    id: 'gtr', label: `Region: ${f.gives_to_region.join(', ')}`,
+    onRemove: () => set({ gives_to_region: [] }),
+  })
+  if (f.gives_to_county.length) chips.push({
+    id: 'gtc',
+    label: `County: ${f.gives_to_county
+      .map((c) => c.split('|')[1].replace(/ County$/, ''))
+      .join(', ')}`,
+    onRemove: () => set({ gives_to_county: [] }),
+  })
   if (f.gives_to_state.length) chips.push({
     id: 'gts', label: `Gives to: ${statesLabel(f.gives_to_state)}`,
     onRemove: () => set({ gives_to_state: [] }),

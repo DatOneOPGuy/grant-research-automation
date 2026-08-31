@@ -12,6 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
+from regions import DIVISION_NAMES, REGIONS, states_in_region
 
 ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT / "data" / "explorer_v5.db"
@@ -152,6 +153,11 @@ def foundations(
     recipient_search: str | None = None,
     state: str | None = None,
     gives_to_state: str | None = None,
+    # Geography above and below the state. A region expands to its states, so
+    # it filters the same indexed column; a county reads the rollup built by
+    # src/build_geo_index.py.
+    gives_to_region: str | None = None,
+    gives_to_county: str | None = None,
     application_status: str | None = None,
     has_website: bool = False, has_email: bool = False,
     has_contact: bool = False,
@@ -226,6 +232,32 @@ def foundations(
         codes = [s.strip().upper() for s in state.split(",") if s.strip()]
         where.append(f"f.state IN ({','.join('?' for _ in codes)})")
         params += codes
+    if gives_to_region:
+        wanted: list[str] = []
+        for name in gives_to_region.split(","):
+            name = name.strip()
+            if name not in REGIONS and name not in DIVISION_NAMES:
+                raise HTTPException(400, f"unknown region: {name}")
+            wanted += states_in_region(name)
+        if wanted:
+            placeholders = ",".join("?" for _ in wanted)
+            where.append(
+                "EXISTS (SELECT 1 FROM recipient_states rs "
+                f"WHERE rs.ein=f.ein AND rs.state IN ({placeholders}))")
+            params += wanted
+    if gives_to_county:
+        # "CA|Los Angeles County" -- the state is part of the key because
+        # thirty-odd states have a Washington County.
+        pairs = [c.strip() for c in gives_to_county.split(",") if "|" in c]
+        if pairs:
+            clauses = []
+            for pair in pairs:
+                st, _, county = pair.partition("|")
+                clauses.append("(fc.state=? AND fc.county=?)")
+                params += [st.strip().upper(), county.strip()]
+            where.append(
+                "EXISTS (SELECT 1 FROM foundation_counties fc "
+                f"WHERE fc.ein=f.ein AND ({' OR '.join(clauses)}))")
     if gives_to_state:
         codes = [s.strip().upper() for s in gives_to_state.split(",") if s.strip()]
         placeholders = ",".join("?" for _ in codes)
@@ -418,6 +450,15 @@ def foundation_detail(ein: str):
             "SELECT state, dollars FROM recipient_states WHERE ein=? "
             f"AND state IN {US_STATES_SQL} "
             "ORDER BY dollars DESC", (ein,)).fetchall()
+        # Counties for this foundation. Optional like the sector tables: a
+        # read model built without src/build_geo_index.py must still serve
+        # this endpoint.
+        try:
+            counties_rows = conn.execute(
+                "SELECT state, county, dollars, grants FROM foundation_counties "
+                "WHERE ein=? ORDER BY dollars DESC LIMIT 40", (ein,)).fetchall()
+        except sqlite3.OperationalError:
+            counties_rows = []
         countries = conn.execute(
             "SELECT country_code, country_name, dollars, grants, "
             "christian_dollars FROM foundation_countries WHERE ein=? "
@@ -476,6 +517,7 @@ def foundation_detail(ein: str):
     return {"foundation": dict(base),
             "traditions": [dict(r) for r in traditions],
             "sectors": sectors,
+            "counties": [dict(r) for r in counties_rows],
             "recipients": [dict(r) for r in recipients],
             "states": [dict(r) for r in states],
             "countries": [dict(r) for r in countries],
@@ -978,6 +1020,35 @@ def non_christian_overview(limit_funders: int = Query(8, ge=1, le=25)):
         "evidence": [{"confidence": k, "dollars": v}
                      for k, v in totals.items() if v],
     }
+
+
+@router.get("/counties")
+def counties(state: str | None = None, q: str | None = None,
+             limit: int = Query(200, ge=1, le=2000)):
+    """Counties that appear in the data, for the filter picker.
+
+    Ordered by dollars received, so the ones a user is likely to want are at
+    the top of the list rather than alphabetically adrift among 3,948.
+    """
+    where, params = ["1=1"], []
+    if state:
+        codes = [c.strip().upper() for c in state.split(",") if c.strip()]
+        if codes:
+            where.append(f"state IN ({','.join('?' for _ in codes)})")
+            params += codes
+    if q and q.strip():
+        where.append("county LIKE ? ESCAPE '\\'")
+        params.append("%" + q.strip().replace("%", "\\%")
+                      .replace("_", "\\_") + "%")
+    with connect() as conn:
+        rows = conn.execute(f"""
+            SELECT state, county, SUM(dollars) AS dollars,
+                   COUNT(DISTINCT ein) AS funders
+            FROM foundation_counties
+            WHERE {' AND '.join(where)}
+            GROUP BY state, county
+            ORDER BY dollars DESC LIMIT ?""", (*params, limit)).fetchall()
+    return {"rows": [dict(r) for r in rows]}
 
 
 @router.get("/analytics/state-breakdown")

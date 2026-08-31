@@ -181,6 +181,30 @@ export function fetchFoundationRecipients(
   return getV5(`/api/v5/foundations/${ein}/recipients?${p}`)
 }
 
+export type CountyOption = {
+  state: string; county: string; dollars: number; funders: number
+}
+
+/** Counties present in the data, biggest first, for the filter picker. */
+export function fetchCounties(q: string, state: string[] = [], limit = 60):
+Promise<{ rows: CountyOption[] }> {
+  const p = new URLSearchParams({ limit: String(limit) })
+  if (q.trim()) p.set('q', q.trim())
+  if (state.length) p.set('state', state.join(','))
+  return getV5(`/api/v5/counties?${p}`)
+}
+
+// Census regions and divisions. Duplicated from backend/regions.py rather
+// than fetched: a fixed vocabulary, not data.
+export const CENSUS_REGIONS = [
+  'Northeast', 'Midwest', 'South', 'West', 'Territories',
+] as const
+export const CENSUS_DIVISIONS = [
+  'New England', 'Mid-Atlantic', 'East North Central', 'West North Central',
+  'South Atlantic', 'East South Central', 'West South Central', 'Mountain',
+  'Pacific',
+] as const
+
 export function fetchNonChristianOverview(): Promise<NonChristianOverview> {
   return getV5<NonChristianOverview>('/api/v5/analytics/non-christian')
 }
@@ -592,6 +616,8 @@ export type V5Filters = {
   recipient_search: string
   state: string[]
   gives_to_state: string[]
+  gives_to_region: string[]
+  gives_to_county: string[]
   application_status: string[]
   has_website: boolean
   has_email: boolean
@@ -637,6 +663,8 @@ export const defaultV5Filters: V5Filters = {
   recipient_search: '',
   state: [],
   gives_to_state: [],
+  gives_to_region: [],
+  gives_to_county: [],
   application_status: [],
   has_website: false,
   has_email: false,
@@ -678,6 +706,7 @@ export const defaultV5Filters: V5Filters = {
 }
 
 const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
+  'gives_to_region', 'gives_to_county',
   'application_status', 'coverage_band', 'deadline_season', 'deadline_months',
   'deadline_kind', 'country'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',

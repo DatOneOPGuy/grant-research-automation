@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Info, Sparkles } from 'lucide-react'
 import {
-  ANY_CHRISTIAN, APPLICATION_STATUSES, CHRISTIAN_TRADITIONS, COVERAGE_BANDS,
+  ANY_CHRISTIAN, APPLICATION_STATUSES, CENSUS_DIVISIONS, CENSUS_REGIONS,
+  CHRISTIAN_TRADITIONS, COVERAGE_BANDS, fetchCounties,
   DEADLINE_KINDS, DEADLINE_QUARTERS, DEADLINE_SEASONS, MISSION_REGIONS,
   MONTH_NAMES,
   defaultV5Filters, OTHER_TRADITIONS, PRESETS, US_REGIONS, type V5Filters,
 } from '../../lib/apiV5'
-import { US_STATES } from '../../lib/format'
+import { money, US_STATES } from '../../lib/format'
 
 type Props = {
   filters: V5Filters
@@ -88,6 +90,92 @@ function Advanced({ filters, children }: {
           one. */}
       {open && (
         <div className="mt-2 pl-3 border-l border-line/60">{children}</div>
+      )}
+    </div>
+  )
+}
+
+/** County picker.
+ *
+ *  3,160 counties is too many for a checkbox list, so this searches instead.
+ *  Suggestions come from the server ordered by dollars received, which puts
+ *  the ones anybody is likely to want above the long alphabetical tail.
+ *  Selections are stored as "CA|Los Angeles County" because thirty-odd states
+ *  have a Washington County and the name alone does not identify one.
+ */
+function CountyPicker({ filters, onChange }: {
+  filters: V5Filters; onChange: (f: V5Filters) => void
+}) {
+  const [draft, setDraft] = useState('')
+  const [query, setQuery] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(draft.trim()), 200)
+    return () => clearTimeout(t)
+  }, [draft])
+
+  const { data } = useQuery({
+    queryKey: ['v5counties', query, filters.state.join(',')],
+    queryFn: () => fetchCounties(query, filters.state),
+    enabled: query.length > 1,
+  })
+
+  const selected = filters.gives_to_county
+  const set = (next: string[]) =>
+    onChange({ ...filters, gives_to_county: next })
+
+  return (
+    <div className="mb-2">
+      <div className="text-[11px] uppercase tracking-wide text-muted mb-1">
+        County
+      </div>
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-1">
+          {selected.map((key) => {
+            const [st, county] = key.split('|')
+            return (
+              <button key={key} onClick={() => set(selected.filter((x) => x !== key))}
+                title="Remove"
+                className="text-[11px] rounded-full bg-primary text-white
+                  px-2 py-0.5 flex items-center gap-1">
+                {county.replace(/ County$/, '')}, {st}
+                <span aria-hidden>×</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      <input value={draft} onChange={(e) => setDraft(e.target.value)}
+        placeholder={filters.state.length
+          ? `Search counties in ${filters.state.join(', ')}…`
+          : 'Search counties…'}
+        aria-label="Search counties"
+        className="w-full text-sm border border-line rounded px-2 py-1
+          placeholder:text-muted/70 focus:outline-none
+          focus:border-primary/40" />
+      {query.length > 1 && (
+        <div className="mt-1 max-h-40 overflow-y-auto border border-line
+          rounded bg-surface"
+          style={{ scrollbarGutter: 'stable', scrollbarWidth: 'thin' }}>
+          {(data?.rows ?? []).filter((c) =>
+            !selected.includes(`${c.state}|${c.county}`)).map((c) => (
+              <button key={`${c.state}|${c.county}`}
+                onClick={() => { set([...selected, `${c.state}|${c.county}`]); setDraft('') }}
+                className="w-full text-left px-2 py-1 text-xs hover:bg-canvas
+                  flex items-center justify-between gap-2">
+                <span className="truncate">
+                  {c.county}, {c.state}
+                </span>
+                <span className="text-muted tabular shrink-0">
+                  {money(c.dollars)}
+                </span>
+              </button>
+            ))}
+          {data && data.rows.length === 0 && (
+            <div className="px-2 py-1.5 text-xs text-muted">
+              No county matches “{query}”.
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -243,6 +331,56 @@ export default function FilterPanel({ filters, onChange }: Props) {
       </div>
 
       <Section title="Geography">
+        <div className="text-[11px] uppercase tracking-wide text-muted mb-1">
+          Region
+        </div>
+        <div className="flex flex-wrap gap-1 mb-2">
+          {CENSUS_REGIONS.map((r) => {
+            const on = filters.gives_to_region.includes(r)
+            return (
+              <button key={r}
+                onClick={() => onChange({
+                  ...filters,
+                  gives_to_region: on
+                    ? filters.gives_to_region.filter((x) => x !== r)
+                    : [...filters.gives_to_region, r],
+                })}
+                className={`text-xs rounded-full border px-2 py-0.5 ${on
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-line hover:border-primary/50'}`}>
+                {r}
+              </button>
+            )
+          })}
+        </div>
+        <details className="mb-2">
+          <summary className="text-[11px] text-muted cursor-pointer
+            hover:text-ink">
+            Finer divisions
+          </summary>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {CENSUS_DIVISIONS.map((d) => {
+              const on = filters.gives_to_region.includes(d)
+              return (
+                <button key={d}
+                  onClick={() => onChange({
+                    ...filters,
+                    gives_to_region: on
+                      ? filters.gives_to_region.filter((x) => x !== d)
+                      : [...filters.gives_to_region, d],
+                  })}
+                  className={`text-[11px] rounded-full border px-2 py-0.5 ${on
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-line hover:border-primary/50'}`}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+        </details>
+
+        <CountyPicker filters={filters} onChange={onChange} />
+
         <div className="text-xs text-muted mb-1">Foundation located in</div>
         <StateMultiSelect values={filters.state}
           onSet={(next) => set({ state: next })} />

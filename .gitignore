@@ -55,3 +55,6 @@ nonprofit_prospects*.csv
 
 # Postgres dumps: contain real user emails, and this repo is public
 *.sql.gz
+
+# Census crosswalk source files (regenerable, ~5 MB)
+data/census/
