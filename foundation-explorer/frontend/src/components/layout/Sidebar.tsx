@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import {
   BarChart3, Bookmark, Building2, DollarSign, Home, PanelLeftClose,
   HelpCircle, Landmark, PanelLeftOpen, PieChart, ShieldCheck, Target,
-  Users, BadgeInfo,
+  Users, BadgeInfo, Globe, ExternalLink,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchStatsV5 } from '../../lib/apiV5'
@@ -24,6 +24,15 @@ const NAV = [
   { to: '/how-to', label: 'How to Filter', icon: HelpCircle },
   { to: '/trust', label: 'Trust & Data', icon: BadgeInfo },
 ]
+
+// The marketing site, mounted at /website by nginx as a static copy of the
+// Next.js build. Not a route in this app, so it cannot be a NavLink -- React
+// Router would try to resolve it internally and render the app's 404 instead
+// of leaving the SPA.
+//
+// Opens in a new tab on purpose: a reviewer clicking away and losing their
+// filters and saved-folder state would be a poor trade for a link.
+const WEBSITE_URL = '/website/'
 
 export default function Sidebar() {
   const { saved } = useSavedFoundations()
@@ -95,6 +104,26 @@ export default function Sidebar() {
             )}
           </NavLink>
         ))}
+        {/* Sits below the app's own pages, separated, because it leaves the
+            product rather than navigating within it. */}
+        <a
+          href={WEBSITE_URL}
+          target="_blank"
+          rel="noreferrer"
+          title={collapsed ? 'Website (opens in a new tab)' : undefined}
+          className={`mt-2 pt-2 border-t border-white/10 flex items-center
+            rounded-md py-2 text-sm transition-colors text-white/70
+            hover:bg-white/5 hover:text-white ${
+              collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
+        >
+          <Globe size={16} className="shrink-0" />
+          {!collapsed && (
+            <>
+              Website
+              <ExternalLink size={12} className="ml-auto opacity-50" />
+            </>
+          )}
+        </a>
       </nav>
 
       <div className={`border-t border-white/10 flex items-center gap-2 ${
