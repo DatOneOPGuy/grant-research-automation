@@ -76,7 +76,18 @@ ORGS: tuple[BenchmarkOrg, ...] = (
     BenchmarkOrg(
         "cru", "Cru / Campus Crusade for Christ", "evangelism",
         eins=("952814920",),
-        patterns=("campus crusade", r"^cru\b", "jesus film")),
+        patterns=("campus crusade", r"^cru\b", "jesus film"),
+        # Athletes in Action is a Cru ministry with its own entry below.
+        # Filings write it both ways -- "ATHLETES IN ACTION" alone and
+        # "CRU ATHLETES IN ACTION" -- and without this carve-out the second
+        # form would count toward both, inflating the commitment tier.
+        exclude=("athletes in action",)),
+    BenchmarkOrg(
+        "athletes-in-action", "Athletes in Action", "evangelism",
+        patterns=("athletes in action",),
+        # A campus sports programme run by a different organisation, and a
+        # university department that merely passed a gift along.
+        exclude=("intervarsity", "uc regents")),
     BenchmarkOrg(
         "navigators", "The Navigators", "evangelism",
         patterns=("navigators",)),
