@@ -109,15 +109,19 @@ function CountyPicker({ filters, onChange }: {
 }) {
   const [draft, setDraft] = useState('')
   const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     const t = setTimeout(() => setQuery(draft.trim()), 200)
     return () => clearTimeout(t)
   }, [draft])
 
+  // No minimum query length. The control used to sit dead until two
+  // characters were typed, which gave no clue that it worked or what was in
+  // it; opening on focus with the largest counties shows both at once.
   const { data } = useQuery({
     queryKey: ['v5counties', query, filters.state.join(',')],
     queryFn: () => fetchCounties(query, filters.state),
-    enabled: query.length > 1,
+    enabled: open,
   })
 
   const selected = filters.gives_to_county
@@ -145,15 +149,17 @@ function CountyPicker({ filters, onChange }: {
           })}
         </div>
       )}
-      <input value={draft} onChange={(e) => setDraft(e.target.value)}
+      <input value={draft} onChange={(e) => { setDraft(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => window.setTimeout(() => setOpen(false), 150)}
         placeholder={filters.state.length
-          ? `Search counties in ${filters.state.join(', ')}…`
-          : 'Search counties…'}
-        aria-label="Search counties"
+          ? `County or city in ${filters.state.join(', ')}…`
+          : 'County or city — try Brooklyn'}
+        aria-label="Search counties by county or city name"
         className="w-full text-sm border border-line rounded px-2 py-1
           placeholder:text-muted/70 focus:outline-none
           focus:border-primary/40" />
-      {query.length > 1 && (
+      {open && (
         <div className="mt-1 max-h-40 overflow-y-auto border border-line
           rounded bg-surface"
           style={{ scrollbarGutter: 'stable', scrollbarWidth: 'thin' }}>
@@ -165,6 +171,9 @@ function CountyPicker({ filters, onChange }: {
                   flex items-center justify-between gap-2">
                 <span className="truncate">
                   {c.county}, {c.state}
+                  {c.matched_city && (
+                    <span className="text-muted"> · {c.matched_city}</span>
+                  )}
                 </span>
                 <span className="text-muted tabular shrink-0">
                   {money(c.dollars)}
@@ -173,7 +182,13 @@ function CountyPicker({ filters, onChange }: {
             ))}
           {data && data.rows.length === 0 && (
             <div className="px-2 py-1.5 text-xs text-muted">
-              No county matches “{query}”.
+              Nothing matches “{query}” — try a city name.
+            </div>
+          )}
+          {!query && data && data.rows.length > 0 && (
+            <div className="px-2 py-1 text-[10px] text-muted border-t
+              border-line/60 sticky bottom-0 bg-surface">
+              Largest first. Type a county or city name to narrow.
             </div>
           )}
         </div>

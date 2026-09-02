@@ -99,6 +99,28 @@ CREATE TABLE recipient_counties (
     place_count INTEGER NOT NULL
 );
 """
+# City -> county, for the filter's type-ahead. A fundraiser thinks "Brooklyn"
+# and "Colorado Springs", not "Kings County" and "El Paso County", and there is
+# no reason to make them learn the county names.
+#
+# Its own table because the obvious query -- LIKE against recipient_counties --
+# takes ~750ms over 907k rows, which is unusable behind a keystroke. This is
+# ~21k rows with an index on the city, and answers in under a millisecond.
+CITY_SCHEMA = """
+DROP TABLE IF EXISTS county_cities;
+CREATE TABLE county_cities (
+    city    TEXT NOT NULL,        -- upper-cased, for prefix matching
+    state   TEXT NOT NULL,
+    county  TEXT NOT NULL,
+    orgs    INTEGER NOT NULL,     -- recipients filed from this city
+    PRIMARY KEY (city, state, county)
+);
+"""
+CITY_INDEXES = """
+DROP INDEX IF EXISTS idx_city_prefix;
+CREATE INDEX idx_city_prefix ON county_cities(city, orgs DESC);
+"""
+
 RECIPIENT_INDEXES = """
 DROP INDEX IF EXISTS idx_rc_lookup;
 DROP INDEX IF EXISTS idx_rc_state;
@@ -133,7 +155,41 @@ def fetch(name: str, url: str) -> Path:
     return path
 
 
-def primary_county(place: str, counties: str | None) -> str | None:
+def build_tiebreak(state_filter: str | None = None) -> dict[tuple[str, str], str]:
+    """(state, place) -> county, from the county-subdivision file.
+
+    Used only to settle which county a multi-county place mainly belongs to.
+    Census county divisions (class Z5) are excluded from ordinary matching --
+    they are analytical areas and add name collisions without adding reach --
+    but they are precisely the right signal here, because there is exactly one
+    "Houston CCD" and it sits in Harris County.
+
+    Exact name matches win: Atlanta has both "Atlanta CCD" in Fulton and
+    "Atlanta-Decatur CCD" in DeKalb, and only the first is Atlanta proper.
+    """
+    best: dict[tuple[str, str], tuple[int, str]] = {}
+    with fetch("cousub2020.txt", SOURCES["cousub2020.txt"]).open(
+            encoding="latin-1") as fh:
+        for row in csv.DictReader(fh, delimiter="|"):
+            county = (row["COUNTYNAME"] or "").strip()
+            name = row["COUSUBNAME"] or ""
+            key = place_key(name)
+            if not county or not key:
+                continue
+            # Rank: an exact CCD beats a hyphenated one, which beats anything
+            # else that merely starts with the name.
+            rank = 2 if row["CLASSFP"] == "Z5" else 1
+            if "-" in name or "/" in name:
+                rank -= 1
+            slot = best.get((row["STATE"], key))
+            if slot is None or rank > slot[0]:
+                best[(row["STATE"], key)] = (rank, county)
+    return {k: v[1] for k, v in best.items()}
+
+
+def primary_county(place: str, counties: str | None,
+                   tiebreak: dict[tuple[str, str], str] | None = None,
+                   state: str | None = None) -> str | None:
     """One county for a place, even when it straddles several.
 
     1,304 places span more than one, and the file separates them with "~~~"
@@ -141,11 +197,19 @@ def primary_county(place: str, counties: str | None) -> str | None:
     produced county names like "Bronx County~~~Kings County~~~New York
     County" on 101,167 rows carrying $37.55B.
 
-    The list is alphabetical, not ordered by size, so taking the first is
-    arbitrary: it would file all of New York City under the Bronx. Where one
-    of the candidates shares the place's own name it is preferred -- New York
-    city to New York County, Kansas City to no match and so onto the fallback
-    -- and otherwise the first is taken and the limitation stands.
+    Three rules, in order.
+
+    1. A candidate sharing the place's own name wins: New York city to New
+       York County.
+    2. Otherwise ask the county-subdivision file, which knows that Houston
+       CCD is in Harris County. This rule exists because the alphabetical
+       fallback below was getting the largest cities in the country wrong --
+       Houston to Fort Bend, Atlanta to DeKalb, Austin to Bastrop, Columbus
+       to Delaware, Kansas City to Cass. Five of the seven major straddling
+       cities checked were misfiled, which is a great deal of money in the
+       wrong county.
+    3. Only then fall back to the first name, and the limitation stands for
+       whatever is left.
     """
     parts = [c.strip() for c in re.split(r"~~~|,", counties or "") if c.strip()]
     if not parts:
@@ -154,6 +218,11 @@ def primary_county(place: str, counties: str | None) -> str | None:
     for candidate in parts:
         if key and key in place_key(candidate):
             return candidate
+    if tiebreak and state and key:
+        found = tiebreak.get((state, key))
+        # Only trust it when it names one of this place's actual counties.
+        if found in parts:
+            return found
     return parts[0]
 
 
@@ -162,10 +231,12 @@ def build_crosswalk() -> dict[tuple[str, str], str]:
     votes: dict[tuple[str, str], collections.Counter] = \
         collections.defaultdict(collections.Counter)
 
+    tiebreak = build_tiebreak()
     with fetch("place2020.txt", SOURCES["place2020.txt"]).open(
             encoding="latin-1") as fh:
         for row in csv.DictReader(fh, delimiter="|"):
-            county = primary_county(row["PLACENAME"], row["COUNTIES"])
+            county = primary_county(row["PLACENAME"], row["COUNTIES"],
+                                    tiebreak, row["STATE"])
             if not county:
                 continue
             name = row["PLACENAME"]
@@ -246,7 +317,19 @@ def build_recipient_counties(conn, crosswalk) -> None:
         [(eid, s, c, city, d, seen[eid])
          for eid, (d, s, c, city) in best.items()])
     conn.executescript(RECIPIENT_INDEXES)
+
+    conn.executescript(CITY_SCHEMA)
+    conn.execute("""
+        INSERT INTO county_cities(city, state, county, orgs)
+        SELECT UPPER(city), state, county, COUNT(*)
+        FROM recipient_counties
+        WHERE COALESCE(city,'') != ''
+        GROUP BY UPPER(city), state, county""")
+    conn.executescript(CITY_INDEXES)
     conn.commit()
+    cities = conn.execute(
+        "SELECT COUNT(*) FROM county_cities").fetchone()[0]
+    log(f"city -> county lookup: {cities:,} (city, state, county) rows")
 
     total = conn.execute(
         "SELECT COUNT(*) FROM recipients WHERE total_received > 0").fetchone()[0]

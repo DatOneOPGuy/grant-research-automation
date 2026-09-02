@@ -1094,20 +1094,39 @@ def counties(state: str | None = None, q: str | None = None,
     """
     if scope not in ("funders", "recipients"):
         raise HTTPException(400, "scope must be 'funders' or 'recipients'")
-    # Column prefix, so the same predicates work against either table. Built
-    # in rather than patched into the finished SQL by string replacement --
-    # that breaks the moment a condition mentions another column.
     p = "rc." if scope == "recipients" else ""
     where, params = ["1=1"], []
     if state:
         codes = [c.strip().upper() for c in state.split(",") if c.strip()]
         if codes:
-            where.append(f"{p}state IN ({','.join('?' for _ in codes)})")
+            placeholders = ",".join("?" for _ in codes)
+            where.append(f"{p}state IN ({placeholders})")
             params += codes
+
+    # A typed query matches county names OR city names. Nobody looking for
+    # funders around Brooklyn knows to type "Kings County", and nobody outside
+    # Colorado knows Colorado Springs is in El Paso County. county_cities maps
+    # the ~21k cities that appear on filings to their county.
+    matched_city: dict[tuple[str, str], str] = {}
     if q and q.strip():
-        where.append(f"{p}county LIKE ? ESCAPE '\\'")
-        params.append("%" + q.strip().replace("%", "\\%")
-                      .replace("_", "\\_") + "%")
+        needle = q.strip()
+        like = "%" + needle.replace("%", "\\%").replace("_", "\\_") + "%"
+        with connect() as conn:
+            city_rows = conn.execute(
+                "SELECT city, state, county FROM county_cities "
+                "WHERE city LIKE ? ESCAPE '\\' "
+                "ORDER BY orgs DESC LIMIT 40",
+                (needle.upper().replace("%", "\\%") + "%",)).fetchall()
+        clauses = [f"{p}county LIKE ? ESCAPE '\\'"]
+        params.append(like)
+        for row in city_rows:
+            key = (row["state"], row["county"])
+            # Remember the first (largest) city that pointed here, so the UI
+            # can say why a county with an unrelated name is in the list.
+            matched_city.setdefault(key, row["city"].title())
+            clauses.append(f"({p}state = ? AND {p}county = ?)")
+            params += [row["state"], row["county"]]
+        where.append("(" + " OR ".join(clauses) + ")")
     sql_where = " AND ".join(where)
 
     if scope == "recipients":
@@ -1129,7 +1148,16 @@ def counties(state: str | None = None, q: str | None = None,
             ORDER BY dollars DESC LIMIT ?"""  # noqa: S608
     with connect() as conn:
         rows = conn.execute(sql, (*params, limit)).fetchall()
-    return {"rows": [dict(r) for r in rows]}
+
+    out = []
+    for row in rows:
+        item = dict(row)
+        # Only worth saying when the county name does not already contain it.
+        city = matched_city.get((row["state"], row["county"]))
+        if city and city.lower() not in row["county"].lower():
+            item["matched_city"] = city
+        out.append(item)
+    return {"rows": out}
 
 
 @router.get("/benchmark-orgs")

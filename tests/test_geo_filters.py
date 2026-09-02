@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -223,3 +224,114 @@ def test_every_recipient_has_exactly_one_location():
         "GROUP BY entity_id HAVING COUNT(*) > 1)").fetchone()[0]
     conn.close()
     assert dupes == 0
+
+
+# --- which county a multi-county city belongs to -----------------------------
+
+CITY_COUNTY = [
+    ("HOUSTON", "TX", "Harris County"),
+    ("ATLANTA", "GA", "Fulton County"),
+    ("AUSTIN", "TX", "Travis County"),
+    ("NEW YORK", "NY", "New York County"),
+    ("CHICAGO", "IL", "Cook County"),
+    ("PHILADELPHIA", "PA", "Philadelphia County"),
+]
+
+
+@pytest.mark.parametrize(("city", "state", "county"), CITY_COUNTY)
+def test_big_cities_land_in_the_right_county(city, state, county):
+    """The alphabetical fallback put Houston in Fort Bend, Atlanta in DeKalb
+    and Austin in Bastrop. The county-subdivision file settles it."""
+    conn = _conn()
+    row = conn.execute(
+        "SELECT county FROM recipient_counties WHERE UPPER(city)=? "
+        "AND state=? GROUP BY county ORDER BY COUNT(*) DESC LIMIT 1",
+        (city, state)).fetchone()
+    conn.close()
+    assert row, f"{city} placed nowhere"
+    assert row["county"] == county
+
+
+# Known wrong, deliberately pinned. Both straddle several counties, neither is
+# settled by the subdivision file -- Columbus appears as "Columbus city" in
+# both Fairfield and Franklin, and Kansas City has no subdivision entry at all
+# -- so both fall back to the alphabetically first county.
+#
+# A population proxy was tried to break these and made things worse: ranking
+# candidates by how many subdivisions each county contains measures land, not
+# people, and scored 2 right against 6 wrong, moving New York City to the
+# Bronx and Chicago's neighbours around. Rejected rather than shipped.
+#
+# If these ever start passing, the fallback has improved -- delete the xfail.
+@pytest.mark.xfail(reason="multi-county city the Census files cannot settle",
+                   strict=True)
+@pytest.mark.parametrize(("city", "state", "county"), [
+    ("COLUMBUS", "OH", "Franklin County"),
+    ("KANSAS CITY", "MO", "Jackson County"),
+])
+def test_known_unsettled_cities(city, state, county):
+    conn = _conn()
+    row = conn.execute(
+        "SELECT county FROM recipient_counties WHERE UPPER(city)=? "
+        "AND state=? GROUP BY county ORDER BY COUNT(*) DESC LIMIT 1",
+        (city, state)).fetchone()
+    conn.close()
+    assert row and row["county"] == county
+
+
+# --- searching counties by city name -----------------------------------------
+
+def test_city_lookup_covers_the_cities_people_type():
+    """Nobody searching near Brooklyn knows to type "Kings County"."""
+    conn = _conn()
+    built = conn.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+        "AND name='county_cities'").fetchone()[0]
+    if not built:
+        conn.close()
+        pytest.skip("county_cities not built")
+    for city, state, county in (
+        ("BROOKLYN", "NY", "Kings County"),
+        ("COLORADO SPRINGS", "CO", "El Paso County"),
+        ("PALO ALTO", "CA", "Santa Clara County"),
+        ("PASADENA", "CA", "Los Angeles County"),
+    ):
+        row = conn.execute(
+            "SELECT county FROM county_cities WHERE city=? AND state=? "
+            "ORDER BY orgs DESC LIMIT 1", (city, state)).fetchone()
+        assert row, f"{city} not in the city lookup"
+        assert row["county"] == county
+    conn.close()
+
+
+def test_city_lookup_is_fast_enough_for_a_keystroke():
+    """The whole reason this table exists.
+
+    The obvious query -- LIKE over recipient_counties -- takes ~750ms across
+    907k rows, which is unusable behind a type-ahead. Here it is ~5ms.
+
+    Note the index does NOT get used, and that is fine: SQLite cannot use a
+    BINARY index for a case-insensitive LIKE, so this is a scan. It is a scan
+    of 21k rows rather than 907k, which is where the speed comes from. The
+    assertion is therefore on the outcome, not on the query plan -- pinning
+    the plan would fail against perfectly good behaviour.
+    """
+    conn = _conn()
+    if not conn.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+            "AND name='county_cities'").fetchone()[0]:
+        conn.close()
+        pytest.skip("county_cities not built")
+    rows = conn.execute("SELECT COUNT(*) FROM county_cities").fetchone()[0]
+    started = time.perf_counter()
+    for prefix in ("BROOK", "COLORADO", "PALO", "SAN", "A"):
+        conn.execute(
+            "SELECT city, state, county FROM county_cities "
+            "WHERE city LIKE ? ORDER BY orgs DESC LIMIT 40",
+            (prefix + "%",)).fetchall()
+    elapsed = (time.perf_counter() - started) * 1000
+    conn.close()
+    assert rows < 60_000, f"{rows:,} rows is too many to scan per keystroke"
+    # Generous: five lookups, and ~25ms in practice. Catches a regression to
+    # the 750ms version without being flaky on a loaded machine.
+    assert elapsed < 500, f"five lookups took {elapsed:.0f}ms"

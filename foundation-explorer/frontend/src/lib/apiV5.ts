@@ -219,6 +219,10 @@ export type CountyOption = {
   state: string; county: string; dollars: number
   funders?: number      // scope=funders
   recipients?: number   // scope=recipients
+  /** Set when the county matched because of a CITY in it rather than its own
+   *  name -- "Kings County" for a search of "Brooklyn". Shown in the list so
+   *  a county nobody typed does not look like a stray result. */
+  matched_city?: string
 }
 
 /** Counties present in the data, biggest first, for the filter pickers.
@@ -231,6 +235,8 @@ export function fetchCounties(
   q: string, state: string[] = [], limit = 60,
   scope: 'funders' | 'recipients' = 'funders',
 ): Promise<{ rows: CountyOption[] }> {
+  // An empty q is valid and returns the largest counties, which is what the
+  // pickers show before anything is typed.
   const p = new URLSearchParams({ limit: String(limit) })
   if (q.trim()) p.set('q', q.trim())
   if (state.length) p.set('state', state.join(','))

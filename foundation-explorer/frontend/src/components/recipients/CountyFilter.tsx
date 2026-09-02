@@ -60,7 +60,9 @@ export default function CountyFilter({ value, onChange }: {
           value={q}
           onChange={(e) => { setQ(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
-          placeholder={value.length ? `${value.length} selected` : 'e.g. Dallas'}
+          placeholder={value.length
+            ? `${value.length} selected`
+            : 'County or city — try Brooklyn'}
           aria-label="Filter by county"
           className="border border-line rounded pl-7 pr-2 py-1.5 text-sm w-52
             focus:outline-none focus:ring-2 focus:ring-honey-400/40
@@ -71,7 +73,7 @@ export default function CountyFilter({ value, onChange }: {
             rounded-lg border border-line bg-surface shadow-xl">
             {rows.length === 0 && (
               <div className="px-3 py-4 text-center text-xs text-muted">
-                {q ? `No county matches “${q}”.` : 'Loading…'}
+                {q ? `Nothing matches “${q}” — try a city name.` : 'Loading…'}
               </div>
             )}
             {rows.map((c) => {
@@ -84,6 +86,9 @@ export default function CountyFilter({ value, onChange }: {
                     ${on ? 'bg-honey-100' : ''}`}>
                   <span className="truncate text-ink">
                     {c.county}, {c.state}
+                    {c.matched_city && (
+                      <span className="text-muted"> · {c.matched_city}</span>
+                    )}
                   </span>
                   <span className="text-[11px] text-muted tabular shrink-0">
                     {num(c.recipients ?? 0)}
