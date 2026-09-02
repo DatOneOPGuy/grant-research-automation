@@ -230,3 +230,53 @@ def test_hits_reference_real_orgs():
     ).fetchone()[0]
     conn.close()
     assert orphans == 0
+
+
+# --- the commitment tiers ----------------------------------------------------
+
+@pytest.fixture(scope="module")
+def api():
+    if not DB.exists():
+        pytest.skip("explorer_v5.db not present")
+    fastapi = pytest.importorskip("fastapi")
+    import v5  # noqa: PLC0415
+    from fastapi.testclient import TestClient  # noqa: PLC0415
+    app = fastapi.FastAPI()
+    app.include_router(v5.router)  # already carries prefix="/api/v5"
+    client = TestClient(app)
+    if client.get("/api/v5/benchmark-orgs").status_code != 200:
+        pytest.skip("benchmark index not built")
+    return client
+
+
+def test_every_advertised_tier_matches_what_the_filter_returns(api):
+    """The counts shown beside each option have to be the number of results
+    that option produces, or the control lies about what it will do."""
+    tiers = api.get("/api/v5/benchmark-orgs").json()["tiers"]
+    assert [t["min"] for t in tiers] == [1, 2, 3, 5]
+    for tier in tiers:
+        got = api.get("/api/v5/foundations"
+                      f"?min_benchmarks={tier['min']}&limit=1").json()["total"]
+        assert got == tier["foundations"], (
+            f"tier {tier['min']}+ advertises {tier['foundations']:,} "
+            f"but the filter returns {got:,}")
+
+
+def test_tiers_are_cumulative_and_shrink(api):
+    """"Three or more" must be a subset of "two or more". They were being
+    read as exclusive buckets -- one to four, then five and up -- and the
+    counts are what settle it for the reader."""
+    tiers = api.get("/api/v5/benchmark-orgs").json()["tiers"]
+    counts = [t["foundations"] for t in tiers]
+    assert counts == sorted(counts, reverse=True), counts
+    assert all(c > 0 for c in counts)
+
+
+def test_the_lowest_tier_actually_filters_something_out(api):
+    """"At least one" is a real filter, not another name for off. It was
+    missing entirely, so the only way to express it was to leave the filter
+    off -- which returns every foundation in the database."""
+    everything = api.get("/api/v5/foundations?limit=1").json()["total"]
+    at_least_one = api.get(
+        "/api/v5/foundations?min_benchmarks=1&limit=1").json()["total"]
+    assert 0 < at_least_one < everything / 10

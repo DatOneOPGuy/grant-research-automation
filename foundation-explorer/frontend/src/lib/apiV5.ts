@@ -201,7 +201,11 @@ export type BenchmarkOrg = {
  *  Fixed vocabulary maintained in src/international_orgs.py and rebuilt into
  *  the read model, so it is fetched rather than duplicated here -- unlike the
  *  Census regions, this list is expected to grow. */
-export function fetchBenchmarkOrgs(): Promise<{ rows: BenchmarkOrg[] }> {
+export type BenchmarkTier = { min: number; foundations: number }
+
+export function fetchBenchmarkOrgs(): Promise<{
+  rows: BenchmarkOrg[]; tiers: BenchmarkTier[]
+}> {
   return getV5('/api/v5/benchmark-orgs')
 }
 

@@ -80,7 +80,10 @@ export function buildChips(
     onRemove: () => set({ benchmark: [] }),
   })
   if (f.min_benchmarks) chips.push({
-    id: 'minbench', label: `Funds ${f.min_benchmarks}+ intl ministries`,
+    id: 'minbench',
+    label: f.min_benchmarks === '1'
+      ? 'Funds an international ministry'
+      : `Funds ${f.min_benchmarks}+ international ministries`,
     onRemove: () => set({ min_benchmarks: '' }),
   })
   if (f.gives_to_county.length) chips.push({

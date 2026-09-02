@@ -1173,7 +1173,21 @@ def benchmark_orgs():
         rows = conn.execute("""
             SELECT slug, name, category, dollars, funders, name_count
             FROM benchmark_orgs ORDER BY funders DESC""").fetchall()
-    return {"rows": [dict(r) for r in rows]}
+        # How many foundations each commitment tier would return. The filter
+        # was reported as "doesn't move" on its default setting, which is
+        # correct -- the default is off -- but there was no way to see what
+        # any option would do before choosing it. Now the UI can say.
+        counts = conn.execute("""
+            SELECT n, COUNT(*) AS foundations FROM (
+              SELECT ein, COUNT(DISTINCT slug) AS n
+              FROM benchmark_hits GROUP BY ein)
+            GROUP BY n""").fetchall()
+        by_n = {r["n"]: r["foundations"] for r in counts}
+    # Cumulative: "funds 3 or more" is every tier from 3 up.
+    tiers = [{"min": t,
+              "foundations": sum(v for n, v in by_n.items() if n >= t)}
+             for t in (1, 2, 3, 5)]
+    return {"rows": [dict(r) for r in rows], "tiers": tiers}
 
 
 @router.get("/analytics/state-breakdown")

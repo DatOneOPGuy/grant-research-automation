@@ -228,21 +228,45 @@ function InternationalFilter({ filters, set }: {
 
   return (
     <div>
-      <div className="text-xs text-muted mb-1">Commitment</div>
+      <div className="text-xs text-muted mb-1">
+        Has funded these ministries
+      </div>
+      {/* The first option is the filter switched OFF, and it used to be
+          labelled "Any" -- which reads like a setting, so selecting it and
+          seeing the result count not move looked like a broken filter. It now
+          says so outright.
+
+          Every tier is cumulative and says "or more", because "Funds 3+" was
+          being read as a bucket of exactly three to four. The live count
+          beside each one settles it: the numbers only fall as the bar rises.
+
+          "At least one" was missing entirely and is the option most people
+          want first -- 5,268 foundations, and no way to ask for them. */}
       {([
-        ['', 'Any'],
-        ['2', 'Funds 2+ of these ministries'],
-        ['3', 'Funds 3+ — an established programme'],
-        ['5', 'Funds 5+ — a major international funder'],
-      ] as const).map(([v, label]) => (
-        <label key={v || 'any'}
-          className="flex items-center gap-2 text-sm py-0.5 cursor-pointer">
-          <input type="radio" name="minbench" className="accent-primary"
-            checked={filters.min_benchmarks === v}
-            onChange={() => set({ min_benchmarks: v })} />
-          {label}
-        </label>
-      ))}
+        ['', 'No — don’t filter on this', null],
+        ['1', 'At least one', 1],
+        ['2', 'Two or more', 2],
+        ['3', 'Three or more — an established programme', 3],
+        ['5', 'Five or more — a major international funder', 5],
+      ] as const).map(([v, label, tier]) => {
+        const count = tier == null
+          ? undefined
+          : data?.tiers?.find((t) => t.min === tier)?.foundations
+        return (
+          <label key={v || 'off'}
+            className="flex items-baseline gap-2 text-sm py-0.5 cursor-pointer">
+            <input type="radio" name="minbench" className="accent-primary"
+              checked={filters.min_benchmarks === v}
+              onChange={() => set({ min_benchmarks: v })} />
+            <span className="flex-1">{label}</span>
+            {count !== undefined && (
+              <span className="text-[11px] text-muted tabular shrink-0">
+                {count.toLocaleString()}
+              </span>
+            )}
+          </label>
+        )
+      })}
 
       <div className="mt-2 pt-2 border-t border-line/60">
         <div className="text-xs text-muted mb-1">
