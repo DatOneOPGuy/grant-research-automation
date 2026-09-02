@@ -505,6 +505,33 @@ read `recipient_sectors` and `sector_stats`, built by
 `src/build_sector_index.py`. Same rule as the search index: rebuild the read
 model and they vanish.
 
+### So do the geo and benchmark indexes
+
+Two more tables sets with the same property. `src/build_geo_index.py` builds
+`foundation_counties` (the county filter on Foundations) and
+`recipient_counties` (recipient location, and the county filter on
+Recipients). `src/build_benchmark_index.py` builds `benchmark_orgs` and
+`benchmark_hits`, behind the International filter.
+
+These two fail quietly rather than loudly, which is the thing to watch for.
+A missing FTS table makes `/api/v5/search` return a 500 you cannot miss; a
+missing `benchmark_hits` makes the International filter return **zero
+foundations**, and a missing `foundation_counties` makes the county picker
+return an empty list. Both look like "no results for that query" rather than
+a broken deploy. Verify them explicitly after shipping a database:
+
+```bash
+ssh fcf "curl -s -o /dev/null -w 'counties=%{http_code}\n' \
+  'localhost:8000/api/v5/counties?limit=1'"
+ssh fcf "curl -s 'localhost:8000/api/v5/benchmark-orgs' | head -c 120"
+```
+
+Note also that unknown query parameters are ignored by FastAPI rather than
+rejected, so `?min_benchmarks=3` against an older backend returns 200 and the
+full unfiltered list. **Ship the backend before the frontend**, as the order
+below already has it — reversed, the new filters silently do nothing instead
+of failing.
+
 **Neither this nor the nonprofit index can be built on the droplet** — both
 need `data/bmf_registry.db` (852 MB), which is excluded from the code rsync
 and is not on the box. So build all three locally, in this order, then ship
@@ -514,15 +541,26 @@ the finished database:
 python3 -m src.build_search_index      # ~17 s, 1.33 GB -> 1.85 GB
 python3 -m src.build_sector_index      # ~16 s, -> 1.93 GB, needs the BMF
 python3 -m src.build_nonprofit_index   # ~17 s, -> 2.39 GB, needs the BMF
+python3 -m src.build_geo_index         # ~34 s, needs data/census/ (cached)
+python3 -m src.build_benchmark_index   # ~26 s, no external data needed
 ```
 
-Order matters for the second two: the sector index reads `recipients`, and
-the nonprofit index reads the grant data both of the others leave alone, so
-running them out of order is harmless — but running the pipeline rebuild
-after any of them silently drops all three.
+Order matters only in that the pipeline rebuild silently drops all of them,
+so these five always run after it and never before. Among themselves the
+order is free: each reads tables the others leave alone.
 
-Both refuse to run while anything else holds the database open, and both
-checkpoint and drop the WAL before exiting.
+The geo index downloads two Census files to `data/census/` on first run and
+caches them, so later rebuilds need no network. On macOS urllib often cannot
+verify TLS; the script prints the exact `curl` command to fetch them by hand
+rather than a traceback.
+
+`build_benchmark_index --review` writes `data/benchmark_review.csv`, listing
+every recipient name each curated ministry claimed. Read it after editing
+`src/international_orgs.py` — a bad pattern there does not fail, it quietly
+labels the wrong foundations as international prospects.
+
+All of them refuse to run while anything else holds the database open, and
+all checkpoint and drop the WAL before exiting.
 
 Shipping 1.93 GB takes ~9 minutes at the ~3.7 MB/s this link measures. To let
 rsync compute a delta instead, seed the target from the copy already on the
