@@ -569,8 +569,15 @@ def foundation_recipients(
     a false negative on the one question this table answers, and the kind a
     user has no way to detect.
 
-    Matches the recipient's display name, its raw filing name, and its EIN,
-    because a researcher may be working from any of the three.
+    Matches the recipient's display name, its raw filing name, its EIN, and
+    where it is -- city, county or state. A fundraiser looking at a funder
+    wants to know not just who it gave to but whereabouts, and "did this
+    foundation give anywhere near Dallas" is the same question as "which of
+    its recipients are in Dallas County".
+
+    Location is derived, not filed: recipients carry no address, so it comes
+    from recipient_counties. 91% of recipients resolve; the rest never had a
+    usable city on any grant and a location search will not return them.
     """
     where = ["frs.ein = ?"]
     params: list = [ein]
@@ -581,15 +588,36 @@ def foundation_recipients(
             where.append("r.ein = ?")
             params.append(digits)
         else:
-            where.append("(COALESCE(r.display_name, r.name) LIKE ? ESCAPE '\\'"
-                         " OR r.name LIKE ? ESCAPE '\\')")
             # Escape the LIKE wildcards so a name containing % or _ is
             # searched for literally rather than matching everything.
             safe = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            params += [f"%{safe}%", f"%{safe}%"]
+            like = f"%{safe}%"
+            clauses = [
+                "COALESCE(r.display_name, r.name) LIKE ? ESCAPE '\\'",
+                "r.name LIKE ? ESCAPE '\\'",
+                "rc.city LIKE ? ESCAPE '\\'",
+                "rc.county LIKE ? ESCAPE '\\'",
+            ]
+            params += [like, like, like, like]
+            # A bare two-letter term is a state code, not a fragment of one:
+            # matching "IN" as a substring of every state would be useless.
+            if len(term) == 2 and term.isalpha():
+                clauses.append("rc.state = ?")
+                params.append(term.upper())
+            where.append("(" + " OR ".join(clauses) + ")")
+    join = ("FROM frs JOIN recipients r ON r.entity_id=frs.entity_id "
+            "LEFT JOIN recipient_counties rc ON rc.entity_id = frs.entity_id")
     with connect() as conn:
         total = conn.execute(
             "SELECT COUNT(*) FROM frs WHERE ein=?", (ein,)).fetchone()[0]
+        # Counted separately from the rows, which are capped by `limit`.
+        # Reporting len(rows) as the match count made a search for "county"
+        # say "500 of 2,072 match" when 812 did -- a precise-looking number
+        # that was simply the cap, and understating in the one direction a
+        # user cannot detect.
+        matched = conn.execute(
+            f"SELECT COUNT(*) {join} WHERE {' AND '.join(where)}",  # noqa: S608
+            params).fetchone()[0]
         rows = conn.execute(f"""
             SELECT r.entity_id, COALESCE(r.display_name, r.name) AS name,
                    r.ein AS recipient_ein,
@@ -597,12 +625,13 @@ def foundation_recipients(
                    r.reason,
                    r.is_daf, (r.mission_text IS NOT NULL
                               AND r.mission_text != '') AS has_mission,
-                   frs.dollars, frs.grants, frs.last_year
-            FROM frs JOIN recipients r ON r.entity_id=frs.entity_id
+                   frs.dollars, frs.grants, frs.last_year,
+                   rc.city, rc.county, rc.state
+            {join}
             WHERE {' AND '.join(where)}
             ORDER BY frs.dollars DESC LIMIT ?""",
             (*params, limit)).fetchall()
-    return {"total": total, "matched": len(rows),
+    return {"total": total, "matched": matched, "returned": len(rows),
             "rows": [dict(r) for r in rows]}
 
 

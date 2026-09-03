@@ -73,3 +73,71 @@ def test_no_match_is_empty_not_an_error():
     out = v5.foundation_recipients(LILLY, q="zzzznotanorg", limit=10)
     assert out["matched"] == 0 and out["rows"] == []
     assert out["total"] > 0, "total still describes the foundation"
+
+
+# --- searching by where the money went ---------------------------------------
+
+def test_search_matches_a_county_name():
+    """"Which of this funder's recipients are near Dallas" is the same
+    question as "which are in Dallas County", and a fundraiser will type
+    either."""
+    data = v5.foundation_recipients(LILLY, q="Dallas County", limit=100)
+    assert data["matched"] > 0
+    for row in data["rows"]:
+        assert row["county"] == "Dallas County"
+
+
+def test_search_matches_a_city_name():
+    data = v5.foundation_recipients(LILLY, q="Indianapolis", limit=100)
+    assert data["matched"] > 0
+    for row in data["rows"]:
+        assert ((row["city"] or "").upper() == "INDIANAPOLIS"
+                or "INDIANAPOLIS" in (row["name"] or "").upper())
+
+
+def test_a_city_search_reaches_the_rest_of_its_county():
+    """The point of carrying the county. Searching Dallas surfaces the
+    recipient in Irving, because Irving is in Dallas County -- a fundraiser
+    working a metro should not have to guess every suburb's name."""
+    data = v5.foundation_recipients(LILLY, q="Dallas", limit=200)
+    cities = {(r["city"] or "").upper() for r in data["rows"]
+              if r["county"] == "Dallas County"}
+    assert len(cities) > 1, f"only one city surfaced: {cities}"
+    assert cities - {"DALLAS"}, "nothing outside the city itself was found"
+
+
+def test_a_bare_state_code_is_matched_as_a_state():
+    """"IN" is Indiana, not a substring. Matching two letters as a fragment
+    would return every recipient whose name merely contains them."""
+    data = v5.foundation_recipients(LILLY, q="TX", limit=100)
+    assert data["matched"] > 0
+    for row in data["rows"]:
+        assert (row["state"] == "TX"
+                or "TX" in (row["name"] or "").upper()
+                or "TX" in (row["city"] or "").upper())
+
+
+def test_the_match_count_is_the_real_one_not_the_page_size():
+    """This returned len(rows), so a search matching 1,925 recipients
+    reported "500" -- the cap, presented as a count, understating in the one
+    direction a user cannot check."""
+    data = v5.foundation_recipients(LILLY, q="county", limit=25)
+    assert data["returned"] == 25
+    assert data["matched"] > 25, "matched is still capped by limit"
+    assert data["matched"] <= data["total"]
+
+
+def test_location_is_returned_for_every_row():
+    data = v5.foundation_recipients(LILLY, q="Houston", limit=50)
+    assert data["rows"]
+    for row in data["rows"]:
+        assert "city" in row and "county" in row and "state" in row
+
+
+def test_a_name_search_is_not_broken_by_the_location_columns():
+    """Adding the LEFT JOIN must not drop recipients that have no location,
+    nor duplicate any that do."""
+    named = v5.foundation_recipients(LILLY, q="university", limit=2000)
+    ids = [r["entity_id"] for r in named["rows"]]
+    assert len(ids) == len(set(ids)), "the join duplicated rows"
+    assert named["matched"] == len(ids)

@@ -95,6 +95,12 @@ export type FoundationRecipientV5 = {
   dollars: number
   grants: number
   last_year: number
+  /** Derived location -- recipients carry no address, so this comes from the
+   *  place their own grants put them in. Null for the ~9% whose grants never
+   *  carried a usable city. */
+  city: string | null
+  county: string | null
+  state: string | null
 }
 
 export type StateDollarsV5 = { state: string; dollars: number }
@@ -172,9 +178,15 @@ export type NonChristianOverview = {
 }
 
 export type FoundationRecipientsPage = {
-  /** Every recipient this foundation has, not just the ones returned. */
+  /** Every recipient this foundation paid, before any search. */
   total: number
+  /** How many matched the search -- the true count, not the number returned.
+   *  A search for "county" matches 1,925 of Lilly Endowment's recipients
+   *  while `rows` is capped at 500, so reporting rows.length as the match
+   *  count understated it by 1,425. */
   matched: number
+  /** How many rows are actually in this response. */
+  returned: number
   rows: FoundationRecipientV5[]
 }
 

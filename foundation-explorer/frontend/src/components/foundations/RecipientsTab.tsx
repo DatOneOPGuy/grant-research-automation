@@ -56,7 +56,7 @@ export default function RecipientsTab({ ein, recipients, total }: {
             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted
               pointer-events-none" />
           <input value={draft} onChange={(e) => setDraft(e.target.value)}
-            placeholder="Search recipients by name or EIN…"
+            placeholder="Name, EIN, city or county…"
             aria-label="Search this foundation's recipients"
             className="w-full text-sm border border-line rounded-md bg-surface
               pl-8 pr-7 py-1.5 placeholder:text-muted/70 focus:outline-none
@@ -72,7 +72,17 @@ export default function RecipientsTab({ ein, recipients, total }: {
         <div className="text-xs text-muted flex items-center gap-2">
           {isFetching && <Loader2 size={13} className="animate-spin" />}
           {searching
-            ? <>{rows.length} of {total.toLocaleString()} recipients match</>
+            ? <>
+                {(data?.matched ?? rows.length).toLocaleString()} of{' '}
+                {total.toLocaleString()} recipients match
+                {/* Says so when the list is capped. Silently showing 500 of
+                    1,925 matches reads as "these are all of them". */}
+                {data && data.matched > data.returned && (
+                  <span className="text-muted">
+                    {' '}— showing the largest {data.returned}
+                  </span>
+                )}
+              </>
             : truncated
               ? <>Showing the largest {recipients.length} of{' '}
                   {total.toLocaleString()} — search to reach the rest</>
@@ -96,6 +106,7 @@ export default function RecipientsTab({ ein, recipients, total }: {
       <thead>
         <tr className="text-left text-xs text-muted border-b border-line">
           <th className="py-2">Recipient</th>
+          <th>Where</th>
           <th>Tradition</th>
           <th>Identity</th>
           <th className="text-right">$ 2023–24</th>
@@ -117,6 +128,26 @@ export default function RecipientsTab({ ein, recipients, total }: {
                     className="ml-1.5 inline-flex text-muted hover:text-primary align-middle">
                     <ExternalLink size={12} />
                   </a>
+                )}
+              </td>
+              {/* Searching "Dallas" returns organisations in Irving and
+                  Plano too, because they are in Dallas County. Showing the
+                  county under the city is what makes that legible rather
+                  than looking like a stray result. */}
+              <td className="pr-2 text-xs whitespace-nowrap">
+                {r.county ? (
+                  <>
+                    <div className="text-ink">
+                      {titleCase(r.city || '')}, {r.state}
+                    </div>
+                    <div className="text-muted">
+                      {r.county.replace(/ County$/, '')}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-muted"
+                    title="No usable city appeared on any grant to this
+                      organisation, so it cannot be placed.">—</span>
                 )}
               </td>
               <td className="pr-2">
@@ -143,7 +174,7 @@ export default function RecipientsTab({ ein, recipients, total }: {
             </tr>
             {open === r.entity_id && (
               <tr className="border-b border-line/60">
-                <td colSpan={6} className="py-2 pl-4">
+                <td colSpan={7} className="py-2 pl-4">
                   <Mission entityId={r.entity_id} />
                 </td>
               </tr>
