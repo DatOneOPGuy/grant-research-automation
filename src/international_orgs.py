@@ -63,7 +63,23 @@ CATEGORIES = {
     "medical": "Medical & water",
     "persecuted": "Persecuted church",
     "sending": "Mission sending agencies",
+    "youth": "Youth, campus & family (US-facing)",
 }
+
+# Categories that do NOT count toward the commitment tier.
+#
+# These four -- Young Life, FCA, Focus on the Family, InterVarsity -- are
+# predominantly US ministries with international arms, and they are enormous:
+# Young Life alone has 1,253 funders against Wycliffe's 253. Counting them
+# would inflate the "funds 5+ ministries, a major international funder" tier
+# by 39%, and 86 of the foundations in it would not fund five international
+# ministries at all. The tier would then be measuring domestic youth giving
+# and calling it international commitment.
+#
+# So they stay fully searchable -- "show me who funds Young Life" is a real
+# question and the whole reason they were requested -- but the tier keeps
+# meaning what it says.
+NON_INTERNATIONAL_CATEGORIES = ("youth",)
 
 ORGS: tuple[BenchmarkOrg, ...] = (
     # --- evangelism & discipleship ------------------------------------------
@@ -258,6 +274,68 @@ ORGS: tuple[BenchmarkOrg, ...] = (
     BenchmarkOrg(
         "team-sending", "TEAM (The Evangelical Alliance Mission)", "sending",
         patterns=("evangelical alliance mission",)),
+    # --- second batch, requested by the client's fundraiser ------------------
+    BenchmarkOrg(
+        "christian-aid-mission", "Christian Aid Mission", "sending",
+        patterns=("christian aid mission",),
+        # Christian Aid Ministries is a separate Anabaptist relief agency and
+        # Christian Aid Center is a domestic shelter. Three different
+        # organisations, two words apart.
+        exclude=("christian aid ministries", "christian aid center")),
+    BenchmarkOrg(
+        "worldventure", "WorldVenture", "sending",
+        patterns=(r"^world ?venture\b",),
+        # WorldVentures is an unrelated travel company's foundation.
+        exclude=("worldventures", "world ventures")),
+    BenchmarkOrg(
+        "one-for-israel", "One for Israel", "evangelism",
+        patterns=("one for israel",)),
+    BenchmarkOrg(
+        "convoy-of-hope", "Convoy of Hope", "relief",
+        patterns=("convoy of hope",)),
+    BenchmarkOrg(
+        "plant-with-purpose", "Plant With Purpose", "relief",
+        # Files under its former name Floresta about as often as its current
+        # one, but "floresta" is Portuguese for forest: on its own it caught
+        # two Brazilian forest NGOs and a baseball league, $3M of other
+        # people's money. Only the US entity and the paired form count.
+        patterns=("plant with purpose", "floresta usa",
+                  "floresta project")),
+    BenchmarkOrg(
+        "heifer", "Heifer International", "relief",
+        patterns=(r"\bheifer\b",)),
+    BenchmarkOrg(
+        "ifcj", "International Fellowship of Christians & Jews", "relief",
+        # "and" and "&" both squash to nothing useful, so match the pair of
+        # words directly. Abbreviated forms are common on filings.
+        patterns=("fellowship of christians and jews",
+                  "fellowship christians and jews",
+                  r"^int(l|ernational)? fellowship.*christians"),
+        # A local interfaith council and an unrelated campus ministry.
+        exclude=("palm beach", "universities and schools")),
+    BenchmarkOrg(
+        "cure-international", "CURE International", "medical",
+        patterns=(r"^cure international\b",)),
+
+    # --- predominantly US-facing, see the note on the "youth" category -------
+    BenchmarkOrg(
+        "focus-on-the-family", "Focus on the Family", "youth",
+        patterns=("focus on the family",)),
+    BenchmarkOrg(
+        "young-life", "Young Life", "youth",
+        patterns=(r"^young ?life\b", r"\byoung ?life$"),
+        # A domestic hospice and an unrelated pregnancy centre.
+        exclude=("young life foundation of", "new young life")),
+    BenchmarkOrg(
+        "fca", "Fellowship of Christian Athletes", "youth",
+        patterns=("fellowship of christian athlete",)),
+    BenchmarkOrg(
+        "intervarsity", "InterVarsity Christian Fellowship", "youth",
+        # squash() turns "Inter-Varsity" into "inter varsity".
+        patterns=(r"inter ?varsity",),
+        # InterVarsity Press is the publishing house, a separate entity.
+        exclude=("varsity press",)),
+
     BenchmarkOrg(
         "partners-international", "Partners International", "sending",
         # Anchored: Community, Malaria, Asian and Social Venture Partners

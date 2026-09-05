@@ -280,3 +280,99 @@ def test_the_lowest_tier_actually_filters_something_out(api):
     at_least_one = api.get(
         "/api/v5/foundations?min_benchmarks=1&limit=1").json()["total"]
     assert 0 < at_least_one < everything / 10
+
+
+# --- the second batch, and what counts toward a tier -------------------------
+
+REQUESTED_BATCH_TWO = [
+    ("christian-aid-mission", "CHRISTIAN AID MISSION"),
+    ("worldventure", "World Venture"),
+    ("one-for-israel", "ONE FOR ISRAEL"),
+    ("convoy-of-hope", "CONVOY OF HOPE"),
+    ("plant-with-purpose", "Plant with Purpose"),
+    ("heifer", "HEIFER PROJECT INTERNATIONAL"),
+    ("ifcj", "INTERNATIONAL FELLOWSHIP OF CHRISTIANS & JEWS"),
+    ("cure-international", "CURE INTERNATIONAL INC"),
+    ("focus-on-the-family", "FOCUS ON THE FAMILY"),
+    ("young-life", "YOUNG LIFE"),
+    ("fca", "FELLOWSHIP OF CHRISTIAN ATHLETES"),
+    ("intervarsity", "Intervarsity Christian Fellowship"),
+]
+
+
+@pytest.mark.parametrize(("slug", "name"), REQUESTED_BATCH_TWO)
+def test_requested_ministries_match_themselves(slug, name):
+    assert _matches(BY_SLUG[slug], name), f"{slug} no longer matches {name!r}"
+
+
+# Every one of these was a false positive caught in benchmark_review.csv when
+# the second batch was added.
+BATCH_TWO_FALSE_POSITIVES = [
+    # "floresta" is Portuguese for forest; on its own it claimed two Brazilian
+    # forest NGOs and a baseball league, about $3M of other people's money.
+    ("plant-with-purpose", "INSTITUTO CONEXAO POVOS DA FLORESTA"),
+    ("plant-with-purpose", "FLORESTA BASEBALL LEAGUE INC"),
+    # Three different organisations, two words apart.
+    ("christian-aid-mission", "CHRISTIAN AID MINISTRIES"),
+    ("christian-aid-mission", "CHRISTIAN AID CENTER"),
+    # An MLM travel company's foundation.
+    ("worldventure", "WORLDVENTURES FOUNDATION"),
+    ("worldventure", "WORLD VENTURES INC"),
+    # A local interfaith council and an unrelated campus ministry.
+    ("ifcj", "Palm Beach Fellowship of Christians and Jews"),
+    ("ifcj", "FELLOWSHIP OF CHRISTIANS IN UNIVERSITIES AND SCHOOLS"),
+    # The publishing house is a separate entity.
+    ("intervarsity", "INTER VARSITY PRESS"),
+]
+
+
+@pytest.mark.parametrize(("slug", "name"), BATCH_TWO_FALSE_POSITIVES)
+def test_batch_two_false_positives_stay_excluded(slug, name):
+    assert not _matches(BY_SLUG[slug], name), f"{slug} wrongly claims {name!r}"
+
+
+def test_us_facing_ministries_are_flagged_not_dropped():
+    """They were requested and are searchable; they just must not inflate the
+    commitment tier."""
+    from src.international_orgs import NON_INTERNATIONAL_CATEGORIES
+    flagged = {o.slug for o in ORGS
+               if o.category in NON_INTERNATIONAL_CATEGORIES}
+    assert flagged == {"young-life", "fca", "focus-on-the-family",
+                       "intervarsity"}, flagged
+
+
+def test_backend_and_builder_agree_on_what_is_excluded():
+    """The backend cannot import from src/, so the list is duplicated. If the
+    two drift, the filter and the advertised counts describe different things.
+    """
+    import v5
+
+    from src.international_orgs import NON_INTERNATIONAL_CATEGORIES
+    assert tuple(v5.NON_INTL_CATEGORIES) == tuple(NON_INTERNATIONAL_CATEGORIES)
+
+
+def test_the_tier_excludes_the_us_facing_ministries(api):
+    """Young Life alone has more funders than any five international
+    ministries combined. Counting it would make "funds 5+ international
+    ministries" mean something else entirely."""
+    conn = _conn()
+    with_all = conn.execute("""
+        SELECT COUNT(*) FROM (
+          SELECT ein FROM benchmark_hits GROUP BY ein
+          HAVING COUNT(DISTINCT slug) >= 5)""").fetchone()[0]
+    conn.close()
+    advertised = next(t["foundations"] for t in
+                      api.get("/api/v5/benchmark-orgs").json()["tiers"]
+                      if t["min"] == 5)
+    assert advertised < with_all, (
+        "the tier is counting US-facing ministries: "
+        f"{advertised:,} advertised vs {with_all:,} counting everything")
+
+
+def test_us_facing_ministries_are_still_individually_searchable(api):
+    """Excluding them from the tier must not make them unfilterable -- being
+    able to ask who funds Young Life is why they were added."""
+    for slug in ("young-life", "fca", "focus-on-the-family", "intervarsity"):
+        total = api.get(
+            f"/api/v5/foundations?benchmark={slug}&limit=1").json()["total"]
+        assert total > 0, f"{slug} returns nothing"

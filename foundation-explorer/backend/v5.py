@@ -18,6 +18,13 @@ ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT / "data" / "explorer_v5.db"
 router = APIRouter(prefix="/api/v5", tags=["v5"])
 
+# Benchmark categories that are US-facing rather than internationally
+# operating, and so do not count toward the commitment tier. Mirrors
+# NON_INTERNATIONAL_CATEGORIES in src/international_orgs.py -- the backend
+# cannot import from src/, so a test pins the two together.
+NON_INTL_CATEGORIES = ("youth",)
+NON_INTL_SQL = ",".join(f"'{c}'" for c in NON_INTL_CATEGORIES)
+
 CHRISTIAN = ("evangelical_protestant", "catholic", "orthodox_christian",
              "christian_unspecified")
 TRADITIONS = {*CHRISTIAN, "jewish", "muslim", "mormon_lds",
@@ -277,9 +284,16 @@ def foundations(
     if min_benchmarks:
         # Distinct ministries, not grants. One is a data point; several is a
         # deliberate international programme, which is the real signal.
+        #
+        # US-facing categories are excluded here. Young Life has 1,253 funders
+        # against Wycliffe's 253, so counting it would inflate the top tier by
+        # 39% with foundations whose international giving is nil. Those
+        # ministries stay individually selectable via `benchmark`.
         where.append(
             "(SELECT COUNT(DISTINCT bh.slug) FROM benchmark_hits bh "
-            "WHERE bh.ein=f.ein) >= ?")
+            " JOIN benchmark_orgs bo ON bo.slug = bh.slug "
+            f" WHERE bh.ein=f.ein AND bo.category NOT IN ({NON_INTL_SQL})"
+            ") >= ?")
         params.append(min_benchmarks)
     if gives_to_state:
         codes = [s.strip().upper() for s in gives_to_state.split(",") if s.strip()]
@@ -1199,18 +1213,23 @@ def benchmark_orgs():
     foundations gave to each, which is what makes one a useful seed.
     """
     with connect() as conn:
-        rows = conn.execute("""
-            SELECT slug, name, category, dollars, funders, name_count
-            FROM benchmark_orgs ORDER BY funders DESC""").fetchall()
+        rows = conn.execute(f"""
+            SELECT slug, name, category, dollars, funders, name_count,
+                   CASE WHEN category IN ({NON_INTL_SQL}) THEN 0 ELSE 1 END
+                       AS counts_toward_tier
+            FROM benchmark_orgs ORDER BY funders DESC""").fetchall()  # noqa: S608
         # How many foundations each commitment tier would return. The filter
         # was reported as "doesn't move" on its default setting, which is
         # correct -- the default is off -- but there was no way to see what
         # any option would do before choosing it. Now the UI can say.
-        counts = conn.execute("""
+        counts = conn.execute(f"""
             SELECT n, COUNT(*) AS foundations FROM (
-              SELECT ein, COUNT(DISTINCT slug) AS n
-              FROM benchmark_hits GROUP BY ein)
-            GROUP BY n""").fetchall()
+              SELECT bh.ein, COUNT(DISTINCT bh.slug) AS n
+              FROM benchmark_hits bh
+              JOIN benchmark_orgs bo ON bo.slug = bh.slug
+              WHERE bo.category NOT IN ({NON_INTL_SQL})
+              GROUP BY bh.ein)
+            GROUP BY n""").fetchall()  # noqa: S608
         by_n = {r["n"]: r["foundations"] for r in counts}
     # Cumulative: "funds 3 or more" is every tier from 3 up.
     tiers = [{"min": t,

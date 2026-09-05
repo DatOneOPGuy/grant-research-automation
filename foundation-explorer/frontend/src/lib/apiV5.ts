@@ -206,6 +206,11 @@ export function fetchFoundationRecipients(
 export type BenchmarkOrg = {
   slug: string; name: string; category: string
   dollars: number; funders: number; name_count: number
+  /** 0 for US-facing ministries, which are searchable but excluded from the
+   *  commitment tier. Young Life has 1,253 funders against Wycliffe's 253;
+   *  counting it would inflate the top tier by 39% with foundations doing no
+   *  international giving at all. */
+  counts_toward_tier: number
 }
 
 /** The curated international-ministry list.
@@ -229,6 +234,7 @@ export const BENCHMARK_CATEGORIES: Record<string, string> = {
   medical: 'Medical & water',
   persecuted: 'Persecuted church',
   sending: 'Mission sending agencies',
+  youth: 'Youth, campus & family (US-facing)',
 }
 
 export type CountyOption = {

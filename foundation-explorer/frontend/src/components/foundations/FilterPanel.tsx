@@ -280,13 +280,23 @@ function InternationalFilter({ filters, set }: {
         {Object.entries(BENCHMARK_CATEGORIES).map(([key, label]) => {
           const orgs = byCategory[key]
           if (!orgs?.length) return null
-          // Long tail hidden by default: the list is 41 ministries and the
+          // Long tail hidden by default: the list is 54 ministries and the
           // rail is 240px. The count on the toggle keeps that visible.
           const shown = showAll ? orgs : orgs.slice(0, 3)
+          const excluded = orgs.every((o) => !o.counts_toward_tier)
           return (
             <div key={key} className="mt-1.5">
               <div className="text-[11px] uppercase tracking-wide
                 text-honey-800">{label}</div>
+              {/* These are searchable but deliberately not counted above.
+                  Saying so beats a user noticing that ticking Young Life does
+                  not move the commitment tier and assuming it is broken. */}
+              {excluded && (
+                <div className="text-[10px] text-muted leading-snug mb-0.5">
+                  Searchable, but not counted in the commitment tiers above —
+                  these work mainly in the US.
+                </div>
+              )}
               {shown.map((o) => (
                 <Check key={o.slug}
                   label={

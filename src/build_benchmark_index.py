@@ -34,7 +34,12 @@ import sys
 import time
 from pathlib import Path
 
-from src.international_orgs import CATEGORIES, ORGS, validate
+from src.international_orgs import (
+    CATEGORIES,
+    NON_INTERNATIONAL_CATEGORIES,
+    ORGS,
+    validate,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "data" / "explorer_v5.db"
@@ -210,11 +215,16 @@ def main() -> int:
         "SELECT COUNT(DISTINCT ein) FROM benchmark_hits").fetchone()[0]
     log(f"{len(ORGS)} ministries in {len(CATEGORIES)} categories")
     log(f"{total_funders:,} foundations fund at least one")
-    log("by number of distinct ministries funded:")
-    for tier, count in conn.execute("""
+    excluded = ",".join(f"'{c}'" for c in NON_INTERNATIONAL_CATEGORIES)
+    log("by number of distinct INTERNATIONAL ministries funded "
+        f"(excluding categories: {excluded}):")
+    for tier, count in conn.execute(f"""
             SELECT n, COUNT(*) FROM (
-              SELECT ein, COUNT(DISTINCT slug) n FROM benchmark_hits
-              GROUP BY ein) GROUP BY n ORDER BY n DESC LIMIT 6"""):
+              SELECT bh.ein, COUNT(DISTINCT bh.slug) n
+              FROM benchmark_hits bh
+              JOIN benchmark_orgs bo ON bo.slug = bh.slug
+              WHERE bo.category NOT IN ({excluded})
+              GROUP BY bh.ein) GROUP BY n ORDER BY n DESC LIMIT 6"""):  # noqa: S608
         log(f"    {tier:>2}+ ministries: {count:,} foundations")
 
     if args.review:
