@@ -268,6 +268,11 @@ def test_big_cities_land_in_the_right_county(city, state, county):
 @pytest.mark.parametrize(("city", "state", "county"), [
     ("COLUMBUS", "OH", "Franklin County"),
     ("KANSAS CITY", "MO", "Jackson County"),
+    # Garland straddles Collin/Dallas/Rockwall (alphabetical puts Collin
+    # first), is mostly Dallas County, and Texas has no county-subdivision
+    # entry to break the tie. Caught 2026-09-08 while fact-checking
+    # marketing copy that claimed "Dallas finds Garland".
+    ("GARLAND", "TX", "Dallas County"),
 ])
 def test_known_unsettled_cities(city, state, county):
     conn = _conn()

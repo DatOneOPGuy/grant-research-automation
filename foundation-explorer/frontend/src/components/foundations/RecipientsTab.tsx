@@ -131,9 +131,12 @@ export default function RecipientsTab({ ein, recipients, total }: {
                 )}
               </td>
               {/* Searching "Dallas" returns organisations in Irving and
-                  Plano too, because they are in Dallas County. Showing the
-                  county under the city is what makes that legible rather
-                  than looking like a stray result. */}
+                  Grand Prairie too, because they are in Dallas County.
+                  (Not Plano or Garland -- both resolve to Collin County;
+                  Garland is a known straddler misassignment, pinned in
+                  tests/test_geo_filters.py.) Showing the county under the
+                  city is what makes these legible rather than looking like
+                  stray results. */}
               <td className="pr-2 text-xs whitespace-nowrap">
                 {r.county ? (
                   <>
