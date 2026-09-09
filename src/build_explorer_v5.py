@@ -162,6 +162,22 @@ CREATE TABLE foundations (
     is_testamentary INTEGER DEFAULT 0, is_micro INTEGER DEFAULT 0,
     active_2023 INTEGER DEFAULT 0, active_2024 INTEGER DEFAULT 0
 );
+-- Read-model corrections ledger: every tradition this build DECLINED to
+-- present, and why. The evidence ledger in the pipeline DB is immutable;
+-- this is the record of what the read model overrode, and the
+-- name_mission_conflict rows are the human-review inbox.
+CREATE TABLE classification_conflicts (
+    entity_id TEXT PRIMARY KEY,
+    name TEXT,
+    dollars INTEGER,
+    prior_tradition TEXT,
+    prior_method TEXT,
+    kind TEXT,          -- government_bucket | grant_purpose_quarantine |
+                        -- rule_recompute | ntee_faith_exclusion |
+                        -- ein_correction | name_mission_conflict
+    detail TEXT
+);
+
 CREATE TABLE tradition_stats (
     ein TEXT, tradition TEXT, tier TEXT,
     dollars INTEGER, recipients INTEGER,
@@ -517,6 +533,251 @@ def build_foundation_countries(out: sqlite3.Connection) -> None:
     log(f"foundations: {rows:,} destination rows across {eins:,} foundations")
 
 
+def apply_classification_corrections(out: sqlite3.Connection) -> None:
+    """Traditions the read model declines to present, applied 2026-09 after
+    the accuracy audit. The pipeline's evidence ledger is immutable and
+    untouched; this mirrors the existing individual/unattributable clearing
+    and records every override in classification_conflicts.
+
+    Runs after build_rollups (total_received exists) and before
+    build_foundations (nothing has aggregated yet)."""
+    from src.classifier import classify  # local: heavy regex module
+    log("classification corrections (accuracy audit, 2026-09)…")
+
+    def clear(kind: str, rows, detail_fn) -> tuple[int, int]:
+        dollars = 0
+        for row in rows:
+            out.execute(
+                "INSERT OR IGNORE INTO classification_conflicts VALUES "
+                "(?,?,?,?,?,?,?)",
+                (row["entity_id"], row["name"], row["total_received"],
+                 row["tradition"], row["method"], kind, detail_fn(row)))
+            out.execute(
+                "UPDATE recipients SET tradition=NULL, method=NULL, "
+                "confidence=NULL, reason=NULL WHERE entity_id=?",
+                (row["entity_id"],))
+            dollars += row["total_received"] or 0
+        return len(rows), dollars
+
+    out.row_factory = sqlite3.Row
+
+    # 1. F3 — a government body cannot hold a RELIGIOUS tradition. The
+    # identity run already bucketed these; the read model now consults it,
+    # exactly as it does for individual/unattributable. Two deliberate
+    # narrowings of the reviewer's literal instruction, both evidence-driven:
+    #   - 'secular' is KEPT on government rows. It is true ($3.06B of
+    #     correctly-understood grants), and clearing it would present the
+    #     Ministry of Health Rwanda as "unknown" when the product's promise
+    #     is that unclassified means unknown, not known-and-hidden.
+    #   - the FOREIGN bucket is untouched: it is overwhelmingly genuine
+    #     Christian organisations (Open Doors regional entities, Diocese of
+    #     Lusaka, Catholic Caritas Nigeria) and powers
+    #     foreign_christian_dollars; foreign government units are caught by
+    #     the GOVT_UNIT name guard in the classifier instead.
+    rows = out.execute("""
+        SELECT entity_id, name, total_received, tradition, method
+        FROM recipients WHERE identity_status='government'
+          AND tradition IS NOT NULL AND tradition != 'secular'""").fetchall()
+    n, d = clear("government_bucket", rows,
+                 lambda r: "identity run bucketed this as government")
+    log(f"  government bucket: cleared {n:,} traditions (${d/1e6:,.1f}M)")
+
+    # 2. F1 — grant_purpose quarantined wholesale. It classifies the
+    # RECIPIENT from what a FUNDER wrote on a grant line, and its biggest
+    # rows were wrong (UJA-Federation $73M via "religious organizations'
+    # missions"; Doctors Without Borders $58M via "MEDICAL MISSIONS"). Out of
+    # the numerator until it has its own gold set.
+    rows = out.execute("""
+        SELECT entity_id, name, total_received, tradition, method
+        FROM recipients WHERE method='grant_purpose'""").fetchall()
+    n, d = clear("grant_purpose_quarantine", rows,
+                 lambda r: "method quarantined pending its own gold-set gate")
+    log(f"  grant_purpose quarantine: cleared {n:,} (${d/1e6:,.1f}M)")
+
+    # 3. F2/F4/F6/F7 — re-run the CURRENT name-rule engine over rule-method
+    # Christian rows and demote any the fixed engine no longer calls
+    # christian (Chapel Hill neutralization, government units,
+    # NY-Presbyterian, St John's College, 'frontiers' removal). Demotions
+    # only: this pass never adds or relabels.
+    rows = out.execute(f"""
+        SELECT entity_id, name, total_received, tradition, method
+        FROM recipients WHERE method='rule'
+          AND tradition IN {CHRISTIAN!r}""").fetchall()
+    # Demote when the corrected engine actively CONTRADICTS the stored
+    # verdict (nonchristian), or when the name carries vocabulary the audit
+    # specifically removed ('frontiers') or neutralized ('chapel hill') —
+    # those must fall even though the engine now merely abstains. A bare
+    # None on other names is vocabulary drift, not evidence of error, and
+    # demoting on it cost 254 genuine-looking rows ($26.2M) in the first
+    # pass of this build.
+    audit_removed = re.compile(r"frontiers|chapel\s*hill", re.IGNORECASE)
+    demote = []
+    for r in rows:
+        verdict = classify(r["name"])
+        if verdict == "nonchristian" or (
+                verdict is None and audit_removed.search(r["name"] or "")):
+            demote.append(r)
+    n, d = clear("rule_recompute", demote,
+                 lambda r: "corrected name-rule engine no longer claims it")
+    log(f"  rule recompute: cleared {n:,} of {len(rows):,} "
+        f"(${d/1e6:,.1f}M)")
+
+    # 4. F5 — the BMF codes Tenacre Foundation (Christian Science) as X200
+    # "Christianity"; our taxonomy deliberately excludes Christian Science
+    # from the Christian bucket, and the name rule honors that while the
+    # NTEE path did not. Name-level faith exclusions for ntee rows, plus the
+    # EIN corrections for names carrying no marker at all.
+    from src.classifier import (
+        CHRISTIAN_SCIENCE,
+        JEWISH,
+        JW,
+        MORMON,
+        MUSLIM,
+        OTHER_RELIGION,
+        UNITARIAN,
+    )
+    rows = out.execute(f"""
+        SELECT entity_id, name, total_received, tradition, method
+        FROM recipients WHERE method='ntee'
+          AND tradition IN {CHRISTIAN!r}""").fetchall()
+    excl = [r for r in rows if any(
+        rx.search(f" {(r['name'] or '').lower()} ")
+        for rx in (JEWISH, CHRISTIAN_SCIENCE, MORMON, JW, UNITARIAN,
+                   MUSLIM, OTHER_RELIGION))]
+    n, d = clear("ntee_faith_exclusion", excl,
+                 lambda r: "name matches a non-Christian faith exclusion")
+    log(f"  ntee faith exclusions: cleared {n:,} (${d/1e6:,.1f}M)")
+
+    # The store has real 'christian_science' and 'mormon_lds' tradition
+    # values, so a known-Christian-Science org is RELABELLED to the truth
+    # rather than cleared to unknown — we do know what it is.
+    CORRECTED_EINS = {
+        # Tenacre Foundation: Christian Science nursing care. The BMF codes
+        # it NTEE X200 "Christianity"; our taxonomy classes Christian
+        # Science separately, the name rule honors that, the NTEE path did
+        # not. No name marker and no mission text, so no mechanism can catch
+        # it; a curated correction with a regression pin is the honest fix.
+        "210577480": ("christian_science",
+                      "Christian Science (BMF NTEE X200; relabelled to the "
+                      "store's christian_science tradition)"),
+        # Partnership for Southern Equity: a secular Atlanta racial-equity
+        # organisation carrying a BMF religion NTEE code; its own mission
+        # text ("policies and actions that promote equity and shared
+        # prosperity") has no religious content. BMF miscode, $11.1M.
+        "274424115": ("secular",
+                      "BMF religion NTEE code appears misassigned; the "
+                      "organisation's own mission text is secular"),
+    }
+    n = d = 0
+    for ein, (new_tradition, why) in CORRECTED_EINS.items():
+        for row in out.execute(
+                "SELECT entity_id, name, total_received, tradition, method "
+                "FROM recipients WHERE ein=? AND tradition IS NOT NULL "
+                "AND tradition != ?", (ein, new_tradition)).fetchall():
+            out.execute(
+                "INSERT OR IGNORE INTO classification_conflicts VALUES "
+                "(?,?,?,?,?,?,?)",
+                (row["entity_id"], row["name"], row["total_received"],
+                 row["tradition"], row["method"], "ein_correction", why))
+            out.execute(
+                "UPDATE recipients SET tradition=?, reason=? "
+                "WHERE entity_id=?",
+                (new_tradition, why, row["entity_id"]))
+            n += 1
+            d += row["total_received"] or 0
+    log(f"  EIN corrections: relabelled {n:,} (${d/1e6:,.1f}M)")
+
+    # 5. F2/F9 mechanism — name-vs-mission conflict. A name-rule match that
+    # rests ONLY on denominational-heritage words (presbyterian, methodist,
+    # baptist, saint, chapel, mission, ministry) is weaker evidence than the
+    # organisation's own mission statement. Where a >= $1M recipient's
+    # mission text carries no religious signal at all, the name rule must
+    # not silently win: the tradition is withheld and the row becomes a
+    # human-review item. Benchmark ministries and seed recipients are
+    # protected — International Justice Mission's mission text says only
+    # "protect people in poverty from violence", and demoting IJM would be
+    # a worse error than any this pass prevents.
+    heritage = re.compile(
+        r"\b(?:presbyterian|methodist|baptist|saints?|st|chapel|"
+        r"missions?|missionar(?:y|ies)|ministr(?:y|ies))\b", re.IGNORECASE)
+    faith_signal = re.compile(
+        r"christ|jesus|\bgod\b|gospel|bibl|faith|church|catholic|luther|"
+        r"presbyter|baptis|episcopal|evangel|holy|saint|pray|worship|"
+        r"scriptur|religio|ministr|discipl|parish|diocese|sacrament|"
+        r"\blord\b|divine|congregation|theolog|seminar|spiritual|"
+        r"chaplain|liturg|sacred", re.IGNORECASE)
+    # Names the conflict pass must never touch, learned from adjudicating
+    # its own first inbox:
+    #   - a STRONG religious word in the name (christian, gospel, church…)
+    #     is not "heritage-only" evidence — RESTORATION CHRISTIAN MINISTRIES
+    #     was demoted with 'christian' in its name because heritage-blanking
+    #     destroyed the phrase the vocabulary needed;
+    #   - 'rescue mission' / 'gospel mission' names a well-defined Christian
+    #     institution type (the classifier encodes it explicitly), even when
+    #     the 990 mission line is worded secularly, as Denver Rescue
+    #     Mission's is.
+    strong_word = re.compile(
+        r"christian|christ\b|church|gospel|bible|biblical|catholic|"
+        r"evangel|lutheran|wesleyan|pentecostal|anglican|episcopal|"
+        r"mennonite|nazarene|adventist|diocese|jesus", re.IGNORECASE)
+    protected_phrase = re.compile(
+        r"rescue\s+mission|gospel\s+mission|union\s+mission",
+        re.IGNORECASE)
+
+    from src.build_benchmark_index import compile_org, squash
+    from src.faith_config import SEED_RECIPIENTS
+    from src.international_orgs import ORGS
+    compiled = [(compile_org(o)) for o in ORGS]
+    seeds = {squash(k) for k in SEED_RECIPIENTS}
+
+    def protected(name: str) -> bool:
+        flat = squash(name)
+        if flat in seeds:
+            return True
+        for pats, excls, _eins in compiled:
+            if any(p.search(flat) for p in pats) and not any(
+                    x.search(flat) for x in excls):
+                return True
+        return False
+
+    rows = out.execute(f"""
+        SELECT entity_id, name, total_received, tradition, method,
+               mission_text
+        FROM recipients WHERE method='rule'
+          AND tradition IN {CHRISTIAN!r}""").fetchall()
+    conflicts = []
+    for r in rows:
+        if (r["total_received"] or 0) < 1_000_000:
+            continue
+        mission = (r["mission_text"] or "").strip()
+        if len(mission) < 20 or faith_signal.search(mission):
+            continue
+        name = r["name"] or ""
+        if not heritage.search(name):
+            continue
+        if strong_word.search(name) or protected_phrase.search(name):
+            continue
+        # Heritage-only: with the heritage words blanked, does the engine
+        # still call it christian on other evidence?
+        if classify(heritage.sub(" ", name)) == "christian":
+            continue
+        if protected(name):
+            continue
+        conflicts.append(r)
+    n, d = clear(
+        "name_mission_conflict", conflicts,
+        lambda r: "heritage-word name match vs mission text with no "
+                  "religious signal: " + (r["mission_text"] or "")[:120])
+    log(f"  name-vs-mission conflicts (>=$1M, human-review inbox): "
+        f"{n:,} (${d/1e6:,.1f}M)")
+
+    out.commit()
+    total = out.execute("SELECT COUNT(*), COALESCE(SUM(dollars),0) "
+                        "FROM classification_conflicts").fetchone()
+    log(f"  corrections total: {total[0]:,} rows, ${total[1]/1e9:.2f}B "
+        f"declined for presentation")
+
+
 def build_foundations(out: sqlite3.Connection) -> None:
     log("foundations: base facts from canonical filings…")
     out.execute("""
@@ -790,6 +1051,7 @@ def main() -> None:
         build_recipients(out, run_id, release_id)
         build_grants(out, run_id)
         build_rollups(out)
+        apply_classification_corrections(out)
         build_foundations(out)
         build_tradition_stats(out)
         median_grants(out)

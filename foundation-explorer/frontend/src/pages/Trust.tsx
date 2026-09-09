@@ -24,6 +24,16 @@ const SECTIONS = [
     ],
   },
   {
+    // A vendor that publishes its corrections is the trust wedge the whole
+    // product claims. This section is updated whenever an accuracy pass
+    // changes published figures; hiding a restatement is how that trust dies.
+    title: 'Corrections',
+    body: [
+      'September 2026: an internal accuracy audit of our own classifications found about $1.7B of giving wrongly presented as Christian, and we corrected it. The error classes: foreign government health ministries matching the word "ministry"; the secular NewYork-Presbyterian hospital system matching "presbyterian"; the town of Chapel Hill matching "chapel"; a Christian Science organization carried by an IRS category code; and one classification method (inferring a recipient\u2019s tradition from a funder\u2019s free-text grant purpose) that was retired entirely until it can pass the same validation gate our other methods pass.',
+      'Every correction is recorded in the database itself, per recipient, with the reason \u2014 the same standard of evidence we apply to the classifications we keep. Aggregate Christian-giving figures shown in the product decreased by roughly 15% as a result. If a number matters to your decision, click into it: every figure still traces to specific grants on specific public filings.',
+    ],
+  },
+  {
     title: 'Privacy Boundary',
     body: [
       'Build-time classification of public source records — organization names, EINs, and mission statements from public IRS filings — may use deterministic code and language models, which may include a commercial LLM API.',

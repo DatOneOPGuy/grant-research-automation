@@ -98,17 +98,20 @@ def test_the_endpoint_returns_no_foreign_regions():
 
 
 @pytest.mark.skipif(not DB.exists(), reason="explorer_v5.db not present")
-def test_the_filter_actually_removes_something():
-    """Guards against the list being applied to data that never needed it.
-
-    If this ever fails, either the builder started filtering too (fine --
-    delete this test) or the join stopped matching (not fine).
-    """
+def test_the_builder_now_filters_at_source():
+    """Replaced 2026-09-09. The original test asserted the query-layer filter
+    removed rows the builder had left in; its docstring said to delete it the
+    day the builder started filtering too. That day arrived with the first
+    full read-model rebuild after the builder gained its own US-states
+    filter: recipient_states now contains only in-set rows, and the query
+    filter is belt-and-braces."""
     conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     total = conn.execute("SELECT COUNT(*) FROM recipient_states").fetchone()[0]
     kept = conn.execute(
         f"SELECT COUNT(*) FROM recipient_states WHERE state IN {v5.US_STATES_SQL}"
     ).fetchone()[0]
     conn.close()
-    assert kept < total, "the filter removed nothing; is it being applied?"
-    assert kept > total * 0.5, "the filter removed most rows; wrong direction?"
+    assert total == kept, (
+        f"{total - kept} non-US rows reached recipient_states; the builder "
+        "filter regressed")
+    assert total > 300_000

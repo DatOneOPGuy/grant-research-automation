@@ -83,6 +83,10 @@ MORMON = _rx([
     'latter-day saints', 'latter day saints', 'brigham young', 'byu ',
     'mormon', 'deseret', 'book of mormon', 'nauvoo', 'tabernacle choir',
     'familysearch', 'church of jesus christ of latter',
+    # Bare 'LDS': "CHURCH OF JESUS CHRIST OF LDS" was classified evangelical
+    # because only the spelled-out form was listed (2026-09 audit top-200
+    # gate). Boundary-guarded, so it cannot match inside "Reynolds".
+    'lds ',
 ])
 JW = _rx(['jehovah', 'watchtower', 'watch tower', 'kingdom hall'])
 UNITARIAN = _rx([
@@ -174,7 +178,10 @@ PROTESTANT = _rx([
     'harvest crusade', 'gideons', 'awana', 'child evangelism',
     'precept ministries', 'walk thru the bible', 'our daily bread',
     'in touch ministries', 'ligonier', 'desiring god', 'grace to you',
-    'answers in genesis', 'ethnos360', 'new tribes', 'pioneers', 'frontiers',
+    'answers in genesis', 'ethnos360', 'new tribes', 'pioneers',
+    # 'frontiers' removed 2026-09: it claimed Medecins Sans Frontieres USA
+    # and Digital Frontiers Institute. The Frontiers sending agency now needs
+    # mission-text or seed evidence — precision over recall.
     'the evangelical alliance', 'serving in mission', 'trans world radio',
     'far east broadcasting', 'jesus film', 'biblica', 'american bible society',
     'international bible society', 'lockman', 'tyndale house',
@@ -261,6 +268,11 @@ CATHOLIC_PLACE = re.compile(
 CHRISTIANA_PLACE = re.compile(
     r'\bchristiana\b(?:\s|$)|\bchristiana\s*(?:care|health|hospital|river|'
     r'town|borough|county)\b|\bchristianas\b', re.IGNORECASE)
+# "Chapel Hill" is a town (286 recipients, $117M — led by UNC-Chapel Hill at
+# $83.8M classified Christian). Same bug class as Christiana, found in the
+# 2026-09 accuracy audit. Blanking the phrase is safe for real churches:
+# "Chapel Hill Bible Church" keeps its verdict from "bible church".
+CHAPEL_HILL_PLACE = re.compile(r'\bchapel\s+hill\w*', re.IGNORECASE)
 # Safety net for the RELIGIOUS_WORD escape hatch. The non-Christian exclusion
 # lists have vocabulary gaps ("Hebrew Theological College" carries no listed
 # Jewish literal; "Rabbincal Seminary" is misspelt), so a generically religious
@@ -334,6 +346,41 @@ PLACEHOLDER = re.compile(
     r'|grant[s]?|contribution[s]?|misc|other|general|unknown|none'
     r')\b', re.IGNORECASE)
 
+# Civil-government units. "MINISTRY OF HEALTH RWANDA" matches 'ministry' and
+# "LIGONIER BOROUGH" matches Ligonier Ministries; a government body cannot
+# hold a religious tradition. The primary guard is the identity run's
+# government bucket (enforced in build_explorer_v5); this catches name shapes
+# at the classifier layer too, so the same bug cannot re-enter through a
+# different pipeline. Deliberately narrow: 'city of X' is NOT here, because
+# City of Refuge and City of Hope are organisations, not municipalities.
+GOVT_UNIT = re.compile(
+    r'\b(?:federal|state|royal|national)?\s*ministr(?:y|ies)\s+of\s+'
+    r'(?:health|education|finance|agricult|social|community|gender|foreign|'
+    r'public|planning|water|environment|interior|justice|labou?r|sanitation|'
+    r'youth|sports?|trade|energy|transport|defen[cs]e|works)\b'
+    r'|\bministry\s+of\s+health\b'
+    r'|^\s*(?:the\s+)?borough\s+of\s+\w+'
+    r'|\b\w+\s+borough\s*$'
+    r'|\bparish\s+of\s+(?:east|west)?\s*baton\s+rouge\b'
+    r'|\b(?:east|west)\s+baton\s+rouge\s+parish\b'
+    r'|\bparish\s+(?:president|council|government|sheriff|school\s+board|'
+    r'library)\b', re.IGNORECASE)
+
+# Institutions whose names carry a denominational heritage word but which are
+# secular today — the audit's F2/F6. The MECHANISM for this class is the
+# name-vs-mission conflict pass in build_explorer_v5; these entries are the
+# no-mission-text stragglers and the regression pins. End-anchored St John's
+# College deliberately spares "St Johns College High School" (Catholic, DC)
+# and "St Johns College Durham" (Church of England).
+SECULAR_INSTITUTION = re.compile(
+    r'\bnew\s*york[\s&-]*(?:and\s+)?presbyterian|\bnewyork[\s-]*presbyterian'
+    r"|\bst\.?\s*john'?s\s+college\s*$"
+    r'|\buniversity\s+of\s+st\.?\s*andrews\b'
+    # Wesleyan University, Middletown CT — secular since 1937. Anchored to
+    # the bare name: Indiana Wesleyan and Ohio Wesleyan (church-affiliated)
+    # do not start with the word and are untouched.
+    r'|^\s*wesleyan\s+university\b', re.IGNORECASE)
+
 # Large secular funders/recipients that recur at high dollar volume.
 BIG_SECULAR = _rx([
     'gates foundation', 'bill & melinda gates', 'bill and melinda gates',
@@ -355,7 +402,7 @@ def _neutralize_places(text: str) -> str:
     front is surgical: no downstream rule can read it as a signal, and no other
     organisation's name is touched.
     """
-    return CHRISTIANA_PLACE.sub(' ', text)
+    return CHAPEL_HILL_PLACE.sub(' ', CHRISTIANA_PLACE.sub(' ', text))
 
 
 def tradition(name: str) -> str | None:
@@ -392,6 +439,10 @@ def classify(name: str) -> str | None:
     if PLACEHOLDER.match(raw) or len(raw) <= 2:
         return 'nonchristian'
 
+    # Civil-government units and known-secular heritage-named institutions
+    # cannot hold a tradition, whatever vocabulary their names contain.
+    if GOVT_UNIT.search(n) or SECULAR_INSTITUTION.search(n):
+        return 'nonchristian'
     if SALVATION_ARMY.search(n):
         return 'christian'
     if MESSIANIC.search(n):
