@@ -638,6 +638,18 @@ export const PRESETS: Preset[] = [
     },
   },
   {
+    // Requested by Emily (Flagship), 2026-09-11: her daily starting point,
+    // saved as one click. Matches min_benchmarks=1 + Accepting exactly --
+    // no tier restriction, because she works from all evidence.
+    id: 'reachable-international',
+    label: 'Reachable international funders',
+    hint: 'Fund at least one major international ministry AND accept applications',
+    filters: {
+      min_benchmarks: '1',
+      application_status: ['Accepting Applications'],
+    },
+  },
+  {
     id: 'accepting',
     label: 'Accepting applications',
     hint: 'Foundations with affirmative application evidence, non-micro',
