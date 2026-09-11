@@ -107,3 +107,40 @@ class FolderItem(Base):
 
     folder: Mapped[Folder] = relationship(back_populates="items")
     adder: Mapped[User | None] = relationship(foreign_keys=[added_by])
+
+
+class FoundationNote(Base):
+    """A team's research note on a foundation, shown in the main table.
+
+    One note per (team, foundation), shared like folders: prospect research
+    is a team activity, and a note only its author can see is a note the
+    team will re-discover the hard way. Distinct from FolderItem.note, which
+    annotates a save inside one folder — this annotates the foundation
+    itself, saved or not, which is how it can appear as a table column while
+    browsing.
+
+    Scale posture: every read is one indexed per-team query, the payload is
+    bounded by a team's own typing, and nothing here needs to change as
+    teams are added — team_id scoping is the whole model.
+    """
+
+    __tablename__ = "foundation_notes"
+    __table_args__ = (
+        # The upsert target: PUT /notes/{ein} is ON CONFLICT DO UPDATE, so a
+        # teammate saving concurrently last-writes rather than erroring.
+        UniqueConstraint("team_id", "ein", name="uq_foundation_notes_team_ein"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    team_id: Mapped[int] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Same non-FK stance as FolderItem.ein, same reason.
+    ein: Mapped[str] = mapped_column(String(9), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(),
+        onupdate=func.now(), nullable=False)
+
+    editor: Mapped[User | None] = relationship(foreign_keys=[updated_by])

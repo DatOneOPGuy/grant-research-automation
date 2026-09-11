@@ -15,7 +15,7 @@ from datetime import datetime
 from auth import current_user
 from db_session import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from models_db import Folder, FolderItem, User
+from models_db import Folder, FolderItem, FoundationNote, User
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -266,3 +266,74 @@ def remove_item_everywhere(
     db.execute(delete(FolderItem).where(
         FolderItem.ein == ein, FolderItem.folder_id.in_(folder_ids)))
     db.commit()
+
+
+# --- foundation notes --------------------------------------------------------
+# The team's annotations on foundations, displayed as a column in the main
+# table. One bulk GET per page load (indexed on team_id, payload bounded by
+# the team's own typing) and one idempotent PUT per edit — the same scaling
+# shape as folders, nothing per-row.
+
+class NoteOut(BaseModel):
+    ein: str
+    note: str
+    updated_by: str | None
+    updated_at: datetime
+
+
+class NoteIn(BaseModel):
+    # An empty note is a deletion: one verb for the whole edit surface, so
+    # the client's "clear the box and save" does what it looks like it does.
+    note: str = Field(max_length=2000)
+
+
+def _ein_digits(ein: str) -> str:
+    digits = "".join(ch for ch in ein if ch.isdigit())
+    if len(digits) != 9:
+        raise HTTPException(status_code=422, detail="ein must be 9 digits")
+    return digits
+
+
+@router.get("/notes", response_model=list[NoteOut])
+def list_notes(
+    user: User = Depends(current_user), db: Session = Depends(get_db),
+) -> list[NoteOut]:
+    rows = db.scalars(
+        select(FoundationNote)
+        .options(selectinload(FoundationNote.editor))
+        .where(FoundationNote.team_id == user.team_id)
+    ).all()
+    return [NoteOut(ein=n.ein, note=n.note, updated_by=_email(n.editor),
+                    updated_at=n.updated_at) for n in rows]
+
+
+@router.put("/notes/{ein}", response_model=NoteOut | None)
+def upsert_note(
+    ein: str, body: NoteIn,
+    user: User = Depends(current_user), db: Session = Depends(get_db),
+) -> NoteOut | None:
+    ein = _ein_digits(ein)
+    text = body.note.strip()
+    if not text:
+        db.execute(delete(FoundationNote).where(
+            FoundationNote.team_id == user.team_id,
+            FoundationNote.ein == ein))
+        db.commit()
+        return None
+    db.execute(
+        pg_insert(FoundationNote)
+        .values(team_id=user.team_id, ein=ein, note=text,
+                updated_by=user.id)
+        .on_conflict_do_update(
+            constraint="uq_foundation_notes_team_ein",
+            set_={"note": text, "updated_by": user.id,
+                  "updated_at": func.now()}))
+    db.commit()
+    saved = db.scalars(
+        select(FoundationNote)
+        .options(selectinload(FoundationNote.editor))
+        .where(FoundationNote.team_id == user.team_id,
+               FoundationNote.ein == ein)).first()
+    return NoteOut(ein=saved.ein, note=saved.note,
+                   updated_by=_email(saved.editor),
+                   updated_at=saved.updated_at)

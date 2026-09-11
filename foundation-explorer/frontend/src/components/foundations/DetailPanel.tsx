@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, X } from 'lucide-react'
-import { MONTH_NAMES, fetchFoundationDetailV5 } from '../../lib/apiV5'
+import { MONTH_NAMES, STATIC_MODE, fetchFoundationDetailV5 } from '../../lib/apiV5'
 import { recordView } from '../../lib/recentStore'
 import SaveMenu from './SaveMenu'
+import { NotesTab } from './NoteCell'
 import { money, propublicaUrl, titleCase, websiteUrl } from '../../lib/format'
 import { Skeleton, StatusPill } from '../ui/primitives'
 import { BucketBarLabeled } from './BucketBar'
@@ -47,7 +48,7 @@ function unattributableMessage(reason: string | null, amount: string) {
 }
 
 const ALL_TABS = ['Overview', 'Recipients', 'Grants', 'International',
-  'Geography', 'Evidence', 'Application'] as const
+  'Geography', 'Evidence', 'Application', 'Notes'] as const
 type Tab = (typeof ALL_TABS)[number]
 
 export default function DetailPanel({ ein, onClose }: Props) {
@@ -67,9 +68,11 @@ export default function DetailPanel({ ein, onClose }: Props) {
   }, [ein, f?.name])
 
   // International is hidden when there is none, so the tab's presence is
-  // itself information rather than a dead end.
+  // itself information rather than a dead end. Notes is hidden in the demo
+  // build, which has no account service to hold one.
   const tabs = ALL_TABS.filter(
-    (t) => t !== 'International' || (f ? f.foreign_dollars > 0 : false))
+    (t) => (t !== 'International' || (f ? f.foreign_dollars > 0 : false))
+      && (t !== 'Notes' || !STATIC_MODE))
   const active: Tab = tabs.includes(tab) ? tab : 'Overview'
 
   return (
@@ -196,6 +199,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
               {active === 'Geography' && <GeographyTab data={data} />}
               {active === 'Evidence' && <EvidenceTab data={data} />}
               {active === 'Application' && <ApplicationTab data={data} />}
+              {active === 'Notes' && <NotesTab ein={ein} />}
             </>
           )}
         </div>

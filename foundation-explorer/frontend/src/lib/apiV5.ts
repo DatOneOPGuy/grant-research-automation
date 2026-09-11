@@ -237,6 +237,28 @@ export const BENCHMARK_CATEGORIES: Record<string, string> = {
   youth: 'Youth, campus & family (US-facing)',
 }
 
+/** A team note on a foundation — shared, one per (team, EIN), shown as a
+ *  column in the main table. Empty note on save = delete. */
+export type NoteV5 = {
+  ein: string; note: string
+  updated_by: string | null; updated_at: string
+}
+
+export function fetchNotesV5(): Promise<NoteV5[]> {
+  return getV5('/api/v5/notes')
+}
+
+export async function saveNoteV5(ein: string, note: string):
+Promise<NoteV5 | null> {
+  const res = await fetch(`/api/v5/notes/${ein}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note }),
+  })
+  if (!res.ok) throw new Error(`save note failed: ${res.status}`)
+  return res.json()
+}
+
 export type CountyOption = {
   state: string; county: string; dollars: number
   funders?: number      // scope=funders

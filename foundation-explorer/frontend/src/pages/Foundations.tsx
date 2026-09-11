@@ -19,6 +19,7 @@ import ActiveFilters from '../components/foundations/ActiveFilters'
 import { activeFilterCount } from '../components/foundations/filterChips'
 import DetailPanel from '../components/foundations/DetailPanel'
 import RecentlyViewed from '../components/foundations/RecentlyViewed'
+import NoteCell, { useNotes } from '../components/foundations/NoteCell'
 import { BucketBar } from '../components/foundations/BucketBar'
 
 const PAGE_SIZE = 25
@@ -56,6 +57,11 @@ const COLUMNS: { key: string; label: string; sortKey?: string
       + '(IRS/FIPS codes, not ISO). Where a code could not be verified the '
       + 'money is counted as international but left unplaced rather than '
       + 'assigned to a guessed country.',
+  },
+  {
+    key: 'notes', label: 'Notes',
+    help: 'Your team\u2019s notes, visible to everyone on your account. '
+      + 'Click a cell to add or edit; clear and save to delete.',
   },
   { key: 'actions', label: '' },
 ]
@@ -129,6 +135,7 @@ export default function Foundations() {
   const total = data?.total ?? 0
   const pageCount = Math.ceil(total / PAGE_SIZE)
   const filterCount = activeFilterCount(filters)
+  const notes = useNotes()
 
   return (
     <div>
@@ -192,7 +199,7 @@ export default function Foundations() {
 
         <div className="flex-1 min-w-0">
           <div className="bg-surface border border-line rounded-lg overflow-x-auto">
-            <table className="w-full text-sm table-fixed min-w-[960px]">
+            <table className="w-full text-sm table-fixed min-w-[1060px]">
               {/* Proportional widths, in COLUMNS order: Foundation,
                   Location, % Christian, Christian $, Paid, Application,
                   International, Actions. Actions gets 9% because that is
@@ -200,13 +207,18 @@ export default function Foundations() {
                   buttons need; less and they overflow the pinned cell.
                   No comments or whitespace inside <colgroup> itself -- React
                   treats stray text nodes there as invalid HTML. */}
+              {/* Order: Foundation, Location, %Christian, Christian$,
+                  Paid, Application, International, Notes, Actions. Notes
+                  sits beside the pinned actions so Emily's annotations are
+                  always at the same edge of the table. */}
               <colgroup>
-                <col className="w-[19%]" />
-                <col className="w-[11%]" />
-                <col className="w-[11%]" />
-                <col className="w-[14%]" />
+                <col className="w-[17%]" />
+                <col className="w-[9%]" />
+                <col className="w-[10%]" />
                 <col className="w-[13%]" />
                 <col className="w-[12%]" />
+                <col className="w-[10%]" />
+                <col className="w-[9%]" />
                 <col className="w-[11%]" />
                 <col className="w-[9%]" />
               </colgroup>
@@ -318,6 +330,7 @@ export default function Foundations() {
                         </>
                       ) : <span className="text-muted">—</span>}
                     </td>
+                    <NoteCell ein={r.ein} note={notes.get(r.ein)} />
                     <RowActions ein={r.ein} website={r.website} />
                   </tr>
                 ))}

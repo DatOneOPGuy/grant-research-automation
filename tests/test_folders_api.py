@@ -271,3 +271,50 @@ def test_dev_bypass_cannot_coexist_with_cloudflare(monkeypatch):
         import config  # noqa: F401
 
     sys.modules.pop("config", None)
+
+
+# --- foundation notes: same isolation bar as folders -------------------------
+
+def test_notes_upsert_read_and_clear(backend_app, two_teams):
+    app, db_session, _ = backend_app
+    with client_as(app, db_session, two_teams["user_a"]) as c:
+        r = c.put("/api/v5/notes/12-3456789", json={"note": "  call in Q1  "})
+        assert r.status_code == 200
+        assert r.json()["note"] == "call in Q1"          # stripped
+        assert r.json()["ein"] == "123456789"            # normalised
+        assert r.json()["updated_by"] == "a@example.com"
+
+        # Upsert, not append: a second save replaces.
+        c.put("/api/v5/notes/123456789", json={"note": "spoke to director"})
+        notes = c.get("/api/v5/notes").json()
+        assert len(notes) == 1
+        assert notes[0]["note"] == "spoke to director"
+
+        # Clearing the box deletes — one verb for the whole edit surface.
+        assert c.put("/api/v5/notes/123456789", json={"note": "   "}).json() is None
+        assert c.get("/api/v5/notes").json() == []
+
+
+def test_notes_are_invisible_across_teams(backend_app, two_teams):
+    """The reason notes live behind the same team scoping as folders: a
+    prospect note is competitive research, and team B reading team A's
+    pipeline would be the worst kind of leak."""
+    app, db_session, _ = backend_app
+    with client_as(app, db_session, two_teams["user_a"]) as c:
+        c.put("/api/v5/notes/123456789", json={"note": "team A private note"})
+    with client_as(app, db_session, two_teams["user_b"]) as c:
+        assert c.get("/api/v5/notes").json() == []
+        # B writing the same EIN creates B's OWN note, touching nothing of A's.
+        c.put("/api/v5/notes/123456789", json={"note": "team B note"})
+        assert [n["note"] for n in c.get("/api/v5/notes").json()] == ["team B note"]
+    with client_as(app, db_session, two_teams["user_a"]) as c:
+        assert [n["note"] for n in c.get("/api/v5/notes").json()] == [
+            "team A private note"]
+
+
+def test_notes_validation(backend_app, two_teams):
+    app, db_session, _ = backend_app
+    with client_as(app, db_session, two_teams["user_a"]) as c:
+        assert c.put("/api/v5/notes/12345", json={"note": "x"}).status_code == 422
+        assert c.put("/api/v5/notes/123456789",
+                     json={"note": "y" * 2001}).status_code == 422

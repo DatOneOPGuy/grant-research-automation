@@ -6,6 +6,7 @@ import type { FoundationRowV5 } from '../../lib/apiV5'
 import { useSavedFoundations } from '../../lib/savedContext'
 import { money, propublicaUrl, titleCase, websiteUrl } from '../../lib/format'
 import { Card, Skeleton, StatusPill } from '../ui/primitives'
+import NoteCell, { useNotes } from '../foundations/NoteCell'
 
 export default function SavedTable({
   rows, loading, expected, folderId, onOpen,
@@ -27,9 +28,10 @@ export default function SavedTable({
   // folders and left the money columns floating in the middle of the row.
   const showFolders = folderId === null
   const widths = showFolders
-    ? ['24%', '13%', '12%', '11%', '11%', '8%', '15%', '6%']
-    : ['30%', '16%', '12%', '12%', '9%', '14%', '7%']
+    ? ['21%', '11%', '11%', '10%', '10%', '7%', '12%', '12%', '6%']
+    : ['26%', '13%', '11%', '11%', '8%', '12%', '12%', '7%']
   const columnCount = widths.length
+  const notes = useNotes()
 
   return (
     <Card>
@@ -49,6 +51,7 @@ export default function SavedTable({
               <th className="px-3 font-medium text-right">Paid</th>
               <th className="px-3 font-medium text-right">Coverage</th>
               <th className="px-3 font-medium">Applications</th>
+              <th className="px-3 font-medium">Notes</th>
               <th className="px-2" />
             </tr>
           </thead>
@@ -94,6 +97,7 @@ export default function SavedTable({
                   <td className="py-2.5 px-3">
                     <StatusPill status={f.application_status} />
                   </td>
+                  <NoteCell ein={f.ein} note={notes.get(f.ein)} />
                   <td className="py-2.5 px-2">
                     <div className="flex items-center justify-end gap-0.5">
                       {site ? (
