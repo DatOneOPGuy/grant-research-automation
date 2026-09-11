@@ -672,6 +672,18 @@ export const PRESETS: Preset[] = [
     },
   },
   {
+    // Emily's companion to the preset above, 2026-09-12: same international
+    // criterion, the other side of the application wall. Invite-only isn't
+    // a dead end for her -- it's the relationship-route list.
+    id: 'invite-only-international',
+    label: 'Invite-only international funders',
+    hint: 'Fund at least one major international ministry but do NOT accept applications — the relationship-building list',
+    filters: {
+      min_benchmarks: '1',
+      application_status: ['Invite Only'],
+    },
+  },
+  {
     id: 'accepting',
     label: 'Accepting applications',
     hint: 'Foundations with affirmative application evidence, non-micro',
