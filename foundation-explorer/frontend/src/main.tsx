@@ -17,6 +17,13 @@ import Recipients from './pages/Recipients'
 import Analytics from './pages/Analytics'
 import DataQuality from './pages/DataQuality'
 import Trust from './pages/Trust'
+// Design Lab — ux branch experiments, local only. Each page is a competing
+// answer to Emily's "sleeker, fewer buttons" feedback; none is the product.
+import LabStart from './pages/lab/Start'
+import LabSimpleSearch from './pages/lab/SimpleSearch'
+import LabGuided from './pages/lab/Guided'
+import LabCards from './pages/lab/Cards'
+import LabFocus from './pages/lab/Focus'
 import RouteError from './components/layout/RouteError'
 import './styles/index.css'
 
@@ -48,6 +55,11 @@ const router = createBrowserRouter([
       { path: 'analytics', element: <Analytics />, errorElement: <RouteError /> },
       { path: 'data-quality', element: <DataQuality />, errorElement: <RouteError /> },
       { path: 'trust', element: <Trust />, errorElement: <RouteError /> },
+      { path: 'lab/start', element: <LabStart />, errorElement: <RouteError /> },
+      { path: 'lab/simple', element: <LabSimpleSearch />, errorElement: <RouteError /> },
+      { path: 'lab/guided', element: <LabGuided />, errorElement: <RouteError /> },
+      { path: 'lab/cards', element: <LabCards />, errorElement: <RouteError /> },
+      { path: 'lab/focus', element: <LabFocus />, errorElement: <RouteError /> },
     ],
   },
 ])

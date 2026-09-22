@@ -3,7 +3,8 @@ import { NavLink } from 'react-router-dom'
 import {
   BarChart3, Bookmark, Building2, DollarSign, Home, PanelLeftClose,
   HelpCircle, Landmark, PanelLeftOpen, PieChart, ShieldCheck, Target,
-  Users, BadgeInfo, Globe, ExternalLink,
+  Users, BadgeInfo, Globe, ExternalLink, FlaskConical, Sparkles,
+  MessageCircleQuestion, LayoutGrid, TableProperties, DoorOpen,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchStatsV5 } from '../../lib/apiV5'
@@ -23,6 +24,17 @@ const NAV = [
   { to: '/data-quality', label: 'Data Quality', icon: ShieldCheck },
   { to: '/how-to', label: 'How to Filter', icon: HelpCircle },
   { to: '/trust', label: 'Trust & Data', icon: BadgeInfo },
+]
+
+// Design Lab: five competing takes on "sleeker, fewer buttons" (Emily's
+// feedback, 2026-09-22). ux branch only — this array is empty on main, and
+// the whole group renders nothing when it is.
+const LAB = [
+  { to: '/lab/start', label: 'Intent home', icon: DoorOpen },
+  { to: '/lab/simple', label: 'One box', icon: Sparkles },
+  { to: '/lab/guided', label: '3 questions', icon: MessageCircleQuestion },
+  { to: '/lab/cards', label: 'Card browser', icon: LayoutGrid },
+  { to: '/lab/focus', label: 'Quiet table', icon: TableProperties },
 ]
 
 // The marketing site, mounted at /website by nginx as a static copy of the
@@ -104,6 +116,33 @@ export default function Sidebar() {
             )}
           </NavLink>
         ))}
+        {LAB.length > 0 && (
+          <div className="mt-3 pt-2 border-t border-white/10">
+            {!collapsed && (
+              <div className="px-3 pb-1 flex items-center gap-1.5
+                text-[10px] uppercase tracking-widest text-honey-400/80">
+                <FlaskConical size={11} /> Design lab
+              </div>
+            )}
+            {LAB.map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to}
+                title={collapsed ? `${label} (design experiment)` : undefined}
+                className={({ isActive }) =>
+                  `flex items-center rounded-md py-1.5 text-[13px]
+                   transition-colors ${collapsed
+                     ? 'justify-center px-2' : 'gap-3 px-3'} ${
+                    isActive
+                      ? 'bg-white/10 text-honey-300 font-medium'
+                      : 'text-white/50 hover:bg-white/5 hover:text-white'
+                  }`
+                }>
+                <Icon size={15} className="shrink-0" />
+                {!collapsed && label}
+              </NavLink>
+            ))}
+          </div>
+        )}
+
         {/* Sits below the app's own pages, separated, because it leaves the
             product rather than navigating within it. */}
         <a
