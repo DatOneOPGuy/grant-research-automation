@@ -82,8 +82,14 @@ export default function Sidebar() {
 
       {/* Collapsed, the title block is gone, so the nav needs its own top
           padding or the first icon sits flush against the window edge. */}
-      <nav className={`flex-1 space-y-1 ${
-        collapsed ? 'px-2 pt-4' : 'px-3'}`}>
+      {/* min-h-0 + overflow-y-auto: without them a nav taller than the
+          viewport (short window, Design Lab expanded) overflows the
+          h-screen aside — items past the bottom render OUTSIDE the painted
+          green background, as white-on-cream ghosts. The footer below stays
+          pinned; only this list scrolls. */}
+      <nav className={`flex-1 min-h-0 overflow-y-auto space-y-1 ${
+        collapsed ? 'px-2 pt-4' : 'px-3'}`}
+        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}>
         {NAV.map(({ to, label, icon: Icon, badge }) => (
           <NavLink
             key={to}
