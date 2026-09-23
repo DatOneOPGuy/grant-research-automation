@@ -24,6 +24,10 @@ import LabSimpleSearch from './pages/lab/SimpleSearch'
 import LabGuided from './pages/lab/Guided'
 import LabCards from './pages/lab/Cards'
 import LabFocus from './pages/lab/Focus'
+import LabReceipts from './pages/lab/Receipts'
+import LabMission from './pages/lab/Mission'
+import LabInline from './pages/lab/Inline'
+import LabThresholds from './pages/lab/Thresholds'
 import RouteError from './components/layout/RouteError'
 import './styles/index.css'
 
@@ -60,6 +64,10 @@ const router = createBrowserRouter([
       { path: 'lab/guided', element: <LabGuided />, errorElement: <RouteError /> },
       { path: 'lab/cards', element: <LabCards />, errorElement: <RouteError /> },
       { path: 'lab/focus', element: <LabFocus />, errorElement: <RouteError /> },
+      { path: 'lab/receipts', element: <LabReceipts />, errorElement: <RouteError /> },
+      { path: 'lab/mission', element: <LabMission />, errorElement: <RouteError /> },
+      { path: 'lab/inline', element: <LabInline />, errorElement: <RouteError /> },
+      { path: 'lab/thresholds', element: <LabThresholds />, errorElement: <RouteError /> },
     ],
   },
 ])

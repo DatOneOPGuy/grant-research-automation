@@ -5,6 +5,7 @@ import {
   HelpCircle, Landmark, PanelLeftOpen, PieChart, ShieldCheck, Target,
   Users, BadgeInfo, Globe, ExternalLink, FlaskConical, Sparkles,
   MessageCircleQuestion, LayoutGrid, TableProperties, DoorOpen,
+  ReceiptText, Compass, ListCollapse, Scale,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchStatsV5 } from '../../lib/apiV5'
@@ -35,6 +36,11 @@ const LAB = [
   { to: '/lab/guided', label: '3 questions', icon: MessageCircleQuestion },
   { to: '/lab/cards', label: 'Card browser', icon: LayoutGrid },
   { to: '/lab/focus', label: 'Quiet table', icon: TableProperties },
+  // Round 2 — "what to show instead" (external review):
+  { to: '/lab/receipts', label: 'Receipts', icon: ReceiptText },
+  { to: '/lab/mission', label: 'Mission first', icon: Compass },
+  { to: '/lab/inline', label: 'Inline expand', icon: ListCollapse },
+  { to: '/lab/thresholds', label: 'Calibration', icon: Scale },
 ]
 
 // The marketing site, mounted at /website by nginx as a static copy of the

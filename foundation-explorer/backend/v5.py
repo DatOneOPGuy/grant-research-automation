@@ -1238,6 +1238,54 @@ def benchmark_orgs():
     return {"rows": [dict(r) for r in rows], "tiers": tiers}
 
 
+@router.get("/receipts")
+def receipts(eins: str, per: int = Query(3, ge=1, le=5)):
+    """Top recognizable grantees per foundation, batched — the Design Lab's
+    "receipt line" experiment ("Funded Wycliffe, Samaritan's Purse + 14
+    more"). A fundraiser thinks in names, not percentages: this is the
+    evidence chain surfaced as the second line of a row, no vocabulary
+    required.
+
+    Recognizable means: benchmark ministries first (the curated 54 — names
+    the audience already knows), then largest recipients by dollars.
+    Batched because it decorates list rows; per-row detail fetches would be
+    24 round-trips per page.
+    """
+    codes = [e.strip() for e in eins.split(",") if e.strip()][:50]
+    out: dict[str, dict] = {}
+    with connect() as conn:
+        for ein in codes:
+            names: list[dict] = []
+            seen: set[str] = set()
+            for row in conn.execute("""
+                SELECT bo.name FROM benchmark_hits bh
+                JOIN benchmark_orgs bo ON bo.slug = bh.slug
+                WHERE bh.ein = ? ORDER BY bh.dollars DESC LIMIT ?""",
+                    (ein, per)):
+                names.append({"name": row["name"], "known": True})
+                seen.add(row["name"].lower())
+            if len(names) < per:
+                for row in conn.execute("""
+                    SELECT COALESCE(r.display_name, r.name) AS name
+                    FROM frs JOIN recipients r ON r.entity_id = frs.entity_id
+                    WHERE frs.ein = ? AND r.is_daf = 0
+                      AND r.identity_status NOT IN ('individual',
+                                                    'unattributable')
+                    ORDER BY frs.dollars DESC LIMIT ?""",
+                        (ein, per + 4)):
+                    flat = (row["name"] or "").lower()
+                    # Skip near-duplicates of an already-listed ministry
+                    # ("SAMARITANS PURSE" after "Samaritan's Purse").
+                    if not flat or any(k[:12] in flat for k in seen):
+                        continue
+                    names.append({"name": row["name"], "known": False})
+                    seen.add(flat)
+                    if len(names) >= per:
+                        break
+            out[ein] = {"names": names}
+    return out
+
+
 @router.get("/analytics/state-breakdown")
 @cached_aggregate
 def state_breakdown():

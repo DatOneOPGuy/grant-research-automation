@@ -15,10 +15,14 @@
  *    - Clicking a foundation opens the REAL detail panel. The experiments
  *      reimagine finding, not the foundation page itself.
  */
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { Bookmark, Flag } from 'lucide-react'
+import { useSavedFoundations } from '../../lib/savedContext'
 import { FlaskConical } from 'lucide-react'
 import { fetchFoundationsV5, type FoundationRowV5 } from '../../lib/apiV5'
-import { money, titleCase } from '../../lib/format'
+import { money, num, titleCase } from '../../lib/format'
 
 // --- data -------------------------------------------------------------------
 
@@ -104,6 +108,7 @@ export function LabBanner({ testing }: { testing: string }) {
         Real data, real filters — a possible future look, not the product.
         <span className="text-muted"> Testing: {testing}</span>
       </div>
+      <SavePill />
     </div>
   )
 }
@@ -151,5 +156,164 @@ export function FoundationCard({ f, onOpen }: {
         {apply.open === null && ' · application info unknown'}
       </div>
     </button>
+  )
+}
+
+// --- round 2: "what to show instead" (external review, 2026-09-22) ----------
+
+/** Batched receipt lines for a page of rows — one request per page, not one
+ *  per row. */
+export function useReceipts(eins: string[]) {
+  const key = [...eins].sort().join(',')
+  return useQuery({
+    queryKey: ['labReceipts', key],
+    queryFn: async () => {
+      const res = await fetch(`/api/v5/receipts?eins=${key}`)
+      if (!res.ok) throw new Error(`receipts: ${res.status}`)
+      return res.json() as Promise<
+        Record<string, { names: { name: string; known: boolean }[] }>>
+    },
+    enabled: eins.length > 0,
+    staleTime: 5 * 60_000,
+  })
+}
+
+/** "Funded Wycliffe, Samaritan's Purse + 14 more" — the evidence chain as a
+ *  sentence. Benchmark ministries render bold because recognition is the
+ *  whole mechanism; the trailing count comes from recipient_count the row
+ *  already carries. */
+export function ReceiptLine({ f, receipts }: {
+  f: FoundationRowV5
+  receipts?: Record<string, { names: { name: string; known: boolean }[] }>
+}) {
+  const r = receipts?.[f.ein]
+  if (!r) return <span className="text-xs text-muted/50">…</span>
+  if (r.names.length === 0) {
+    return <span className="text-xs text-muted">
+      No named recipients on file
+    </span>
+  }
+  const more = f.recipient_count - r.names.length
+  return (
+    <span className="text-xs text-ink leading-snug">
+      Funded{' '}
+      {r.names.map((n, i) => (
+        <span key={n.name}>
+          {i > 0 && ', '}
+          <span className={n.known ? 'font-semibold' : ''}>
+            {n.known ? n.name : titleCase(n.name)}
+          </span>
+        </span>
+      ))}
+      {more > 0 && (
+        <span className="text-muted"> + {num(more)} more</span>
+      )}
+    </span>
+  )
+}
+
+// Session metric the reviewer asked to design around: saves per session,
+// not pages viewed. In-memory on purpose — it resets when the tab does,
+// which is exactly what "per session" means.
+let sessionSaves = 0
+const bumpSaves = () => {
+  sessionSaves += 1
+  window.dispatchEvent(new Event('lab-save'))
+}
+
+/** One-click save — the reviewer's "make Save the primary action". First
+ *  click creates/uses a shared "Prospects" folder; no menu, no decision.
+ *  The full SaveMenu still exists inside the detail panel for filing into
+ *  specific folders. */
+export function QuickSave({ ein }: { ein: string }) {
+  const { folders, foldersFor, addTo, removeFrom, createFolder, busy } =
+    useSavedFoundations()
+  const inFolderIds = foldersFor(ein)
+  const saved = inFolderIds.length > 0
+
+  const toggle = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (saved) {
+      await removeFrom(ein, inFolderIds[0])
+      return
+    }
+    let target = folders.find(
+      (f) => f.name.toLowerCase() === 'prospects')
+    if (!target) target = (await createFolder('Prospects')) ?? undefined
+    if (target) {
+      await addTo(ein, String(target.id))
+      bumpSaves()
+    }
+  }
+
+  return (
+    <button onClick={toggle} disabled={busy}
+      title={saved ? 'Saved — click to remove' : 'Save to Prospects'}
+      aria-label={saved ? 'Remove from saved' : 'Save to Prospects'}
+      className={`rounded-md p-1.5 transition-colors ${saved
+        ? 'text-honey-700'
+        : 'text-muted/40 hover:text-honey-700 hover:bg-honey-50'}`}>
+      <Bookmark size={16} fill={saved ? 'currentColor' : 'none'} />
+    </button>
+  )
+}
+
+/** "This looks wrong" — one quiet flag per row. Lab version stores flags in
+ *  localStorage; the production version writes to the team database and
+ *  becomes free adjudication from people who know the funders. The
+ *  experiment here is only: do they click it? */
+const FLAG_KEY = 'lab.flags'
+const readFlags = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem(FLAG_KEY) ?? '{}') }
+  catch { return {} }
+}
+
+export function FlagButton({ ein }: { ein: string }) {
+  const [on, setOn] = useState(() => Boolean(readFlags()[ein]))
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const flags = readFlags()
+    if (on) delete flags[ein]
+    else flags[ein] = true
+    localStorage.setItem(FLAG_KEY, JSON.stringify(flags))
+    setOn(!on)
+  }
+  return (
+    <button onClick={toggle}
+      title={on ? 'Flagged as looks-wrong (stored locally in this lab)'
+        : 'This looks wrong'}
+      aria-label="Flag as incorrect"
+      className={`rounded-md p-1.5 ${on
+        ? 'text-scoremid'
+        : 'text-muted/30 hover:text-scoremid hover:bg-amber-50'}`}>
+      <Flag size={14} fill={on ? 'currentColor' : 'none'} />
+    </button>
+  )
+}
+
+/** The always-visible worklist: total saved + saves this session, pinned
+ *  bottom-right on every lab page (rendered by LabBanner). */
+export function SavePill() {
+  const { saved } = useSavedFoundations()
+  const [session, setSession] = useState(sessionSaves)
+  useEffect(() => {
+    const on = () => setSession(sessionSaves)
+    window.addEventListener('lab-save', on)
+    return () => window.removeEventListener('lab-save', on)
+  }, [])
+  return (
+    <Link to="/saved"
+      className="fixed bottom-5 right-5 z-30 flex items-center gap-2
+        rounded-full border border-honey-300 bg-surface px-4 py-2 text-sm
+        shadow-lg hover:border-honey-500">
+      <Bookmark size={15} className="text-honey-700" />
+      <span className="font-medium text-ink">{num(saved.length)} saved</span>
+      {session > 0 && (
+        <span className="rounded-full bg-honey-100 px-2 py-0.5 text-[11px]
+          font-medium text-honey-800">
+          +{session} this session
+        </span>
+      )}
+    </Link>
   )
 }
