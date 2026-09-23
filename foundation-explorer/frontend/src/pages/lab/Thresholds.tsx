@@ -15,7 +15,8 @@ import { useQueries } from '@tanstack/react-query'
 import { fetchFoundationsV5, type FoundationRowV5 } from '../../lib/apiV5'
 import { money, titleCase } from '../../lib/format'
 import {
-  LabBanner, ReceiptLine, focusPhrase, placeOf, useReceipts,
+  AdvancedButton, AdvancedDrawer, LabBanner, ReceiptLine, focusPhrase,
+  placeOf, useAdvanced, useReceipts,
 } from './shared'
 
 type Bucket = 'focused' | 'somewhat' | 'not'
@@ -42,10 +43,15 @@ const BANDS = [
 ]
 
 export default function LabThresholds() {
+  // Advanced filters scope the POOL the 18 cards are drawn from — e.g. set
+  // "gives in TX" and calibrate against funders Emily actually works.
+  const adv = useAdvanced()
+  const advQs = new URLSearchParams(adv.params).toString()
   const results = useQueries({
     queries: BANDS.map((qs, i) => ({
-      queryKey: ['labBand', i],
-      queryFn: () => fetchFoundationsV5(qs, 12, 0),
+      queryKey: ['labBand', i, advQs],
+      queryFn: () => fetchFoundationsV5(
+        advQs ? `${qs}&${advQs}` : qs, 12, 0),
       staleTime: Infinity,
     })),
   })
@@ -66,7 +72,7 @@ export default function LabThresholds() {
     }
     return out.slice(0, 18)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded])
+  }, [loaded, advQs])
 
   const [votes, setVotes] = useState<Record<string, Bucket>>({})
   const [revealed, setRevealed] = useState(false)
@@ -80,9 +86,12 @@ export default function LabThresholds() {
     <div className="mx-auto max-w-3xl">
       <LabBanner testing="do the phrase thresholds match a fundraiser's gut?" />
 
-      <h1 className="font-display text-3xl font-semibold text-primary">
-        Calibration: sort these by feel
-      </h1>
+      <div className="flex items-end justify-between">
+        <h1 className="font-display text-3xl font-semibold text-primary">
+          Calibration: sort these by feel
+        </h1>
+        <AdvancedButton adv={adv} />
+      </div>
       <p className="mt-1 mb-6 text-sm text-muted">
         For each foundation — is it Christian-focused, somewhat, or not
         really? No percentages shown; judge from the names and dollars like
@@ -167,6 +176,7 @@ export default function LabThresholds() {
           </button>
         </div>
       )}
+      <AdvancedDrawer adv={adv} />
     </div>
   )
 }

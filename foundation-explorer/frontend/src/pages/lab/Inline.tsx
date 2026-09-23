@@ -13,7 +13,8 @@ import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN } from '../../lib/apiV5'
 import { money, num, titleCase } from '../../lib/format'
 import {
-  LabBanner, QuickSave, applyPhrase, focusPhrase, placeOf, useLab,
+  AdvancedButton, AdvancedDrawer, LabBanner, QuickSave, applyPhrase,
+  focusPhrase, placeOf, useAdvanced, useLab,
 } from './shared'
 
 type GrantRow = {
@@ -38,8 +39,10 @@ export default function LabInline() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [panel, setPanel] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const adv = useAdvanced()
   const { data, isFetching } = useLab({
     tradition: ANY_CHRISTIAN, sort: 'christian',
+    ...adv.params,
   }, 25, page)
   const grants = useTopGrants(expanded)
 
@@ -47,13 +50,19 @@ export default function LabInline() {
     <div className="mx-auto max-w-4xl">
       <LabBanner testing="rows that open in place — is the detail panel part of the overwhelm?" />
 
-      <h1 className="font-display text-3xl font-semibold text-primary mb-1">
-        Funders
-      </h1>
-      <p className="text-sm text-muted mb-4">
-        {data ? num(data.total) : '…'} — click a row to see the receipts
-        right here.
-      </p>
+      <div className="mb-4 flex items-end justify-between">
+        <div>
+          <h1 className="font-display text-3xl font-semibold text-primary
+            mb-1">
+            Funders
+          </h1>
+          <p className="text-sm text-muted">
+            {data ? num(data.total) : '…'} — click a row to see the receipts
+            right here.
+          </p>
+        </div>
+        <AdvancedButton adv={adv} />
+      </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
         <table className="w-full text-sm">
@@ -163,6 +172,7 @@ export default function LabInline() {
         </div>
       )}
 
+      <AdvancedDrawer adv={adv} />
       {panel && (
         <DetailPanel ein={panel} onClose={() => setPanel(null)} />
       )}

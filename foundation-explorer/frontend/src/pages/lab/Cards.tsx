@@ -7,13 +7,14 @@
  *  Reads ?preset= from the URL so Lab 5's big intent buttons can land here
  *  pre-filtered.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN, CHRISTIAN_TRADITIONS } from '../../lib/apiV5'
 import { US_STATES, num } from '../../lib/format'
-import { FoundationCard, LabBanner, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
+  useAdvanced, useLab } from './shared'
 
 const PRESETS: Record<string, Partial<State>> = {
   open: { accepting: true },
@@ -38,6 +39,10 @@ export default function LabCards() {
   })
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
+  // ?adv=1 lets other pages (Intent home) land here with the drawer open.
+  const adv = useAdvanced()
+  const wantAdv = params.get('adv') === '1'
+  useEffect(() => { if (wantAdv) adv.setOpen(true) }, [])  // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<State>) => { setS((p) => ({ ...p, ...patch })); setPage(0) }
 
   const { data, isFetching } = useLab({
@@ -46,6 +51,7 @@ export default function LabCards() {
     application_status: s.accepting ? 'Accepting Applications' : '',
     min_benchmarks: s.international ? '1' : '',
     sort: s.sort,
+    ...adv.params,
   }, 24, page)
 
   return (
@@ -91,6 +97,7 @@ export default function LabCards() {
           onClick={() => set({ international: !s.international })}>
           International
         </Toggle>
+        <AdvancedButton adv={adv} />
         <div className="ml-auto flex items-center gap-1.5 text-sm">
           <span className="text-xs text-muted">Sort</span>
           <select value={s.sort}
@@ -128,6 +135,7 @@ export default function LabCards() {
         </div>
       )}
 
+      <AdvancedDrawer adv={adv} />
       {selected && (
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}

@@ -16,8 +16,8 @@ import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN } from '../../lib/apiV5'
 import { US_STATES, money, num, titleCase } from '../../lib/format'
 import {
-  FlagButton, LabBanner, QuickSave, ReceiptLine, applyPhrase, placeOf,
-  useLab, useReceipts,
+  AdvancedButton, AdvancedDrawer, FlagButton, LabBanner, QuickSave,
+  ReceiptLine, applyPhrase, placeOf, useAdvanced, useLab, useReceipts,
 } from './shared'
 
 export default function LabReceipts() {
@@ -26,6 +26,7 @@ export default function LabReceipts() {
   const [international, setInternational] = useState(false)
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
+  const adv = useAdvanced()
 
   const { data, isFetching } = useLab({
     tradition: ANY_CHRISTIAN,
@@ -33,6 +34,7 @@ export default function LabReceipts() {
     application_status: accepting ? 'Accepting Applications' : '',
     min_benchmarks: international ? '1' : '',
     sort: 'christian',
+    ...adv.params,
   }, 25, page)
   const { data: receipts } = useReceipts(
     (data?.rows ?? []).map((f) => f.ein))
@@ -66,6 +68,7 @@ export default function LabReceipts() {
           <Chip on={international} onClick={() => { setInternational(!international); setPage(0) }}>
             International
           </Chip>
+          <AdvancedButton adv={adv} />
         </div>
       </div>
 
@@ -140,6 +143,7 @@ export default function LabReceipts() {
         </div>
       )}
 
+      <AdvancedDrawer adv={adv} />
       {selected && (
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}

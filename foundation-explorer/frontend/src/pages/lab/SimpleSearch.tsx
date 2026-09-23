@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { num } from '../../lib/format'
-import { FoundationCard, LabBanner, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
+  useAdvanced, useLab } from './shared'
 
 const CHIPS = [
   { key: 'accepting', label: 'I can apply' },
@@ -25,6 +26,7 @@ export default function LabSimpleSearch() {
     accepting: false, international: false, christian: true,
   })
   const [selected, setSelected] = useState<string | null>(null)
+  const adv = useAdvanced()
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 300)
@@ -36,6 +38,7 @@ export default function LabSimpleSearch() {
     application_status: on.accepting ? 'Accepting Applications' : '',
     min_benchmarks: on.international ? '1' : '',
     sort: on.christian ? 'christian' : 'paid',
+    ...adv.params,
   })
 
   return (
@@ -80,6 +83,7 @@ export default function LabSimpleSearch() {
             {c.label}
           </button>
         ))}
+        <AdvancedButton adv={adv} />
       </div>
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -93,6 +97,7 @@ export default function LabSimpleSearch() {
         </div>
       )}
 
+      <AdvancedDrawer adv={adv} />
       {selected && (
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}

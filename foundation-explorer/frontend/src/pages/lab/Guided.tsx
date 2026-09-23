@@ -10,7 +10,8 @@ import { ArrowLeft, RotateCcw } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN } from '../../lib/apiV5'
 import { US_STATES, num } from '../../lib/format'
-import { FoundationCard, LabBanner, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
+  useAdvanced, useLab } from './shared'
 
 const WORK = [
   { id: 'christian', label: 'Christian ministry or church work',
@@ -29,6 +30,7 @@ export default function LabGuided() {
   const [state, setState] = useState<string>('')
   const [openOnly, setOpenOnly] = useState<boolean | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const adv = useAdvanced()
 
   const done = step >= 3
   const { data, isFetching } = useLab({
@@ -38,6 +40,7 @@ export default function LabGuided() {
     gives_to_state: state,
     application_status: openOnly ? 'Accepting Applications' : '',
     sort: 'christian',
+    ...adv.params,
   }, 24, 0)
 
   const reset = () => {
@@ -163,11 +166,14 @@ export default function LabGuided() {
                 {openOnly && ' · open to applications'}
               </p>
             </div>
-            <button onClick={reset}
-              className="flex items-center gap-1.5 text-sm text-muted
-                hover:text-ink">
-              <RotateCcw size={13} /> Start over
-            </button>
+            <div className="flex items-center gap-2">
+              <AdvancedButton adv={adv} />
+              <button onClick={reset}
+                className="flex items-center gap-1.5 text-sm text-muted
+                  hover:text-ink">
+                <RotateCcw size={13} /> Start over
+              </button>
+            </div>
           </div>
           <div className={`mt-5 grid gap-3 sm:grid-cols-2
             ${isFetching ? 'opacity-60' : ''}`}>
@@ -178,6 +184,7 @@ export default function LabGuided() {
         </div>
       )}
 
+      <AdvancedDrawer adv={adv} />
       {selected && (
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}

@@ -11,6 +11,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Globe2, HeartHandshake, Send } from 'lucide-react'
 import { fetchStatsV5 } from '../../lib/apiV5'
 import { money, num } from '../../lib/format'
+import { SlidersHorizontal } from 'lucide-react'
 import { LabBanner } from './shared'
 
 const DOORS = [
@@ -85,7 +86,16 @@ export default function LabStart() {
         ))}
       </div>
 
-      <p className="mt-8 text-center text-xs text-muted">
+      <div className="mt-6 text-center">
+        <Link to="/lab/cards?adv=1"
+          className="inline-flex items-center gap-1.5 text-sm text-muted
+            underline underline-offset-4 hover:text-ink">
+          <SlidersHorizontal size={13} />
+          I know exactly what I want — open the advanced filters
+        </Link>
+      </div>
+
+      <p className="mt-4 text-center text-xs text-muted">
         Every number traces to a specific grant on a specific public IRS
         filing. When we don't know something, we say so.
       </p>

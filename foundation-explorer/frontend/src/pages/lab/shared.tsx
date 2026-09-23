@@ -15,13 +15,18 @@
  *    - Clicking a foundation opens the REAL detail panel. The experiments
  *      reimagine finding, not the foundation page itself.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Bookmark, Flag } from 'lucide-react'
+import { Bookmark, Flag, FlaskConical, SlidersHorizontal, X }
+  from 'lucide-react'
 import { useSavedFoundations } from '../../lib/savedContext'
-import { FlaskConical } from 'lucide-react'
-import { fetchFoundationsV5, type FoundationRowV5 } from '../../lib/apiV5'
+import FilterPanel from '../../components/foundations/FilterPanel'
+import { activeFilterCount } from '../../components/foundations/filterChips'
+import {
+  defaultV5Filters, fetchFoundationsV5, v5FilterParams,
+  type FoundationRowV5, type V5Filters,
+} from '../../lib/apiV5'
 import { money, num, titleCase } from '../../lib/format'
 
 // --- data -------------------------------------------------------------------
@@ -315,5 +320,91 @@ export function SavePill() {
         </span>
       )}
     </Link>
+  )
+}
+
+// --- the real advanced filters, in every design ------------------------------
+// Per Drake (2026-09-22): each lab design must still offer the full filter
+// vocabulary so Emily can do real work inside any of them. Rather than
+// rebuild filters per page, every page gets the REAL FilterPanel — presets,
+// geography, reachability, denomination, International, Advanced group,
+// all of it — in a slide-over drawer. Its settings merge into the page's
+// own quick controls, and win on overlap: opening the power drawer and
+// setting something there is the stronger statement of intent.
+
+/** One advanced-filter state per page. `params` is ready to spread into
+ *  useLab AFTER the page's own params: last wins, so advanced overrides. */
+export function useAdvanced() {
+  const [filters, setFilters] = useState<V5Filters>(defaultV5Filters)
+  const [open, setOpen] = useState(false)
+  const params = useMemo(
+    () => Object.fromEntries(v5FilterParams(filters).entries()),
+    [filters])
+  return {
+    filters, setFilters, open, setOpen, params,
+    count: activeFilterCount(filters),
+    clear: () => setFilters(defaultV5Filters),
+  }
+}
+export type Advanced = ReturnType<typeof useAdvanced>
+
+export function AdvancedButton({ adv }: { adv: Advanced }) {
+  return (
+    <button onClick={() => adv.setOpen(true)}
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5
+        text-sm transition-colors ${adv.count > 0
+          ? 'border-primary bg-primary/5 text-primary'
+          : 'border-line bg-surface text-muted hover:text-ink'}`}>
+      <SlidersHorizontal size={14} />
+      Advanced
+      {adv.count > 0 && (
+        <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px]
+          font-medium text-white tabular">
+          {adv.count}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/** The full production FilterPanel in a right-hand slide-over. */
+export function AdvancedDrawer({ adv }: { adv: Advanced }) {
+  if (!adv.open) return null
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end">
+      <div className="absolute inset-0 bg-black/20"
+        onClick={() => adv.setOpen(false)} />
+      <div className="relative flex h-full w-[340px] flex-col bg-surface
+        shadow-2xl">
+        <div className="flex items-center justify-between border-b
+          border-line px-4 py-3">
+          <span className="font-display text-base font-semibold text-primary">
+            Advanced filters
+          </span>
+          <div className="flex items-center gap-3">
+            {adv.count > 0 && (
+              <button onClick={adv.clear}
+                className="text-xs text-muted underline underline-offset-2
+                  hover:text-ink">
+                Clear all ({adv.count})
+              </button>
+            )}
+            <button onClick={() => adv.setOpen(false)} aria-label="Close"
+              className="rounded p-1 text-muted hover:bg-canvas
+                hover:text-ink">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+        <p className="border-b border-line bg-honey-50/60 px-4 py-2
+          text-[11px] leading-snug text-muted">
+          The product's full filter set. Where a setting here overlaps a
+          quick control on the page, this drawer wins.
+        </p>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <FilterPanel filters={adv.filters} onChange={adv.setFilters} />
+        </div>
+      </div>
+    </div>
   )
 }

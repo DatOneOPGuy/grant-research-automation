@@ -10,7 +10,8 @@ import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN, CHRISTIAN_TRADITIONS } from '../../lib/apiV5'
 import { US_STATES, money, num, titleCase } from '../../lib/format'
-import { LabBanner, applyPhrase, focusPhrase, placeOf, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, LabBanner, applyPhrase,
+  focusPhrase, placeOf, useAdvanced, useLab } from './shared'
 
 export default function LabFocus() {
   const [denom, setDenom] = useState(ANY_CHRISTIAN)
@@ -21,6 +22,7 @@ export default function LabFocus() {
   const [drawer, setDrawer] = useState(false)
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
+  const adv = useAdvanced()
 
   const { data, isFetching } = useLab({
     tradition: denom,
@@ -28,6 +30,7 @@ export default function LabFocus() {
     application_status: accepting ? 'Accepting Applications' : '',
     min_benchmarks: international ? '1' : '',
     sort,
+    ...adv.params,
   }, 30, page)
 
   const active = [state && `gives in ${state}`, accepting && 'open to apply',
@@ -47,6 +50,8 @@ export default function LabFocus() {
             {active && <span> · {active}</span>}
           </div>
         </div>
+        <div className="flex items-center gap-2">
+        <AdvancedButton adv={adv} />
         <button onClick={() => setDrawer((d) => !d)}
           className={`flex items-center gap-2 rounded-lg border px-3 py-1.5
             text-sm ${drawer
@@ -56,6 +61,7 @@ export default function LabFocus() {
           <ChevronDown size={13}
             className={`transition-transform ${drawer ? 'rotate-180' : ''}`} />
         </button>
+        </div>
       </div>
 
       {drawer && (
@@ -173,6 +179,7 @@ export default function LabFocus() {
         </div>
       )}
 
+      <AdvancedDrawer adv={adv} />
       {selected && (
         <DetailPanel ein={selected} onClose={() => setSelected(null)} />
       )}
