@@ -24,7 +24,7 @@ import { useSavedFoundations } from '../../lib/savedContext'
 import FilterPanel from '../../components/foundations/FilterPanel'
 import { activeFilterCount } from '../../components/foundations/filterChips'
 import {
-  defaultV5Filters, fetchFoundationsV5, v5FilterParams,
+  NTEE_MAJORS, defaultV5Filters, fetchFoundationsV5, v5FilterParams,
   type FoundationRowV5, type V5Filters,
 } from '../../lib/apiV5'
 import { money, num, titleCase } from '../../lib/format'
@@ -406,5 +406,27 @@ export function AdvancedDrawer({ adv }: { adv: Advanced }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/** Compact cause-area picker for the lab pages' quick bars — one major at
+ *  a time, plain labels. The full 26-checkbox + exact-code version lives in
+ *  the Advanced drawer; this is the one-click path Emily asked for
+ *  ("food security, North Carolina"). Composes conjointly with any state
+ *  control on the page: the API requires the cause area IN the states. */
+export function CauseSelect({ value, onChange }: {
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      aria-label="Cause area"
+      className="rounded-lg border border-line bg-surface px-2.5 py-1.5
+        text-sm focus:outline-none focus:border-honey-500">
+      <option value="">Any cause area</option>
+      {NTEE_MAJORS.map(([m, label]) => (
+        <option key={m} value={m}>{label}</option>
+      ))}
+    </select>
   )
 }

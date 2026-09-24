@@ -10,8 +10,8 @@ import { ArrowLeft, RotateCcw } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN } from '../../lib/apiV5'
 import { US_STATES, num } from '../../lib/format'
-import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
-  useAdvanced, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, CauseSelect, FoundationCard,
+  LabBanner, useAdvanced, useLab } from './shared'
 
 const WORK = [
   { id: 'christian', label: 'Christian ministry or church work',
@@ -30,6 +30,7 @@ export default function LabGuided() {
   const [state, setState] = useState<string>('')
   const [openOnly, setOpenOnly] = useState<boolean | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [cause, setCause] = useState('')
   const adv = useAdvanced()
 
   const done = step >= 3
@@ -38,6 +39,7 @@ export default function LabGuided() {
       : work === 'christian' ? ANY_CHRISTIAN : '',
     min_benchmarks: work === 'international' ? '1' : '',
     gives_to_state: state,
+    ntee: cause,
     application_status: openOnly ? 'Accepting Applications' : '',
     sort: 'christian',
     ...adv.params,
@@ -167,6 +169,7 @@ export default function LabGuided() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <CauseSelect value={cause} onChange={setCause} />
               <AdvancedButton adv={adv} />
               <button onClick={reset}
                 className="flex items-center gap-1.5 text-sm text-muted

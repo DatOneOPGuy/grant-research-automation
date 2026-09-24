@@ -16,8 +16,8 @@ import DetailPanel from '../../components/foundations/DetailPanel'
 import { fetchBenchmarkOrgs } from '../../lib/apiV5'
 import { useSavedFoundations } from '../../lib/savedContext'
 import { US_STATES, num } from '../../lib/format'
-import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
-  useAdvanced, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, CauseSelect, FoundationCard,
+  LabBanner, useAdvanced, useLab } from './shared'
 
 /** Hand-picked peers, most-recognized first. Slugs are benchmark ministries
  *  (filter: foundations that funded them); the two tradition entries cover
@@ -41,6 +41,7 @@ export default function LabMission() {
   const [selected, setSelected] = useState<string | null>(null)
   const [seeded, setSeeded] = useState<'idle' | 'working' | 'done'>('idle')
   const { createFolder, addTo, folders } = useSavedFoundations()
+  const [cause, setCause] = useState('')
   const adv = useAdvanced()
 
   // Funder counts on the picker cards, so even the choosing step teaches
@@ -56,6 +57,7 @@ export default function LabMission() {
     benchmark: peer.kind === 'benchmark' ? peer.value : '',
     tradition: peer.kind === 'tradition' ? peer.value : '',
     gives_to_state: state,
+    ntee: cause,
     sort: 'christian',
     ...adv.params,
   } : {}, 24, 0)
@@ -160,6 +162,7 @@ export default function LabMission() {
                   : seeded === 'working' ? 'Saving…'
                     : 'Save the top 10 as my starter folder'}
               </button>
+              <CauseSelect value={cause} onChange={setCause} />
               <AdvancedButton adv={adv} />
               <button onClick={() => { setStarted(false); setSeeded('idle') }}
                 className="flex items-center gap-1 text-sm text-muted

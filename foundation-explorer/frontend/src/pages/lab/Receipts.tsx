@@ -16,12 +16,14 @@ import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN } from '../../lib/apiV5'
 import { US_STATES, money, num, titleCase } from '../../lib/format'
 import {
-  AdvancedButton, AdvancedDrawer, FlagButton, LabBanner, QuickSave,
-  ReceiptLine, applyPhrase, placeOf, useAdvanced, useLab, useReceipts,
+  AdvancedButton, AdvancedDrawer, CauseSelect, FlagButton, LabBanner,
+  QuickSave, ReceiptLine, applyPhrase, placeOf, useAdvanced, useLab,
+  useReceipts,
 } from './shared'
 
 export default function LabReceipts() {
   const [state, setState] = useState('')
+  const [cause, setCause] = useState('')
   const [accepting, setAccepting] = useState(false)
   const [international, setInternational] = useState(false)
   const [page, setPage] = useState(0)
@@ -30,6 +32,7 @@ export default function LabReceipts() {
 
   const { data, isFetching } = useLab({
     tradition: ANY_CHRISTIAN,
+    ntee: cause,
     gives_to_state: state,
     application_status: accepting ? 'Accepting Applications' : '',
     min_benchmarks: international ? '1' : '',
@@ -54,6 +57,8 @@ export default function LabReceipts() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <CauseSelect value={cause}
+            onChange={(v) => { setCause(v); setPage(0) }} />
           <select value={state} onChange={(e) => { setState(e.target.value); setPage(0) }}
             className="rounded-lg border border-line bg-surface px-2.5 py-1.5
               text-sm focus:outline-none focus:border-honey-500">

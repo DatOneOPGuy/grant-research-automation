@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react'
 import { Loader2, Search } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { num } from '../../lib/format'
-import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
-  useAdvanced, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, CauseSelect, FoundationCard,
+  LabBanner, useAdvanced, useLab } from './shared'
 
 const CHIPS = [
   { key: 'accepting', label: 'I can apply' },
@@ -26,6 +26,7 @@ export default function LabSimpleSearch() {
     accepting: false, international: false, christian: true,
   })
   const [selected, setSelected] = useState<string | null>(null)
+  const [cause, setCause] = useState('')
   const adv = useAdvanced()
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function LabSimpleSearch() {
 
   const { data, isFetching } = useLab({
     search: debounced,
+    ntee: cause,
     application_status: on.accepting ? 'Accepting Applications' : '',
     min_benchmarks: on.international ? '1' : '',
     sort: on.christian ? 'christian' : 'paid',
@@ -83,6 +85,7 @@ export default function LabSimpleSearch() {
             {c.label}
           </button>
         ))}
+        <CauseSelect value={cause} onChange={setCause} />
         <AdvancedButton adv={adv} />
       </div>
 

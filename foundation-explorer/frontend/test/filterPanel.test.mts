@@ -47,9 +47,12 @@ const primary = [...panel.matchAll(/<Section title="([^"]+)"/g)]
 // fundraiser says over half their clients are international work, and it is
 // where they spend most of their time. It opens collapsed, so it costs no
 // vertical space until it is wanted.
-ok('Geography, Reachability, Recipient Faith and International come first',
+ok('Geography, Reachability, Recipient Faith, International and Cause Areas come first',
    JSON.stringify(primary) === JSON.stringify(
-     ['Geography', 'Reachability', 'Recipient Faith', 'International']))
+     ['Geography', 'Reachability', 'Recipient Faith', 'International',
+      'Cause Areas (NTEE)']))
+ok('Cause Areas is collapsed by default, so it costs no space unused',
+   /<Section title="Cause Areas \(NTEE\)" defaultOpen=\{false\}>/.test(panel))
 ok('International is collapsed by default, so it costs no space unused',
    /<Section title="International" defaultOpen=\{false\}>/.test(panel))
 ok('Giving, Foundation and Data Quality are inside Advanced',

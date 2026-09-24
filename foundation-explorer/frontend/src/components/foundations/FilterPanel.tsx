@@ -46,7 +46,7 @@ const ADVANCED_KEYS: (keyof V5Filters)[] = [
   'exclude_micro', 'include_inactive', 'daf', 'min_christian',
   'min_pct_christian', 'deadline_season', 'deadline_months', 'deadline_kind',
   'deadline_from_month', 'deadline_to_month',
-  'coverage_band', 'min_coverage', 'ntee',
+  'coverage_band', 'min_coverage',
 ]
 
 function countAdvanced(filters: V5Filters): number {
@@ -744,6 +744,15 @@ export default function FilterPanel({ filters, onChange }: Props) {
         <InternationalFilter filters={filters} set={set} />
       </Section>
 
+      {/* Primary, not Advanced, by request: cause area x state is the
+          lead-generation move (food security in NC), and a filter nobody
+          can find is a filter that does not exist. Collapsed by default so
+          it costs no space until wanted. */}
+      <Section title="Cause Areas (NTEE)" defaultOpen={false}>
+        <NteeFilter values={filters.ntee}
+          onSet={(ntee) => set({ ntee })} />
+      </Section>
+
       <Advanced filters={filters}>
       <Section title="Giving" defaultOpen={false}>
         <Range label="Total paid (2023–24)"
@@ -884,11 +893,6 @@ export default function FilterPanel({ filters, onChange }: Props) {
           </label>
         ))}
       </Section>
-      <Section title="Cause Areas (NTEE)" defaultOpen={false}>
-        <NteeFilter values={filters.ntee}
-          onSet={(ntee) => set({ ntee })} />
-      </Section>
-
       <Section title="Data Quality" defaultOpen={false}>
         <div className="flex items-center gap-1 text-xs text-muted mb-1">
           Coverage band

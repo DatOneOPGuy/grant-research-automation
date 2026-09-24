@@ -13,8 +13,8 @@ import { Loader2 } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN, CHRISTIAN_TRADITIONS } from '../../lib/apiV5'
 import { US_STATES, num } from '../../lib/format'
-import { AdvancedButton, AdvancedDrawer, FoundationCard, LabBanner,
-  useAdvanced, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, CauseSelect, FoundationCard,
+  LabBanner, useAdvanced, useLab } from './shared'
 
 const PRESETS: Record<string, Partial<State>> = {
   open: { accepting: true },
@@ -24,6 +24,7 @@ const PRESETS: Record<string, Partial<State>> = {
 
 type State = {
   denom: string
+  cause: string
   state: string
   accepting: boolean
   international: boolean
@@ -34,7 +35,7 @@ export default function LabCards() {
   const [params] = useSearchParams()
   const preset = PRESETS[params.get('preset') ?? ''] ?? {}
   const [s, setS] = useState<State>({
-    denom: ANY_CHRISTIAN, state: '', accepting: false, international: false,
+    denom: ANY_CHRISTIAN, cause: '', state: '', accepting: false, international: false,
     sort: 'christian', ...preset,
   })
   const [page, setPage] = useState(0)
@@ -47,6 +48,7 @@ export default function LabCards() {
 
   const { data, isFetching } = useLab({
     tradition: s.denom,
+    ntee: s.cause,
     gives_to_state: s.state,
     application_status: s.accepting ? 'Accepting Applications' : '',
     min_benchmarks: s.international ? '1' : '',
@@ -90,6 +92,8 @@ export default function LabCards() {
             <option key={st} value={st}>Gives in {st}</option>
           ))}
         </select>
+        <CauseSelect value={s.cause}
+          onChange={(cause) => set({ cause })} />
         <Toggle on={s.accepting} onClick={() => set({ accepting: !s.accepting })}>
           I can apply
         </Toggle>

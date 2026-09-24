@@ -10,11 +10,12 @@ import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN, CHRISTIAN_TRADITIONS } from '../../lib/apiV5'
 import { US_STATES, money, num, titleCase } from '../../lib/format'
-import { AdvancedButton, AdvancedDrawer, LabBanner, applyPhrase,
-  focusPhrase, placeOf, useAdvanced, useLab } from './shared'
+import { AdvancedButton, AdvancedDrawer, CauseSelect, LabBanner,
+  applyPhrase, focusPhrase, placeOf, useAdvanced, useLab } from './shared'
 
 export default function LabFocus() {
   const [denom, setDenom] = useState(ANY_CHRISTIAN)
+  const [cause, setCause] = useState('')
   const [state, setState] = useState('')
   const [accepting, setAccepting] = useState(false)
   const [international, setInternational] = useState(false)
@@ -26,6 +27,7 @@ export default function LabFocus() {
 
   const { data, isFetching } = useLab({
     tradition: denom,
+    ntee: cause,
     gives_to_state: state,
     application_status: accepting ? 'Accepting Applications' : '',
     min_benchmarks: international ? '1' : '',
@@ -89,6 +91,13 @@ export default function LabFocus() {
               <option value="">Anywhere</option>
               {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+          </label>
+          <label className="text-xs text-muted">
+            Cause area of grantees
+            <div className="mt-1">
+              <CauseSelect value={cause}
+                onChange={(v) => { setCause(v); setPage(0) }} />
+            </div>
           </label>
           <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" checked={accepting}

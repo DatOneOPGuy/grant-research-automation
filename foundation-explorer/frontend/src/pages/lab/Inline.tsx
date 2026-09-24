@@ -13,8 +13,8 @@ import DetailPanel from '../../components/foundations/DetailPanel'
 import { ANY_CHRISTIAN } from '../../lib/apiV5'
 import { money, num, titleCase } from '../../lib/format'
 import {
-  AdvancedButton, AdvancedDrawer, LabBanner, QuickSave, applyPhrase,
-  focusPhrase, placeOf, useAdvanced, useLab,
+  AdvancedButton, AdvancedDrawer, CauseSelect, LabBanner, QuickSave,
+  applyPhrase, focusPhrase, placeOf, useAdvanced, useLab,
 } from './shared'
 
 type GrantRow = {
@@ -39,9 +39,11 @@ export default function LabInline() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [panel, setPanel] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const [cause, setCause] = useState('')
   const adv = useAdvanced()
   const { data, isFetching } = useLab({
     tradition: ANY_CHRISTIAN, sort: 'christian',
+    ntee: cause,
     ...adv.params,
   }, 25, page)
   const grants = useTopGrants(expanded)
@@ -61,7 +63,10 @@ export default function LabInline() {
             right here.
           </p>
         </div>
-        <AdvancedButton adv={adv} />
+        <div className="flex items-center gap-2">
+          <CauseSelect value={cause} onChange={setCause} />
+          <AdvancedButton adv={adv} />
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-line bg-surface">
