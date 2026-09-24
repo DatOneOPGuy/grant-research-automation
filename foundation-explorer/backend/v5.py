@@ -167,6 +167,7 @@ def foundations(
     gives_to_county: str | None = None,
     benchmark: str | None = None,
     min_benchmarks: int | None = None,
+    ntee: str | None = None,
     application_status: str | None = None,
     has_website: bool = False, has_email: bool = False,
     has_contact: bool = False,
@@ -281,6 +282,40 @@ def foundations(
                 "EXISTS (SELECT 1 FROM benchmark_hits bh "
                 f"WHERE bh.ein=f.ein AND bh.slug IN ({marks}))")
             params += slugs
+    if ntee:
+        # Cause areas by what the foundation FUNDS: NTEE codes of its
+        # EIN-matched grantees (foundation_ntee, built by
+        # src/build_ntee_index). One LIKE per term serves both grains --
+        # a bare major ("B") and a full code ("E86") are each a prefix.
+        # Coverage is partial by nature (only EIN-matched recipients carry
+        # codes, ~33% of grant dollars), so the semantic is "has at least
+        # one matching coded grantee", which the UI states.
+        #
+        # CONJOINT with gives_to_state, by request from the first customer:
+        # "food security in North Carolina" means a K-coded grantee IN North
+        # Carolina -- not food security somewhere plus NC somewhere. When
+        # states are selected, the cause-area match is constrained to them;
+        # the independent gives_to_state clause below still applies and is
+        # simply implied by this stricter one.
+        terms = [t.strip().upper() for t in ntee.split(",") if t.strip()][:12]
+        for t in terms:
+            if not (t.isalnum() and t[0].isalpha() and len(t) <= 5):
+                raise HTTPException(400, f"bad NTEE term: {t!r}")
+        if terms:
+            likes = " OR ".join("fn.ntee LIKE ?" for _ in terms)
+            state_sql = ""
+            state_params: list[str] = []
+            if gives_to_state:
+                codes = [c.strip().upper() for c in gives_to_state.split(",")
+                         if c.strip()]
+                if codes:
+                    marks = ",".join("?" for _ in codes)
+                    state_sql = f" AND fn.state IN ({marks})"
+                    state_params = codes
+            where.append(
+                "EXISTS (SELECT 1 FROM foundation_ntee fn "
+                f"WHERE fn.ein=f.ein AND ({likes}){state_sql})")
+            params += [f"{t}%" for t in terms] + state_params
     if min_benchmarks:
         # Distinct ministries, not grants. One is a data point; several is a
         # deliberate international programme, which is the real signal.
@@ -1201,6 +1236,22 @@ def counties(state: str | None = None, q: str | None = None,
             item["matched_city"] = city
         out.append(item)
     return {"rows": out}
+
+
+@router.get("/ntee-majors")
+@cached_aggregate
+def ntee_majors():
+    """Foundation counts per NTEE major group, for the filter's checkbox
+    list -- live numbers beside each option, same manners as the
+    international tiers."""
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT SUBSTR(ntee, 1, 1) AS major,
+                   COUNT(DISTINCT ein) AS funders,
+                   SUM(dollars) AS dollars
+            FROM foundation_ntee
+            GROUP BY 1 ORDER BY 1""").fetchall()
+    return {"rows": [dict(r) for r in rows]}
 
 
 @router.get("/benchmark-orgs")

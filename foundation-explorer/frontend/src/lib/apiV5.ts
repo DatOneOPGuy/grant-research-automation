@@ -203,6 +203,27 @@ export function fetchFoundationRecipients(
   return getV5(`/api/v5/foundations/${ein}/recipients?${p}`)
 }
 
+/** The 26 NTEE major groups, in IRS order. Fixed vocabulary. */
+export const NTEE_MAJORS: [string, string][] = [
+  ['A', 'Arts & culture'], ['B', 'Education'], ['C', 'Environment'],
+  ['D', 'Animals'], ['E', 'Health care'], ['F', 'Mental health'],
+  ['G', 'Diseases & disorders'], ['H', 'Medical research'],
+  ['I', 'Crime & legal'], ['J', 'Employment'], ['K', 'Food & agriculture'],
+  ['L', 'Housing & shelter'], ['M', 'Public safety & disaster'],
+  ['N', 'Recreation & sports'], ['O', 'Youth development'],
+  ['P', 'Human services'], ['Q', 'International'], ['R', 'Civil rights'],
+  ['S', 'Community improvement'], ['T', 'Philanthropy & grantmaking'],
+  ['U', 'Science & technology'], ['V', 'Social science'],
+  ['W', 'Public benefit'], ['X', 'Religion'], ['Y', 'Mutual benefit'],
+  ['Z', 'Unknown'],
+]
+
+export function fetchNteeMajors(): Promise<{
+  rows: { major: string; funders: number; dollars: number }[]
+}> {
+  return getV5('/api/v5/ntee-majors')
+}
+
 export type BenchmarkOrg = {
   slug: string; name: string; category: string
   dollars: number; funders: number; name_count: number
@@ -739,6 +760,9 @@ export type V5Filters = {
   // International prospecting by peer -- see src/international_orgs.py.
   benchmark: string[]
   min_benchmarks: string
+  /** NTEE terms — bare majors ('B') or full codes ('E86'); matches
+   *  foundations with >=1 coded grantee under any term (prefix). */
+  ntee: string[]
   application_status: string[]
   has_website: boolean
   has_email: boolean
@@ -788,6 +812,7 @@ export const defaultV5Filters: V5Filters = {
   gives_to_county: [],
   benchmark: [],
   min_benchmarks: '',
+  ntee: [],
   application_status: [],
   has_website: false,
   has_email: false,
@@ -829,7 +854,7 @@ export const defaultV5Filters: V5Filters = {
 }
 
 const LIST_KEYS = ['tradition', 'state', 'gives_to_state',
-  'gives_to_region', 'gives_to_county', 'benchmark',
+  'gives_to_region', 'gives_to_county', 'benchmark', 'ntee',
   'application_status', 'coverage_band', 'deadline_season', 'deadline_months',
   'deadline_kind', 'country'] as const
 const NUM_KEYS = ['min_tradition_dollars', 'min_tradition_recipients',

@@ -72,6 +72,11 @@ export function buildChips(
     id: 'gtr', label: `Region: ${f.gives_to_region.join(', ')}`,
     onRemove: () => set({ gives_to_region: [] }),
   })
+  if (f.ntee.length) chips.push({
+    id: 'ntee',
+    label: `Funds NTEE: ${f.ntee.join(', ')}`,
+    onRemove: () => set({ ntee: [] }),
+  })
   if (f.benchmark.length) chips.push({
     id: 'bench',
     label: `Funds: ${f.benchmark.length === 1

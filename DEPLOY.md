@@ -524,6 +524,8 @@ a broken deploy. Verify them explicitly after shipping a database:
 ssh fcf "curl -s -o /dev/null -w 'counties=%{http_code}\n' \
   'localhost:8000/api/v5/counties?limit=1'"
 ssh fcf "curl -s 'localhost:8000/api/v5/benchmark-orgs' | head -c 120"
+ssh fcf "curl -s -o /dev/null -w 'ntee=%{http_code}\n' \
+  'localhost:8000/api/v5/foundations?ntee=B&limit=1'"
 ```
 
 Note also that unknown query parameters are ignored by FastAPI rather than
@@ -543,6 +545,7 @@ python3 -m src.build_sector_index      # ~16 s, -> 1.93 GB, needs the BMF
 python3 -m src.build_nonprofit_index   # ~17 s, -> 2.39 GB, needs the BMF
 python3 -m src.build_geo_index         # ~34 s, needs data/census/ (cached)
 python3 -m src.build_benchmark_index   # ~26 s, no external data needed
+python3 -m src.build_ntee_index        # ~20 s, joins tables already present
 ```
 
 Order matters only in that the pipeline rebuild silently drops all of them,

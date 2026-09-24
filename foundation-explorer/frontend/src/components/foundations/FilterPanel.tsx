@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Info, Sparkles } from 'lucide-react'
 import {
   ANY_CHRISTIAN, APPLICATION_STATUSES, CENSUS_DIVISIONS, CENSUS_REGIONS,
   BENCHMARK_CATEGORIES, fetchBenchmarkOrgs, type BenchmarkOrg,
+  NTEE_MAJORS, fetchNteeMajors,
   CHRISTIAN_TRADITIONS, COVERAGE_BANDS, fetchCounties,
   DEADLINE_KINDS, DEADLINE_QUARTERS, DEADLINE_SEASONS, MISSION_REGIONS,
   MONTH_NAMES,
@@ -45,7 +46,7 @@ const ADVANCED_KEYS: (keyof V5Filters)[] = [
   'exclude_micro', 'include_inactive', 'daf', 'min_christian',
   'min_pct_christian', 'deadline_season', 'deadline_months', 'deadline_kind',
   'deadline_from_month', 'deadline_to_month',
-  'coverage_band', 'min_coverage',
+  'coverage_band', 'min_coverage', 'ntee',
 ]
 
 function countAdvanced(filters: V5Filters): number {
@@ -321,6 +322,94 @@ function InternationalFilter({ filters, set }: {
               : `Show all ${data?.rows.length} ministries`}
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** Filter by the NTEE codes of what a foundation FUNDS. Grant
+ *  professionals arrive knowing these; nobody else has to touch them —
+ *  hence a collapsed section inside Advanced. Coverage is partial by
+ *  nature (codes exist only for EIN-matched grantees, about a third of
+ *  grant dollars) and the section says so rather than letting the filter
+ *  quietly mean more than it does. */
+function NteeFilter({ values, onSet }: {
+  values: string[]; onSet: (next: string[]) => void
+}) {
+  const { data } = useQuery({
+    queryKey: ['nteeMajors'], queryFn: fetchNteeMajors,
+    staleTime: Infinity,
+  })
+  const funders = (m: string) =>
+    data?.rows.find((r) => r.major === m)?.funders
+  const [code, setCode] = useState('')
+
+  const toggle = (term: string) => onSet(
+    values.includes(term)
+      ? values.filter((t) => t !== term)
+      : [...values, term])
+  const addCode = () => {
+    const t = code.trim().toUpperCase()
+    if (!/^[A-Z][A-Z0-9]{0,4}$/.test(t)) return
+    if (!values.includes(t)) onSet([...values, t])
+    setCode('')
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] text-muted leading-snug mb-2">
+        Cause areas of the organizations a foundation funds, by IRS NTEE
+        code. Pick states under Geography ("gives to organizations in") and
+        this looks for the cause area <b>in those states</b> — food security
+        in North Carolina, youth programs across twelve states. Codes exist
+        only for grantees matched to an IRS record (about a third of grant
+        dollars), so this finds funders with at least one matching grantee —
+        it never claims all their giving is in the area.
+      </p>
+
+      {values.filter((t) => t.length > 1).length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {values.filter((t) => t.length > 1).map((t) => (
+            <button key={t} onClick={() => toggle(t)}
+              title="Remove"
+              className="text-[11px] rounded-full bg-primary text-white
+                px-2 py-0.5 flex items-center gap-1">
+              {t} <span aria-hidden>×</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5 mb-2">
+        <input value={code} onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') addCode() }}
+          placeholder="Exact code, e.g. E86"
+          aria-label="Add an NTEE code"
+          className="flex-1 min-w-0 text-sm border border-line rounded
+            px-2 py-1 placeholder:text-muted/60 focus:outline-none
+            focus:border-primary/40" />
+        <button onClick={addCode}
+          className="text-xs px-2.5 rounded border border-line text-muted
+            hover:text-ink hover:bg-canvas">
+          Add
+        </button>
+      </div>
+
+      <div className="max-h-56 overflow-y-auto pr-1"
+        style={{ scrollbarWidth: 'thin' }}>
+        {NTEE_MAJORS.map(([m, label]) => (
+          <Check key={m}
+            label={
+              <span className="flex items-baseline gap-1 min-w-0">
+                <span className="truncate">{label}</span>
+                <span className="text-[10px] text-muted tabular shrink-0">
+                  {m}{funders(m) != null &&
+                    ` · ${funders(m)!.toLocaleString()}`}
+                </span>
+              </span>
+            }
+            checked={values.includes(m)}
+            onChange={() => toggle(m)} />
+        ))}
       </div>
     </div>
   )
@@ -795,6 +884,11 @@ export default function FilterPanel({ filters, onChange }: Props) {
           </label>
         ))}
       </Section>
+      <Section title="Cause Areas (NTEE)" defaultOpen={false}>
+        <NteeFilter values={filters.ntee}
+          onSet={(ntee) => set({ ntee })} />
+      </Section>
+
       <Section title="Data Quality" defaultOpen={false}>
         <div className="flex items-center gap-1 text-xs text-muted mb-1">
           Coverage band
