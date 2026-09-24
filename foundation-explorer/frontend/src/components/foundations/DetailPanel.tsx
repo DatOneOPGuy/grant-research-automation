@@ -5,6 +5,7 @@ import { MONTH_NAMES, STATIC_MODE, fetchFoundationDetailV5 } from '../../lib/api
 import { recordView } from '../../lib/recentStore'
 import SaveMenu from './SaveMenu'
 import { NotesTab } from './NoteCell'
+import CausesTab from './tabs/CausesTab'
 import { money, propublicaUrl, titleCase, websiteUrl } from '../../lib/format'
 import { Skeleton, StatusPill } from '../ui/primitives'
 import { BucketBarLabeled } from './BucketBar'
@@ -47,8 +48,8 @@ function unattributableMessage(reason: string | null, amount: string) {
   }
 }
 
-const ALL_TABS = ['Overview', 'Recipients', 'Grants', 'International',
-  'Geography', 'Evidence', 'Application', 'Notes'] as const
+const ALL_TABS = ['Overview', 'Recipients', 'Grants', 'Causes',
+  'International', 'Geography', 'Evidence', 'Application', 'Notes'] as const
 type Tab = (typeof ALL_TABS)[number]
 
 export default function DetailPanel({ ein, onClose }: Props) {
@@ -72,7 +73,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
   // build, which has no account service to hold one.
   const tabs = ALL_TABS.filter(
     (t) => (t !== 'International' || (f ? f.foreign_dollars > 0 : false))
-      && (t !== 'Notes' || !STATIC_MODE))
+      && ((t !== 'Notes' && t !== 'Causes') || !STATIC_MODE))
   const active: Tab = tabs.includes(tab) ? tab : 'Overview'
 
   return (
@@ -195,6 +196,7 @@ export default function DetailPanel({ ein, onClose }: Props) {
                   total={f?.recipient_count ?? data.recipients.length} />
               )}
               {active === 'Grants' && <GrantsTab ein={ein} />}
+              {active === 'Causes' && <CausesTab ein={ein} />}
               {active === 'International' && <InternationalTab data={data} />}
               {active === 'Geography' && <GeographyTab data={data} />}
               {active === 'Evidence' && <EvidenceTab data={data} />}

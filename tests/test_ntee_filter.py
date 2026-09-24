@@ -121,3 +121,42 @@ def test_majors_endpoint_counts_match_the_filter(api):
               for r in api.get("/api/v5/ntee-majors").json()["rows"]}
     for m in ("B", "X", "Q"):
         assert majors[m] == total(api, f"ntee={m}"), m
+
+
+# --- the Causes tab endpoint --------------------------------------------------
+
+def test_causes_majors_reconcile_with_the_table(api):
+    """The tab's per-major dollars must equal foundation_ntee's rollup —
+    the same table the filter uses, so the two can never disagree."""
+    d = api.get("/api/v5/foundations/562255292/causes").json()
+    assert d["majors"]
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    for m in d["majors"]:
+        want = conn.execute(
+            "SELECT COALESCE(SUM(dollars),0) FROM foundation_ntee "
+            "WHERE ein='562255292' AND ntee LIKE ?",
+            (m["major"] + "%",)).fetchone()[0]
+        assert m["dollars"] == want, m["major"]
+    conn.close()
+    assert d["coded_dollars"] == sum(m["dollars"] for m in d["majors"])
+
+
+def test_causes_recipients_carry_their_majors_code(api):
+    d = api.get("/api/v5/foundations/562255292/causes").json()
+    for m in d["majors"]:
+        for r in m["recipients"]:
+            assert r["ntee"].startswith(m["major"]), (m["major"], r["ntee"])
+
+
+def test_causes_recipient_rows_are_capped_but_counted(api):
+    """Lilly has hundreds of coded recipients; rows cap at 50 per major
+    while recipient_count keeps the true figure."""
+    d = api.get("/api/v5/foundations/350868122/causes").json()
+    assert any(m["recipient_count"] > 50 for m in d["majors"])
+    for m in d["majors"]:
+        assert len(m["recipients"]) <= 50
+        assert m["recipient_count"] >= len(m["recipients"])
+
+
+def test_causes_unknown_foundation_is_404(api):
+    assert api.get("/api/v5/foundations/000000000/causes").status_code == 404

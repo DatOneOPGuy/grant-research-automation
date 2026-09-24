@@ -684,6 +684,81 @@ def foundation_recipients(
             "rows": [dict(r) for r in rows]}
 
 
+@router.get("/foundations/{ein}/causes")
+def foundation_causes(ein: str):
+    """Every cause area this foundation funded, with the recipients inside
+    each — the detail-page counterpart of the Cause Areas filter.
+
+    Grouped by NTEE major, largest dollars first. Each major carries its
+    per-state split (from foundation_ntee's state dimension, so "Education —
+    NC, VA" reads directly) and its coded recipients with their exact codes.
+    Coverage is stated, not implied: codes exist only for grantees matched
+    to an IRS record, and the header says how much of this foundation's
+    giving that covers.
+    """
+    with connect() as conn:
+        paid = conn.execute(
+            "SELECT paid_2324 FROM foundations WHERE ein=?",
+            (ein,)).fetchone()
+        if paid is None:
+            raise HTTPException(status_code=404, detail="Unknown foundation")
+        majors_rows = conn.execute("""
+            SELECT SUBSTR(ntee,1,1) AS major, SUM(dollars) AS dollars,
+                   SUM(grants) AS grants
+            FROM foundation_ntee WHERE ein=?
+            GROUP BY 1 ORDER BY 2 DESC""", (ein,)).fetchall()
+        state_rows = conn.execute("""
+            SELECT SUBSTR(ntee,1,1) AS major, state, SUM(dollars) AS dollars
+            FROM foundation_ntee WHERE ein=? AND state != ''
+            GROUP BY 1, 2""", (ein,)).fetchall()
+        recip_rows = conn.execute("""
+            SELECT UPPER(TRIM(n.ntee_code)) AS ntee, r.entity_id,
+                   COALESCE(r.display_name, r.name) AS name, r.tradition,
+                   rc.city, rc.state AS org_state,
+                   frs.dollars, frs.grants
+            FROM frs
+            JOIN recipients r ON r.entity_id = frs.entity_id
+            JOIN nonprofits n ON n.ein = r.ein
+            LEFT JOIN recipient_counties rc ON rc.entity_id = r.entity_id
+            WHERE frs.ein = ? AND COALESCE(n.ntee_code, '') != ''
+            ORDER BY frs.dollars DESC""", (ein,)).fetchall()
+
+    states: dict[str, list] = {}
+    for row in state_rows:
+        states.setdefault(row["major"], []).append(
+            {"state": row["state"], "dollars": row["dollars"]})
+    for lst in states.values():
+        lst.sort(key=lambda x: -x["dollars"])
+
+    PER_MAJOR = 50
+    grouped: dict[str, list] = {}
+    counts: dict[str, int] = {}
+    for row in recip_rows:
+        major = row["ntee"][:1]
+        counts[major] = counts.get(major, 0) + 1
+        bucket = grouped.setdefault(major, [])
+        if len(bucket) < PER_MAJOR:
+            bucket.append(dict(row))
+
+    majors = [{
+        "major": m["major"],
+        "dollars": m["dollars"],
+        "grants": m["grants"],
+        "recipient_count": counts.get(m["major"], 0),
+        # Top five states carry the story; the tail is noise at this grain.
+        "states": states.get(m["major"], [])[:5],
+        "recipients": grouped.get(m["major"], []),
+    } for m in majors_rows]
+
+    coded = sum(m["dollars"] for m in majors)
+    return {
+        "paid_2324": paid["paid_2324"],
+        "coded_dollars": coded,
+        "coded_recipients": len(recip_rows),
+        "majors": majors,
+    }
+
+
 @router.get("/foundations/{ein}/grants")
 def foundation_grants(ein: str, limit: int = Query(200, le=1000), offset: int = 0):
     with connect() as conn:
