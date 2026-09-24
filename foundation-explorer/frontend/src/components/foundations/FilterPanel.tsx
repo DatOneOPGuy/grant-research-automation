@@ -71,7 +71,7 @@ function Advanced({ filters, children }: {
   }, [active, open])
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 mb-10">
       <button onClick={() => setOpen(!open)} aria-expanded={open}
         className="flex items-center gap-1.5 w-full text-xs font-semibold
           uppercase tracking-wide text-muted mb-2 hover:text-ink">
@@ -91,7 +91,14 @@ function Advanced({ filters, children }: {
           mt-2 because the first child's heading sat directly against this
           one. */}
       {open && (
-        <div className="mt-2 pl-3 border-l border-line/60">{children}</div>
+        // The child sections keep their own compact pb-3/mb-3 rhythm in the
+        // primary list; inside this group they read cramped against the
+        // rule, so the child selector loosens them to pb-4/mb-4 here only,
+        // and pb-2 keeps the last heading off the group's bottom edge.
+        <div className="mt-2 pl-3 pb-2 border-l border-line/60
+          [&>div]:pb-4 [&>div]:mb-4">
+          {children}
+        </div>
       )}
     </div>
   )
