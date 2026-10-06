@@ -72,6 +72,11 @@ export function buildChips(
     id: 'gtr', label: `Region: ${f.gives_to_region.join(', ')}`,
     onRemove: () => set({ gives_to_region: [] }),
   })
+  if (f.grantee_word.trim()) chips.push({
+    id: 'gword',
+    label: `Funded orgs named “${f.grantee_word.trim()}”`,
+    onRemove: () => set({ grantee_word: '' }),
+  })
   if (f.ntee.length) chips.push({
     id: 'ntee',
     label: `Funds NTEE: ${f.ntee.join(', ')}`,

@@ -753,6 +753,9 @@ export type V5Filters = {
   active_year: string // '' | '2023' | '2024'
   search: string
   recipient_search: string
+  /** Whole-WORD grantee-name match ('camp' excludes Campus Crusade).
+   *  The generalised form of Emily's camp request. */
+  grantee_word: string
   state: string[]
   gives_to_state: string[]
   gives_to_region: string[]
@@ -806,6 +809,7 @@ export const defaultV5Filters: V5Filters = {
   active_year: '',
   search: '',
   recipient_search: '',
+  grantee_word: '',
   state: [],
   gives_to_state: [],
   gives_to_region: [],
@@ -880,6 +884,7 @@ export function v5FilterParams(f: V5Filters): URLSearchParams {
   if (f.active_year) p.set('active_year', f.active_year)
   if (f.search.trim()) p.set('search', f.search.trim())
   if (f.recipient_search.trim()) p.set('recipient_search', f.recipient_search.trim())
+  if (f.grantee_word.trim()) p.set('grantee_word', f.grantee_word.trim())
   if (f.daf !== 'include') p.set('daf', f.daf)
   if (f.sort !== defaultV5Filters.sort) p.set('sort', f.sort)
   if (f.order !== defaultV5Filters.order) p.set('order', f.order)
@@ -900,6 +905,7 @@ export function v5FiltersFromParams(sp: URLSearchParams): V5Filters {
   f.active_year = sp.get('active_year') || ''
   f.search = sp.get('search') || ''
   f.recipient_search = sp.get('recipient_search') || ''
+  f.grantee_word = sp.get('grantee_word') || ''
   const daf = sp.get('daf')
   if (daf === 'exclude' || daf === 'only') f.daf = daf
   f.sort = sp.get('sort') || defaultV5Filters.sort

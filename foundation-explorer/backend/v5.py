@@ -7,6 +7,7 @@ floors; identity/classification status is first-class and never hidden.
 
 from __future__ import annotations
 
+import functools
 import re
 import sqlite3
 from functools import lru_cache
@@ -159,6 +160,7 @@ def foundations(
     # rather than the name.
     search: str | None = None,
     recipient_search: str | None = None,
+    grantee_word: str | None = None,
     state: str | None = None,
     gives_to_state: str | None = None,
     # Geography above and below the state. A region expands to its states, so
@@ -390,11 +392,24 @@ def foundations(
             SELECT 1 FROM frs JOIN recipients r ON r.entity_id=frs.entity_id
             WHERE frs.ein=f.ein AND r.name LIKE ?)""")
         params.append(f"%{recipient_search}%")
+    grantee_word_ids: tuple[str, ...] | None = None
+    if grantee_word:
+        # Whole-WORD grantee-name match — Emily's camp request generalised
+        # into a filter, so the next "orgs with X in their name" ask is
+        # self-serve. Distinct from recipient_search above, which is a
+        # substring and would count Campus Crusade as a camp. SQLite cannot
+        # word-boundary natively, so the matching entity set is computed
+        # once per term (LRU-cached) and joined via a temp table.
+        grantee_word_ids = _grantee_word_ids(grantee_word)
     # The rigor dial recomputes the headline number rather than only filtering
     # rows: on the authoritative tier the percentage is the authoritative-only
     # ratio, so "90% Christian" always means "of the evidence you asked for".
     pct_column = ("pct_christian_auth" if tier == "authoritative"
                   else "pct_christian")
+    if grantee_word_ids is not None:
+        where.append(
+            "EXISTS (SELECT 1 FROM frs JOIN temp.gw_ids gw "
+            "ON gw.entity_id = frs.entity_id WHERE frs.ein = f.ein)")
     # Denominator stays the full classified base on both tiers -- only the
     # numerator tightens -- so the dial cannot inflate a foundation.
     order_column = SORTS.get(sort, "paid_2324")
@@ -444,6 +459,11 @@ def foundations(
             params += codes
     sql_where = " AND ".join(where)
     with connect() as conn:
+        if grantee_word_ids is not None:
+            conn.execute(
+                "CREATE TEMP TABLE gw_ids (entity_id TEXT PRIMARY KEY)")
+            conn.executemany("INSERT INTO temp.gw_ids VALUES (?)",
+                             [(i,) for i in grantee_word_ids])
         total = conn.execute(
             f"SELECT COUNT(*) FROM foundations f WHERE {sql_where}", params
         ).fetchone()[0]
@@ -496,6 +516,27 @@ def _sector_breakdown(conn, ein: str) -> list[dict]:
         out.append({**row,
                     "confidence": {k: v for k, v in confidence.items() if v}})
     return out
+
+
+@functools.lru_cache(maxsize=64)
+def _grantee_word_ids(term: str) -> tuple[str, ...]:
+    """Recipients whose name contains `term` as a whole word.
+
+    The LIKE is only a prefilter; the boundary check happens here, which is
+    what keeps Campus Crusade out of a "camp" cohort. Cached per term: the
+    scan over 1.3M names costs ~0.5s once, then every page/sort/filter
+    change over the cohort is temp-table speed.
+    """
+    clean = term.strip().lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9 \-']{1,29}", clean):
+        raise HTTPException(400, "grantee_word: 2-30 letters/digits only")
+    word = re.compile(rf"\b{re.escape(clean)}s?\b", re.IGNORECASE)
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT entity_id, COALESCE(display_name, name) AS name "
+            "FROM recipients WHERE name LIKE ? AND total_received > 0",
+            (f"%{clean}%",)).fetchall()
+    return tuple(r["entity_id"] for r in rows if word.search(r["name"]))
 
 
 @router.get("/foundations/{ein}")
@@ -1363,7 +1404,7 @@ def camp_funders():
             SELECT a.ein, f.name, f.city, f.state, f.application_status,
                    f.website, a.dollars, a.camp_count, a.examples
             FROM agg a JOIN foundations f ON f.ein = a.ein
-            ORDER BY a.dollars DESC LIMIT 1000""").fetchall()
+            ORDER BY a.dollars DESC""").fetchall()
         total_funders = conn.execute(
             "SELECT COUNT(DISTINCT ein) FROM frs "
             "JOIN temp.camp_ids ci ON ci.entity_id = frs.entity_id"

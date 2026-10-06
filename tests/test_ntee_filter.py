@@ -205,3 +205,40 @@ def test_camp_funders_rows_are_verifiable(api):
                            if word.search(r["name"]))
         assert camp_dollars == f["dollars"], f["name"]
     conn.close()
+
+
+def test_grantee_word_filter_matches_the_custom_endpoint(api):
+    """grantee_word=camp on the Foundations page IS the camp-funders list —
+    the browse-all button promises the same 5,770, so the two must never
+    drift."""
+    custom = api.get("/api/v5/custom/camp-funders").json()["total_funders"]
+    filtered = api.get(
+        "/api/v5/foundations?grantee_word=camp&limit=1").json()["total"]
+    assert filtered == custom
+
+
+def test_grantee_word_is_narrower_than_the_substring(api):
+    """The whole point: word-boundary excludes Campus Crusade et al., so it
+    must be strictly smaller than recipient_search's contains-match."""
+    word = api.get(
+        "/api/v5/foundations?grantee_word=camp&limit=1").json()["total"]
+    substring = api.get(
+        "/api/v5/foundations?recipient_search=camp&limit=1").json()["total"]
+    assert 0 < word < substring
+
+
+def test_grantee_word_composes_with_everything(api):
+    base = api.get(
+        "/api/v5/foundations?grantee_word=camp&limit=1").json()["total"]
+    for extra in ("application_status=Accepting Applications",
+                  "gives_to_state=SC", "ntee=O"):
+        narrowed = api.get(
+            f"/api/v5/foundations?grantee_word=camp&{extra}&limit=1"
+        ).json()["total"]
+        assert 0 < narrowed < base, extra
+
+
+def test_grantee_word_rejects_garbage(api):
+    for bad in (";drop", "a", "x" * 31, "%"):
+        r = api.get(f"/api/v5/foundations?grantee_word={bad}&limit=1")
+        assert r.status_code == 400, f"{bad!r} -> {r.status_code}"

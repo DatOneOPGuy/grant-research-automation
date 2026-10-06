@@ -125,13 +125,24 @@ function CampFundersRequest({ onOpen }: { onOpen: (ein: string) => void }) {
                   excluded, not counted.
                 </span>
               </p>
-              <button onClick={exportCsv}
-                className="flex shrink-0 items-center gap-1.5 rounded-md
-                  border border-line px-3 py-1.5 text-sm text-muted
-                  hover:bg-canvas hover:text-ink">
-                <Download size={14} />
-                Export CSV (top {num(data.funders.length)})
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {/* The real "filter through them": the full cohort on the
+                    Foundations page, where every filter and the notes
+                    column apply. Plain <a>: filters load from the URL on
+                    mount. */}
+                <a href="/foundations?grantee_word=camp"
+                  className="rounded-md bg-primary px-3 py-1.5 text-sm
+                    font-medium text-white hover:bg-primary/90">
+                  Browse &amp; filter all {num(data.total_funders)} →
+                </a>
+                <button onClick={exportCsv}
+                  className="flex items-center gap-1.5 rounded-md border
+                    border-line px-3 py-1.5 text-sm text-muted
+                    hover:bg-canvas hover:text-ink">
+                  <Download size={14} />
+                  CSV (all {num(data.funders.length)})
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 overflow-x-auto">

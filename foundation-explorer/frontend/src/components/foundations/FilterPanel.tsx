@@ -41,7 +41,7 @@ function Section({ title, children, defaultOpen = true }: {
 // once you already have a shortlist.
 const ADVANCED_KEYS: (keyof V5Filters)[] = [
   'min_paid', 'max_paid', 'min_median', 'max_median', 'min_grants',
-  'active_year', 'recipient_search',
+  'active_year', 'recipient_search', 'grantee_word',
   'min_assets', 'max_assets', 'min_revenue', 'exclude_testamentary',
   'exclude_micro', 'include_inactive', 'daf', 'min_christian',
   'min_pct_christian', 'deadline_season', 'deadline_months', 'deadline_kind',
@@ -788,6 +788,16 @@ export default function FilterPanel({ filters, onChange }: Props) {
           className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
           value={filters.recipient_search}
           onChange={(e) => set({ recipient_search: e.target.value })} />
+        <div className="text-xs text-muted mb-1 mt-2">
+          Gave to orgs with the word… 
+          <span title="Whole-word match: 'camp' finds Camp Longridge's peers
+            but not Campus Crusade or capital campaigns. The box above is a
+            plain contains-match.">ⓘ</span>
+        </div>
+        <input placeholder="e.g. camp"
+          className="w-full border border-line rounded px-2 py-1 text-sm bg-surface"
+          value={filters.grantee_word}
+          onChange={(e) => set({ grantee_word: e.target.value })} />
       </Section>
       <Section title="Foundation" defaultOpen={false}>
         <Range label="Total assets"
