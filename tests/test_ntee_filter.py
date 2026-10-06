@@ -167,13 +167,24 @@ def test_causes_unknown_foundation_is_404(api):
 def test_camp_funders_excludes_the_near_misses(api):
     """The reason this endpoint exists instead of a LIKE: 'camp' as a
     substring hands back Campus Crusade, campaigns and the Campbell
-    foundations. Word-boundary matching must keep them out."""
+    foundations.
+
+    The correct property is per-name, not per-substring: every example must
+    itself contain the WORD camp/camps. A first draft of this test banned
+    the substring CAMPAIGN outright and promptly failed on "CAMP RAMAH
+    CAPITAL CAMPAIGN" -- a camp's capital campaign, which belongs on the
+    list. Campus Crusade still cannot pass, because 'campus' never matches
+    the word boundary."""
+    import re as _re
+    word = _re.compile(r"\bcamps?\b", _re.IGNORECASE)
     d = api.get("/api/v5/custom/camp-funders").json()
     assert d["camp_orgs"] > 3000
     assert d["total_funders"] > 5000
-    joined = " ".join((f["examples"] or "") for f in d["funders"]).upper()
-    for leak in ("CAMPUS", "CAMPAIGN"):
-        assert leak not in joined, f"{leak} leaked into the camp examples"
+    for f in d["funders"]:
+        for example in (f["examples"] or "").split(" \u00b7 "):
+            if example.strip():
+                assert word.search(example), (
+                    f"non-camp name in {f['name']}'s examples: {example!r}")
 
 
 def test_camp_funders_rows_are_verifiable(api):
