@@ -160,3 +160,37 @@ def test_causes_recipient_rows_are_capped_but_counted(api):
 
 def test_causes_unknown_foundation_is_404(api):
     assert api.get("/api/v5/foundations/000000000/causes").status_code == 404
+
+
+# --- Emily's custom requests --------------------------------------------------
+
+def test_camp_funders_excludes_the_near_misses(api):
+    """The reason this endpoint exists instead of a LIKE: 'camp' as a
+    substring hands back Campus Crusade, campaigns and the Campbell
+    foundations. Word-boundary matching must keep them out."""
+    d = api.get("/api/v5/custom/camp-funders").json()
+    assert d["camp_orgs"] > 3000
+    assert d["total_funders"] > 5000
+    joined = " ".join((f["examples"] or "") for f in d["funders"]).upper()
+    for leak in ("CAMPUS", "CAMPAIGN"):
+        assert leak not in joined, f"{leak} leaked into the camp examples"
+
+
+def test_camp_funders_rows_are_verifiable(api):
+    """Each returned funder's camp dollars must reconcile against frs for
+    at least the top rows — the list is a deliverable Emily hands a client,
+    so it gets the same evidence bar as the product."""
+    import re as _re
+    word = _re.compile(r"\bcamps?\b", _re.IGNORECASE)
+    d = api.get("/api/v5/custom/camp-funders").json()
+    conn = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    for f in d["funders"][:5]:
+        rows = conn.execute("""
+            SELECT COALESCE(r.display_name, r.name) AS name, frs.dollars
+            FROM frs JOIN recipients r ON r.entity_id = frs.entity_id
+            WHERE frs.ein = ?""", (f["ein"],)).fetchall()
+        camp_dollars = sum(r["dollars"] for r in rows
+                           if word.search(r["name"]))
+        assert camp_dollars == f["dollars"], f["name"]
+    conn.close()

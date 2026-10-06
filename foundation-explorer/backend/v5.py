@@ -7,6 +7,7 @@ floors; identity/classification status is first-class and never hidden.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from functools import lru_cache
 from pathlib import Path
@@ -1311,6 +1312,72 @@ def counties(state: str | None = None, q: str | None = None,
             item["matched_city"] = city
         out.append(item)
     return {"rows": out}
+
+
+@router.get("/custom/camp-funders")
+@cached_aggregate
+def camp_funders():
+    """Emily's custom request (2026-10-06, for Camp Longridge): every funder
+    that has given to an organization with "camp" in its name.
+
+    Word-boundary matching, not substring -- a bare LIKE '%CAMP%' hands back
+    Campus Crusade, every CAMPAIGN, and the Campbell family foundations'
+    grantees. The SQL LIKE is only a prefilter; the boundary check happens
+    in Python and the false positives never reach the rollup.
+    """
+    word = re.compile(r"\bcamps?\b", re.IGNORECASE)
+    with connect() as conn:
+        candidates = conn.execute("""
+            SELECT entity_id, COALESCE(display_name, name) AS name,
+                   total_received
+            FROM recipients
+            WHERE UPPER(name) LIKE '%CAMP%' AND total_received > 0
+        """).fetchall()
+        camp_ids = [(r["entity_id"],) for r in candidates
+                    if word.search(r["name"])]
+        camp_dollars = sum(r["total_received"] for r in candidates
+                           if word.search(r["name"]))
+
+        # Temp table instead of IN (...): 3,984 ids is four times SQLite's
+        # bound-parameter ceiling.
+        conn.execute("DROP TABLE IF EXISTS temp.camp_ids")
+        conn.execute("CREATE TEMP TABLE camp_ids (entity_id TEXT PRIMARY KEY)")
+        conn.executemany("INSERT INTO temp.camp_ids VALUES (?)", camp_ids)
+
+        funders = conn.execute("""
+            WITH ranked AS (
+              SELECT frs.ein, COALESCE(r.display_name, r.name) AS camp,
+                     frs.dollars,
+                     ROW_NUMBER() OVER (PARTITION BY frs.ein
+                                        ORDER BY frs.dollars DESC) AS rn
+              FROM frs
+              JOIN temp.camp_ids ci ON ci.entity_id = frs.entity_id
+              JOIN recipients r ON r.entity_id = frs.entity_id
+            ),
+            agg AS (
+              SELECT ein, SUM(dollars) AS dollars, COUNT(*) AS camp_count,
+                     GROUP_CONCAT(CASE WHEN rn <= 3 THEN camp END,
+                                  ' · ') AS examples
+              FROM ranked GROUP BY ein
+            )
+            SELECT a.ein, f.name, f.city, f.state, f.application_status,
+                   f.website, a.dollars, a.camp_count, a.examples
+            FROM agg a JOIN foundations f ON f.ein = a.ein
+            ORDER BY a.dollars DESC LIMIT 1000""").fetchall()
+        total_funders = conn.execute(
+            "SELECT COUNT(DISTINCT ein) FROM frs "
+            "JOIN temp.camp_ids ci ON ci.entity_id = frs.entity_id"
+        ).fetchone()[0]
+        conn.execute("DROP TABLE IF EXISTS temp.camp_ids")
+
+    return {
+        "asked": "Funders who have given to an organization with 'camp' "
+                 "in their name",
+        "camp_orgs": len(camp_ids),
+        "camp_dollars": camp_dollars,
+        "total_funders": total_funders,
+        "funders": [dict(r) for r in funders],
+    }
 
 
 @router.get("/ntee-majors")

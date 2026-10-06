@@ -4,6 +4,7 @@ import {
   BarChart3, Bookmark, Building2, DollarSign, Home, PanelLeftClose,
   HelpCircle, Landmark, PanelLeftOpen, PieChart, ShieldCheck, Target,
   Users, BadgeInfo, Globe, ExternalLink, FlaskConical, Sparkles,
+  MessageSquareQuote,
   MessageCircleQuestion, LayoutGrid, TableProperties, DoorOpen,
   ReceiptText, Compass, ListCollapse, Scale,
 } from 'lucide-react'
@@ -17,6 +18,7 @@ const NAV = [
   { to: '/best-prospects', label: 'Best Prospects', icon: Target },
   { to: '/foundations', label: 'Foundations', icon: Building2 },
   { to: '/saved', label: 'Saved', icon: Bookmark, badge: true },
+  { to: '/requests', label: "Emily's Requests", icon: MessageSquareQuote },
   { to: '/grants', label: 'Grants', icon: DollarSign },
   { to: '/recipients', label: 'Recipients', icon: Users },
   { to: '/nonprofits', label: 'Nonprofits', icon: Landmark },
