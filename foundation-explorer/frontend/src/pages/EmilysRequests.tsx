@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Download, MessageSquareQuote } from 'lucide-react'
 import DetailPanel from '../components/foundations/DetailPanel'
+import NoteCell, { useNotes } from '../components/foundations/NoteCell'
 import { StatusPill } from '../components/ui/primitives'
 import { money, num, titleCase } from '../lib/format'
 
@@ -63,18 +64,21 @@ function CampFundersRequest({ onOpen }: { onOpen: (ein: string) => void }) {
     staleTime: 10 * 60_000,
   })
   const [shown, setShown] = useState(50)
+  // Emily's team notes each funder as they review it — the notes column
+  // here is their review checklist, shared app-wide via the same cache.
+  const notes = useNotes()
 
   const exportCsv = () => {
     if (!data) return
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
     const lines = [
       ['Foundation', 'City', 'State', 'Applications', 'Website',
-        '$ to camp orgs', '# camp orgs', 'Example camps', 'EIN']
+        '$ to camp orgs', '# camp orgs', 'Example camps', 'Our notes', 'EIN']
         .map(esc).join(','),
       ...data.funders.map((f) => [
         titleCase(f.name), f.city ? titleCase(f.city) : '', f.state ?? '',
         f.application_status ?? '', f.website ?? '', f.dollars,
-        f.camp_count, f.examples ?? '', f.ein,
+        f.camp_count, f.examples ?? '', notes.get(f.ein)?.note ?? '', f.ein,
       ].map(esc).join(',')),
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
@@ -157,6 +161,7 @@ function CampFundersRequest({ onOpen }: { onOpen: (ein: string) => void }) {
                     </th>
                     <th className="px-3 text-right font-medium"># camps</th>
                     <th className="px-3 font-medium">Applications</th>
+                    <th className="px-3 font-medium">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,6 +195,7 @@ function CampFundersRequest({ onOpen }: { onOpen: (ein: string) => void }) {
                       <td className="px-3 py-2">
                         <StatusPill status={f.application_status} />
                       </td>
+                      <NoteCell ein={f.ein} note={notes.get(f.ein)} />
                     </tr>
                   ))}
                 </tbody>
